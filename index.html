@@ -13,9 +13,9 @@
   <meta name="robots" content="noindex,nofollow" />
   <title>Blood QC</title>
   <link rel="icon" href="assets/platelet.svg" />
-  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=5.0.2" />
-  <link rel="manifest" href="manifest.webmanifest?v=5.0.2" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=5.0.3" />
+  <link rel="manifest" href="manifest.webmanifest?v=5.0.3" />
+  <link rel="stylesheet" href="styles.css?v=5.0.3" />
 </head>
 <body>
   <div id="toast" class="toast" aria-live="polite"></div>
@@ -38,6 +38,18 @@
         <li>อัปโหลดไฟล์ขึ้น GitHub Pages</li>
       </ol>
       <p class="muted small">ดูคู่มือละเอียดที่ <code>INSTALL_STEP_BY_STEP_TH.md</code></p>
+    </div>
+  </section>
+
+  <section id="resumeScreen" class="center-screen hidden">
+    <div class="auth-card">
+      <img src="assets/platelet.svg" class="app-logo" alt="" />
+      <h1>Blood QC</h1>
+      <p id="resumeMessage" class="muted">กำลังตรวจสอบการเข้าสู่ระบบ...</p>
+      <div id="resumeActions" class="stack hidden">
+        <button class="btn primary" type="button" id="retrySessionBtn">ลองเชื่อมต่ออีกครั้ง</button>
+        <button class="btn ghost" type="button" id="resumeLogoutBtn">ออกจากระบบ</button>
+      </div>
     </div>
   </section>
 
@@ -147,7 +159,7 @@
           <section id="view-users" class="view hidden"></section>
           <section id="view-audit" class="view hidden"></section>
         </main>
-        <footer id="appFooter" class="footer">CNMI Blood Component QC · v5.0.2 · bloodqc.cnmiblood.com</footer>
+        <footer id="appFooter" class="footer">CNMI Blood Component QC · v5.0.3 · bloodqc.cnmiblood.com</footer>
       </div>
     </div>
   </div>
@@ -214,7 +226,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
-  <script src="pwa.js"></script>
-  <script src="app.js"></script>
+  <script src="pwa.js?v=5.0.3"></script>
+  <script src="app.js?v=5.0.3"></script>
 </body>
 </html>

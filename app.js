@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.0.2 - concise multi-module shell / Platelet active */
+/* CNMI Blood Component QC v5.0.3 - concise multi-module shell / Platelet active */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -20,7 +20,7 @@
     return `<span class="badge ${cls}">${esc(poolReleaseTH(s))}</span>`;
   };
   const measuredTH = iso => iso ? dateTH(iso) : 'ยังไม่บันทึก';
-  const state = { sb:null, session:null, user:null, profile:null, settings:null, productSettings:[], records:[], profiles:[], currentRecordId:null, currentEvidence:[], currentPool:[], lastLoginPassword:null, uiMode:'staff', auditUserFilter:'', resetTargetId:null, showDeletedRecords:false, currentView:'home', currentModule:null, currentPage:null };
+  const state = { sb:null, session:null, user:null, profile:null, settings:null, productSettings:[], records:[], profiles:[], currentRecordId:null, currentEvidence:[], currentPool:[], lastLoginPassword:null, uiMode:'staff', auditUserFilter:'', resetTargetId:null, showDeletedRecords:false, currentView:'home', currentModule:null, currentPage:null, sessionRetryTimer:null };
   const productSetting = type => state.productSettings.find(x=>x.product_type===type);
   const activeProducts = () => state.productSettings.filter(x=>x.is_active).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||a.product_type.localeCompare(b.product_type));
   const productOptions = selected => activeProducts().map(x=>`<option value="${esc(x.product_type)}" ${selected===x.product_type?'selected':''}>${esc(x.product_type)}</option>`).join('');
@@ -32,6 +32,17 @@
     users:'#/admin/users',
     audit:'#/admin/audit'
   };
+  function isStandaloneApp(){
+    return window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+  }
+  function normalizeStandaloneLaunch(){
+    // iOS Add to Home Screen can remember the exact page used during installation.
+    // When the app is launched/reloaded as a standalone app, always begin at the Blood QC home.
+    if(isStandaloneApp() && cleanHash()!==ROUTES.home){
+      history.replaceState(null,'',location.pathname+location.search+ROUTES.home);
+    }
+  }
+
   const MODULE_META = {
     platelet:{label:'Platelet',title:'Platelet Preparation & QC',active:true},
     rbc:{label:'RBC',title:'RBC Preparation & QC',active:false},
@@ -70,10 +81,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.0.2 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.0.3 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.0.2 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.0.3 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -92,7 +103,7 @@
   function cfgReady(){ return C.SUPABASE_URL && C.SUPABASE_KEY && !C.SUPABASE_URL.includes('PASTE_') && !C.SUPABASE_KEY.includes('PASTE_'); }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'5.0.2',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.0.3',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -156,38 +167,77 @@
     applyUiMode(true); logActivity('ui_mode_change','session',null,{mode:state.uiMode}).catch(()=>{}); showToast(state.uiMode==='admin'?'เปิดโหมดผู้ดูแลระบบแล้ว':'กลับสู่โหมดผู้ใช้งานทั่วไปแล้ว','good');
   }
 
-  async function init(){
-    if(!cfgReady() || !window.supabase){ $('#setupScreen').classList.remove('hidden'); return; }
-    state.sb=window.supabase.createClient(C.SUPABASE_URL,C.SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-    state.sb.auth.onAuthStateChange((event,session)=>{
-      setTimeout(async()=>{
-        try{
-          if(event==='PASSWORD_RECOVERY' && session){
-            state.session=session; state.user=session.user;
-            await showForcedPassword(true);
-            return;
-          }
-          if(session && !state.session) await enterApp(session);
-          if(!session){state.session=null;state.user=null;state.profile=null;showLogin();}
-        }catch(e){console.error(e);showToast(errText(e),'error');}
-      },0);
-    });
-    const {data:{session}}=await state.sb.auth.getSession();
-    if(session) await enterApp(session); else showLogin();
+  let enterAppPromise=null;
+  function clearSessionRetry(){
+    if(state.sessionRetryTimer){ clearTimeout(state.sessionRetryTimer); state.sessionRetryTimer=null; }
   }
-
   function hideAuthScreens(){
     $('#setupScreen').classList.add('hidden');
+    $('#resumeScreen')?.classList.add('hidden');
     $('#loginScreen').classList.add('hidden');
     $('#forcePasswordScreen').classList.add('hidden');
     $('#appShell').classList.add('hidden');
   }
-
+  function showResume(message='กำลังตรวจสอบการเข้าสู่ระบบ...',allowActions=false){
+    hideAuthScreens();
+    $('#resumeScreen')?.classList.remove('hidden');
+    if($('#resumeMessage')) $('#resumeMessage').textContent=message;
+    $('#resumeActions')?.classList.toggle('hidden',!allowActions);
+  }
   function showLogin(){
+    clearSessionRetry();
     hideAuthScreens();
     $('#loginScreen').classList.remove('hidden');
     $('#loginPassword').value='';
     $('#loginMessage').textContent='';
+  }
+  function scheduleSessionRetry(delay=4000){
+    clearSessionRetry();
+    state.sessionRetryTimer=setTimeout(()=>restoreCurrentSession(true),delay);
+  }
+  async function restoreCurrentSession(fromRetry=false){
+    if(!state.sb) return;
+    showResume(fromRetry?'กำลังเชื่อมต่อใหม่ โดยยังคงสถานะการเข้าสู่ระบบไว้...':'กำลังเปิด Blood QC...');
+    try{
+      const {data,error}=await state.sb.auth.getSession();
+      if(error) throw error;
+      const session=data?.session||null;
+      if(session){
+        state.session=session; state.user=session.user;
+        await enterApp(session);
+      }else{
+        state.session=null; state.user=null; state.profile=null;
+        showLogin();
+      }
+    }catch(e){
+      console.warn('session restore failed',e);
+      showResume('ยังเชื่อมต่อระบบไม่ได้ แต่ระบบยังเก็บการเข้าสู่ระบบไว้ จะลองใหม่อัตโนมัติ',true);
+      scheduleSessionRetry();
+    }
+  }
+  async function init(){
+    normalizeStandaloneLaunch();
+    if(!cfgReady() || !window.supabase){ $('#setupScreen').classList.remove('hidden'); return; }
+    showResume('กำลังตรวจสอบการเข้าสู่ระบบ...');
+    state.sb=window.supabase.createClient(C.SUPABASE_URL,C.SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage}});
+    state.sb.auth.onAuthStateChange((event,session)=>{
+      setTimeout(async()=>{
+        try{
+          if(event==='PASSWORD_RECOVERY' && session){
+            clearSessionRetry(); state.session=session; state.user=session.user;
+            await showForcedPassword(true);
+            return;
+          }
+          if(event==='SIGNED_OUT' || !session){
+            clearSessionRetry(); state.session=null;state.user=null;state.profile=null;showLogin(); return;
+          }
+          state.session=session; state.user=session.user;
+          if(event==='TOKEN_REFRESHED') return;
+          if(!state.profile) await enterApp(session);
+        }catch(e){console.error(e);showToast(errText(e),'error');}
+      },0);
+    });
+    await restoreCurrentSession(false);
   }
 
   async function loadOwnProfile(){
@@ -197,32 +247,29 @@
   }
 
   async function enterApp(session){
-    state.session=session; state.user=session.user;
-    if(!state.user.email?.toLowerCase().endsWith('@mahidol.ac.th')){ await state.sb.auth.signOut(); showToast('บัญชีนี้ไม่ใช่ @mahidol.ac.th','error'); return; }
-    let p;
-    try{ p=await loadOwnProfile(); }catch(e){ await state.sb.auth.signOut(); showToast('อ่านสิทธิ์ผู้ใช้ไม่ได้: '+errText(e),'error'); return; }
-    if(!p){ await state.sb.auth.signOut(); showToast('บัญชียังไม่ได้รับสิทธิ์ในระบบ หรือยังไม่มี Profile','error'); return; }
-    if(!p.is_active){ await state.sb.auth.signOut(); showToast('บัญชีนี้ถูกปิดการใช้งาน','error'); return; }
-    state.profile=p;
-    if(p.must_change_password){ await showForcedPassword(false); return; }
-    await openAppShell();
-  }
-
-  async function openAppShell(){
-    hideAuthScreens();
-    $('#appShell').classList.remove('hidden');
-    const p=state.profile;
-    state.uiMode=p.role==='admin' ? ((localStorage.getItem('bloodqc_ui_mode')||localStorage.getItem('platelet_ui_mode'))==='admin'?'admin':'staff') : p.role;
-    await loadSettings(); await loadProductSettings(); await loadProfiles(); await loadRecords();
-    applyUiMode(false);
-    const loginKey=`bloodqc_login_${state.user.id}_${String(state.session?.access_token||'').slice(-16)}`;
-    if(!sessionStorage.getItem(loginKey)){
-      await logActivity('login','session',null,{platform:navigator.platform||'',standalone:window.matchMedia?.('(display-mode: standalone)')?.matches||false});
-      sessionStorage.setItem(loginKey,'1');
-      await loadProfiles();
-    }
-    const route=normalizeAppRoute();
-    switchView(route.view,true,route);
+    if(enterAppPromise) return enterAppPromise;
+    enterAppPromise=(async()=>{
+      clearSessionRetry();
+      state.session=session; state.user=session.user;
+      if(!state.user.email?.toLowerCase().endsWith('@mahidol.ac.th')){ await state.sb.auth.signOut(); showToast('บัญชีนี้ไม่ใช่ @mahidol.ac.th','error'); return; }
+      let p;
+      try{
+        p=await loadOwnProfile();
+      }catch(e){
+        // A temporary network/Supabase error must not erase a valid saved session.
+        console.warn('profile restore failed; keeping session',e);
+        state.profile=null;
+        showResume('เชื่อมต่อข้อมูลผู้ใช้งานไม่สำเร็จ แต่ยังคงสถานะการเข้าสู่ระบบไว้ จะลองใหม่อัตโนมัติ',true);
+        scheduleSessionRetry();
+        return;
+      }
+      if(!p){ await state.sb.auth.signOut(); showToast('บัญชียังไม่ได้รับสิทธิ์ในระบบ หรือยังไม่มี Profile','error'); return; }
+      if(!p.is_active){ await state.sb.auth.signOut(); showToast('บัญชีนี้ถูกปิดการใช้งาน','error'); return; }
+      state.profile=p;
+      if(p.must_change_password){ await showForcedPassword(false); return; }
+      await openAppShell();
+    })();
+    try{return await enterAppPromise;} finally{enterAppPromise=null;}
   }
 
   async function showForcedPassword(recoveryMode=false){
@@ -286,6 +333,9 @@
   });
 
   async function logoutWithAudit(){ try{await logActivity('logout','session');}catch(_e){} await state.sb.auth.signOut(); }
+  $('#retrySessionBtn')?.addEventListener('click',()=>restoreCurrentSession(true));
+  $('#resumeLogoutBtn')?.addEventListener('click',async()=>{ clearSessionRetry(); await state.sb?.auth.signOut(); });
+  window.addEventListener('online',()=>{ if(state.session && !state.profile) restoreCurrentSession(true); });
   $('#forceLogoutBtn').addEventListener('click',()=>state.sb.auth.signOut());
   $('#logoutBtn').addEventListener('click',logoutWithAudit);
   $('#closeDetailBtn').addEventListener('click',()=>$('#detailDialog').close());

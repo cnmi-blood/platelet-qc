@@ -45,6 +45,12 @@
   async function installApp() {
     if (isStandalone()) return;
     if (isIOS) {
+      // Safari Add to Home Screen remembers the exact page being viewed.
+      // Move to the Blood QC home first so the created icon opens the system home, not Platelet.
+      if ((location.hash || '#/') !== '#/') {
+        location.hash = '#/';
+        await new Promise(resolve => setTimeout(resolve, 120));
+      }
       showGuide('ios');
       return;
     }
