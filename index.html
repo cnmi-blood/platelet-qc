@@ -53,7 +53,7 @@
         <label for="loginPassword">รหัสผ่าน</label>
         <input id="loginPassword" type="password" autocomplete="current-password" minlength="8" placeholder="อย่างน้อย 8 ตัวอักษร" required />
         <button class="btn primary" type="submit">เข้าสู่ระบบ</button>
-        <button class="btn ghost" type="button" id="forgotPasswordBtn">ลืมรหัสผ่าน</button>
+        <button class="btn ghost" type="button" id="forgotPasswordBtn">ลืมรหัสผ่าน / ติดต่อ Admin</button>
       </form>
       <p id="loginMessage" class="muted small"></p>
       <div class="notice info small"><strong>ครั้งแรก:</strong> ใช้รหัสผ่านตั้งต้นที่ Admin ให้ แล้วระบบจะบังคับให้เปลี่ยนรหัสผ่านใหม่ก่อนเข้าใช้งาน</div>
@@ -95,6 +95,7 @@
           <button data-view="record">บันทึกใหม่</button>
           <button data-view="records">รายการทั้งหมด</button>
           <button data-view="settings" id="settingsTab" class="hidden">ตั้งค่า Admin</button>
+          <button data-view="audit" id="auditTab" class="hidden">Audit Log</button>
         </nav>
 
         <div class="sidebar-spacer"></div>
@@ -128,8 +129,9 @@
           <section id="view-record" class="view hidden"></section>
           <section id="view-records" class="view hidden"></section>
           <section id="view-settings" class="view hidden"></section>
+          <section id="view-audit" class="view hidden"></section>
         </main>
-        <footer class="footer">Platelet QC v4.4.0 · ติดตั้งบน Android ได้ · iPhone มีคำแนะนำเพิ่มไปยังหน้าจอโฮม</footer>
+        <footer class="footer">Platelet QC v4.5.0 · ติดตั้งบน Android ได้ · iPhone มีคำแนะนำเพิ่มไปยังหน้าจอโฮม</footer>
       </div>
     </div>
   </div>
@@ -153,6 +155,20 @@
       <div class="field"><label for="confirmPassword">ยืนยันรหัสผ่านใหม่</label><input id="confirmPassword" type="password" autocomplete="new-password" minlength="8" required></div>
       <p id="passwordDialogMessage" class="muted small"></p>
       <div class="actions"><button class="btn" type="button" id="cancelPasswordBtn">ยกเลิก</button><button class="btn primary" type="submit">เปลี่ยนรหัสผ่าน</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="adminResetPasswordDialog" class="dialog password-dialog">
+    <div class="dialog-head">
+      <div><h2>Reset Password</h2><p id="adminResetTarget" class="muted">-</p></div>
+      <button class="icon-btn" id="closeAdminResetPasswordBtn" aria-label="ปิด">×</button>
+    </div>
+    <form id="adminResetPasswordForm" class="password-dialog-body">
+      <div class="notice info small">Admin กำหนดรหัสผ่านชั่วคราวใหม่ แล้วผู้ใช้จะถูกบังคับให้เปลี่ยนรหัสผ่านเองเมื่อเข้าสู่ระบบครั้งถัดไป</div>
+      <div class="field"><label for="adminTempPassword">รหัสผ่านชั่วคราวใหม่</label><input id="adminTempPassword" type="password" minlength="8" autocomplete="new-password" placeholder="อย่างน้อย 8 ตัวอักษร" required></div>
+      <div class="field"><label for="adminTempPasswordConfirm">ยืนยันรหัสผ่าน</label><input id="adminTempPasswordConfirm" type="password" minlength="8" autocomplete="new-password" required></div>
+      <p id="adminResetPasswordMessage" class="muted small"></p>
+      <div class="actions"><button class="btn" type="button" id="cancelAdminResetPasswordBtn">ยกเลิก</button><button class="btn primary" type="submit">Reset password</button></div>
     </form>
   </dialog>
 
