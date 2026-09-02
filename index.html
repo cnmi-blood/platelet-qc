@@ -7,6 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Platelet QC" />
   <meta name="format-detection" content="telephone=no" />
   <meta name="robots" content="noindex,nofollow" />
   <title>Platelet Preparation & QC | CNMI Blood Component QC</title>
@@ -43,7 +44,8 @@
     <div class="auth-card">
       <img src="assets/platelet.svg" class="app-logo" alt="" />
       <h1>Platelet Preparation & QC</h1>
-      <p class="muted">ระบบบันทึก คำนวณ และเก็บหลักฐานการเตรียมเกล็ดเลือด ใช้ Mahidol ID และรหัสผ่านที่ Admin กำหนดให้</p>
+      <p class="muted">ระบบบันทึกการเตรียมเกล็ดเลือด และแยกรายการที่ใช้เป็น QC ใช้ Mahidol ID และรหัสผ่านที่ Admin กำหนดให้</p>
+      <button class="btn install-app-btn auth-install-btn hidden" type="button">เพิ่ม Platelet QC เป็นแอป</button>
       <form id="loginForm" class="stack">
         <label for="loginEmail">Mahidol ID / Email</label>
         <div class="email-field">
@@ -89,19 +91,19 @@
 
     <div class="app-layout">
       <aside id="sideNav" class="sidebar" aria-label="เมนูหลัก">
-        <div class="sidebar-title">Platelet QC</div>
+        <div class="sidebar-title">Platelet</div>
         <nav class="tabs side-tabs" id="mainTabs">
-          <button data-view="dashboard" class="active">ภาพรวม Platelet QC</button>
-          <button data-view="record">บันทึก Platelet QC</button>
-          <button data-view="records">รายการ Platelet QC</button>
+          <button data-view="dashboard" class="active">ภาพรวม Platelet</button>
+          <button data-view="record">บันทึก Platelet</button>
+          <button data-view="records">รายการ Platelet</button>
           <div id="adminNavLabel" class="sidebar-section-label hidden">Admin</div>
-          <button data-view="settings" id="settingsTab" class="hidden">จัดการระบบ Platelet QC</button>
+          <button data-view="settings" id="settingsTab" class="hidden">จัดการระบบ Platelet</button>
           <button data-view="audit" id="auditTab" class="hidden">ประวัติการใช้งาน</button>
         </nav>
 
         <div class="sidebar-spacer"></div>
 
-        <button id="installAppBtn" class="sidebar-action install-app-btn hidden" type="button">ติดตั้งแอป</button>
+        <button class="sidebar-action install-app-btn hidden" type="button">ติดตั้ง Platelet QC</button>
         <button id="changePasswordBtn" class="sidebar-action" type="button">เปลี่ยนรหัสผ่าน</button>
 
         <div id="adminModePanel" class="admin-mode-panel hidden">
@@ -132,7 +134,7 @@
           <section id="view-settings" class="view hidden"></section>
           <section id="view-audit" class="view hidden"></section>
         </main>
-        <footer class="footer">CNMI Blood Component QC · Platelet module v4.7.0 · bloodqc.cnmiblood.com/#/platelet</footer>
+        <footer class="footer">CNMI Blood Component QC · Platelet module v4.8.0 · bloodqc.cnmiblood.com/#/platelet</footer>
       </div>
     </div>
   </div>

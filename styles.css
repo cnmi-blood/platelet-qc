@@ -134,3 +134,23 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 @media(max-width:760px){.user-create-grid{grid-template-columns:1fr}.user-create-password{grid-column:span 1}.users-table{min-width:1050px}.audit-filters{grid-template-columns:1fr}.audit-table{min-width:780px}.row-actions{min-width:210px}.audit-details pre{max-width:520px}}
 
 .sidebar-section-label{margin:16px 10px 6px;color:var(--muted);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+
+/* v4.8 Prepare vs QC + Admin correction */
+.badge.prepare-purpose{background:#f2f4f7;color:#475467;border:1px solid #e4e7ec}
+.badge.qc-purpose{background:#eef4ff;color:#3538cd;border:1px solid #c7d7fe}
+.badge.not_qc{background:#f2f4f7;color:#667085}
+.badge.deleted{background:var(--bad-soft);color:var(--bad);border:1px solid #fecdca}
+.purpose-panel{border-color:#d9dde5;background:linear-gradient(180deg,#fff,#fcfcfd)}
+.purpose-selector{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.purpose-option{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:13px;padding:13px 14px;background:#fff;cursor:pointer;transition:.15s}
+.purpose-option:hover{border-color:#c7ccd4}.purpose-option.selected{border-color:var(--primary);box-shadow:0 0 0 2px rgba(139,30,45,.08);background:var(--primary-soft)}
+.purpose-option input{width:auto;margin:3px 0 0;flex:none}.purpose-option span{display:block}.purpose-option strong{display:block}.purpose-option small{display:block;color:var(--muted);margin-top:3px;line-height:1.4}
+.purpose-note{margin:10px 0 0}
+.admin-correction-panel{border-color:#fedf89;background:#fffdf7}.admin-correction-panel textarea{background:#fff}
+.inline-check{display:flex;align-items:center;gap:7px;width:max-content;margin:10px 0 0;color:var(--muted);font-size:13px;font-weight:700}.inline-check input{width:auto}
+.deleted-row td{opacity:.68;background:#fffafa!important}.deleted-row .link-btn{text-decoration:line-through}
+.evidence-reason{display:block;color:var(--warn);font-size:11px;margin-top:3px;white-space:normal}
+.audit-note{margin-top:5px;padding:6px 8px;border-radius:7px;background:var(--warn-soft);font-size:12px;color:#7a2e0e}
+.auth-install-btn{width:100%;margin:16px 0 4px;min-height:46px}
+.install-app-btn.hidden{display:none!important}
+@media(max-width:760px){.purpose-selector{grid-template-columns:1fr}.purpose-option{padding:12px}.auth-install-btn{display:block}}
