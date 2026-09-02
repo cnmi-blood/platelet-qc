@@ -11,6 +11,8 @@
   <meta name="robots" content="noindex,nofollow" />
   <title>Platelet Preparation & QC</title>
   <link rel="icon" href="assets/platelet.svg" />
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -97,6 +99,7 @@
 
         <div class="sidebar-spacer"></div>
 
+        <button id="installAppBtn" class="sidebar-action install-app-btn hidden" type="button">ติดตั้งแอป</button>
         <button id="changePasswordBtn" class="sidebar-action" type="button">เปลี่ยนรหัสผ่าน</button>
 
         <div id="adminModePanel" class="admin-mode-panel hidden">
@@ -126,7 +129,7 @@
           <section id="view-records" class="view hidden"></section>
           <section id="view-settings" class="view hidden"></section>
         </main>
-        <footer class="footer">Platelet QC v4.2.0 · Admin สลับ Staff/Admin mode ได้ · เมนูด้านข้าง · รองรับมือถือ</footer>
+        <footer class="footer">Platelet QC v4.3.0 · ติดตั้งบน Android ได้ · iPhone มีคำแนะนำเพิ่มไปยังหน้าจอโฮม</footer>
       </div>
     </div>
   </div>
@@ -153,8 +156,33 @@
     </form>
   </dialog>
 
+  <dialog id="installDialog" class="dialog install-dialog">
+    <div class="dialog-head">
+      <div><h2 id="installDialogTitle">ติดตั้งแอปบนโทรศัพท์</h2><p id="installDialogSubtitle" class="muted">เปิด Platelet QC จากหน้าจอโฮมได้เหมือนแอป</p></div>
+      <button class="icon-btn" id="closeInstallDialogBtn" aria-label="ปิด">×</button>
+    </div>
+    <div class="install-dialog-body">
+      <div id="iosInstallGuide" class="install-guide hidden">
+        <div class="install-step"><span>1</span><div><strong>เปิดเว็บนี้ด้วย Safari</strong><p>ถ้าเปิดอยู่ใน Chrome หรือ Browser อื่น ให้เปิดลิงก์นี้ใน Safari ก่อน</p></div></div>
+        <div class="install-step"><span>2</span><div><strong>กดปุ่ม Share</strong><p>ปุ่มรูปสี่เหลี่ยมมีลูกศรชี้ขึ้น ที่แถบเครื่องมือ Safari</p></div></div>
+        <div class="install-step"><span>3</span><div><strong>เลือก “เพิ่มไปยังหน้าจอโฮม”</strong><p>หรือ “Add to Home Screen” แล้วกด “เพิ่ม / Add”</p></div></div>
+        <div class="notice info small"><strong>หลังติดตั้ง:</strong> จะมีไอคอน Platelet QC บนหน้าจอโฮม กดเข้าใช้งานได้เหมือนแอปทั่วไป</div>
+      </div>
+      <div id="androidInstallGuide" class="install-guide hidden">
+        <div class="install-step"><span>1</span><div><strong>ใช้ Chrome บน Android</strong><p>เปิดหน้า Platelet QC นี้ใน Chrome</p></div></div>
+        <div class="install-step"><span>2</span><div><strong>กดเมนู ⋮</strong><p>มุมขวาบน แล้วเลือก “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”</p></div></div>
+        <div class="install-step"><span>3</span><div><strong>กดติดตั้ง</strong><p>ระบบจะสร้างไอคอน Platelet QC บนหน้าจอหลัก</p></div></div>
+      </div>
+      <div id="genericInstallGuide" class="install-guide hidden">
+        <p>อุปกรณ์นี้ยังไม่แสดงหน้าติดตั้งอัตโนมัติ ลองเปิดเมนูของ Browser แล้วหา “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”</p>
+      </div>
+      <div class="actions"><button class="btn primary" type="button" id="installDialogOkBtn">เข้าใจแล้ว</button></div>
+    </div>
+  </dialog>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
+  <script src="pwa.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
