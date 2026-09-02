@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#8b1e2d" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Platelet Preparation & QC</title>
+  <link rel="icon" href="assets/platelet.svg" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <section id="setupScreen" class="center-screen hidden">
+    <div class="auth-card wide-card">
+      <img src="assets/platelet.svg" class="app-logo" alt="" />
+      <h1>ยังไม่ได้เชื่อม Supabase</h1>
+      <p class="muted">เปิดไฟล์ <code>config.js</code> แล้วใส่ Supabase Project URL และ Publishable key ก่อนใช้งาน</p>
+      <div class="notice warning">
+        <strong>ห้ามใส่ Service Role key ในเว็บไซต์</strong><br>
+        หน้าเว็บใช้ Publishable key หรือ legacy anon key เท่านั้น
+      </div>
+      <ol class="setup-mini">
+        <li>สร้าง Supabase Project</li>
+        <li>รัน <code>supabase/schema.sql</code></li>
+        <li>สร้าง Storage bucket ชื่อ <code>platelet-evidence</code> แบบ Private</li>
+        <li>ตั้ง Password Auth และปิดการสมัครเอง</li>
+        <li>แก้ <code>config.js</code></li>
+        <li>อัปโหลดไฟล์ขึ้น GitHub Pages</li>
+      </ol>
+      <p class="muted small">ดูคู่มือละเอียดที่ <code>INSTALL_STEP_BY_STEP_TH.md</code></p>
+    </div>
+  </section>
+
+  <section id="loginScreen" class="center-screen hidden">
+    <div class="auth-card">
+      <img src="assets/platelet.svg" class="app-logo" alt="" />
+      <h1>Platelet Preparation & QC</h1>
+      <p class="muted">ใช้ Mahidol ID และรหัสผ่านที่ Admin กำหนดให้</p>
+      <form id="loginForm" class="stack">
+        <label for="loginEmail">Mahidol ID / Email</label>
+        <div class="email-field">
+          <input id="loginEmail" autocomplete="username" placeholder="เช่น parichat.i" required />
+          <span>@mahidol.ac.th</span>
+        </div>
+        <label for="loginPassword">รหัสผ่าน</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" minlength="8" placeholder="อย่างน้อย 8 ตัวอักษร" required />
+        <button class="btn primary" type="submit">เข้าสู่ระบบ</button>
+        <button class="btn ghost" type="button" id="forgotPasswordBtn">ลืมรหัสผ่าน</button>
+      </form>
+      <p id="loginMessage" class="muted small"></p>
+      <div class="notice info small"><strong>ครั้งแรก:</strong> ใช้รหัสผ่านตั้งต้นที่ Admin ให้ แล้วระบบจะบังคับให้เปลี่ยนรหัสผ่านใหม่ก่อนเข้าใช้งาน</div>
+    </div>
+  </section>
+
+  <section id="forcePasswordScreen" class="center-screen hidden">
+    <div class="auth-card">
+      <img src="assets/platelet.svg" class="app-logo" alt="" />
+      <h1 id="forcePasswordTitle">ตั้งรหัสผ่านใหม่</h1>
+      <p class="muted" id="forcePasswordText">เพื่อความปลอดภัย กรุณาเปลี่ยนรหัสผ่านตั้งต้นก่อนเข้าใช้งาน</p>
+      <form id="forcePasswordForm" class="stack">
+        <label for="forceNewPassword">รหัสผ่านใหม่</label>
+        <input id="forceNewPassword" type="password" autocomplete="new-password" minlength="8" placeholder="อย่างน้อย 8 ตัวอักษร" required />
+        <label for="forceConfirmPassword">ยืนยันรหัสผ่านใหม่</label>
+        <input id="forceConfirmPassword" type="password" autocomplete="new-password" minlength="8" placeholder="พิมพ์ซ้ำอีกครั้ง" required />
+        <button class="btn primary" type="submit">บันทึกรหัสผ่านใหม่</button>
+        <button class="btn ghost" type="button" id="forceLogoutBtn">ออกจากระบบ</button>
+      </form>
+      <p id="forcePasswordMessage" class="muted small"></p>
+    </div>
+  </section>
+
+  <div id="appShell" class="hidden">
+    <header class="topbar">
+      <div class="brand">
+        <img src="assets/platelet.svg" alt="" />
+        <div><strong>Platelet Preparation & QC</strong><span>CNMI Blood Bank</span></div>
+      </div>
+      <div class="userbox">
+        <div><strong id="headerUser">-</strong><span id="headerRole">-</span></div>
+        <button id="changePasswordBtn" class="btn ghost small-btn">เปลี่ยนรหัสผ่าน</button>
+        <button id="logoutBtn" class="btn ghost small-btn">ออกจากระบบ</button>
+      </div>
+    </header>
+
+    <nav class="tabs" id="mainTabs">
+      <button data-view="dashboard" class="active">ภาพรวม</button>
+      <button data-view="record">บันทึกใหม่</button>
+      <button data-view="records">รายการทั้งหมด</button>
+      <button data-view="settings" id="settingsTab" class="hidden">ตั้งค่า</button>
+    </nav>
+
+    <main class="container">
+      <section id="view-dashboard" class="view"></section>
+      <section id="view-record" class="view hidden"></section>
+      <section id="view-records" class="view hidden"></section>
+      <section id="view-settings" class="view hidden"></section>
+    </main>
+
+    <footer class="footer">Platelet QC v3.0.0 · ข้อมูลในระบบควรใช้ตาม WI/เกณฑ์ที่หน่วยอนุมัติ</footer>
+  </div>
+
+  <dialog id="detailDialog" class="dialog">
+    <div class="dialog-head">
+      <div><h2 id="detailTitle">รายละเอียด</h2><p id="detailSubtitle" class="muted"></p></div>
+      <button class="icon-btn" id="closeDetailBtn" aria-label="ปิด">×</button>
+    </div>
+    <div id="detailBody"></div>
+  </dialog>
+
+  <dialog id="passwordDialog" class="dialog password-dialog">
+    <div class="dialog-head">
+      <div><h2>เปลี่ยนรหัสผ่าน</h2><p class="muted">อย่างน้อย 8 ตัวอักษร</p></div>
+      <button class="icon-btn" id="closePasswordDialogBtn" aria-label="ปิด">×</button>
+    </div>
+    <form id="passwordDialogForm" class="password-dialog-body">
+      <div class="field"><label for="currentPassword">รหัสผ่านปัจจุบัน</label><input id="currentPassword" type="password" autocomplete="current-password" minlength="8" required></div>
+      <div class="field"><label for="newPassword">รหัสผ่านใหม่</label><input id="newPassword" type="password" autocomplete="new-password" minlength="8" required></div>
+      <div class="field"><label for="confirmPassword">ยืนยันรหัสผ่านใหม่</label><input id="confirmPassword" type="password" autocomplete="new-password" minlength="8" required></div>
+      <p id="passwordDialogMessage" class="muted small"></p>
+      <div class="actions"><button class="btn" type="button" id="cancelPasswordBtn">ยกเลิก</button><button class="btn primary" type="submit">เปลี่ยนรหัสผ่าน</button></div>
+    </form>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
