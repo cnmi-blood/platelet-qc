@@ -1,8 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a52a3a"/><stop offset="1" stop-color="#651523"/></linearGradient></defs>
-  <circle cx="32" cy="32" r="29" fill="url(#g)"/>
-  <circle cx="24" cy="25" r="7" fill="#fff" opacity=".95"/>
-  <circle cx="39" cy="22" r="5" fill="#fff" opacity=".9"/>
-  <circle cx="41" cy="38" r="8" fill="#fff" opacity=".95"/>
-  <circle cx="23" cy="41" r="4" fill="#fff" opacity=".9"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Platelet Preparation and QC">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#9b2335"/>
+      <stop offset="1" stop-color="#7f1727"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="url(#bg)"/>
+  <path d="M42 28h44c4.4 0 8 3.6 8 8v8c0 3.5-1.3 6.8-3.6 9.4L82 63.2V88c0 4.4-3.6 8-8 8H54c-4.4 0-8-3.6-8-8V63.2l-8.4-9.8A13.9 13.9 0 0 1 34 44v-8c0-4.4 3.6-8 8-8z" fill="#fff"/>
+  <path d="M46 42h36v14.5c0 5.2-1.5 10.2-4.2 14.6L72 80.4c-2.4 3.9-8.1 3.9-10.5 0l-5.8-9.3A28 28 0 0 1 51.5 56V42z" fill="#f7dbe0"/>
+  <circle cx="58" cy="53" r="4.3" fill="#9b2335"/>
+  <circle cx="69.5" cy="58.5" r="5.2" fill="#9b2335"/>
+  <circle cx="60.5" cy="66.5" r="3.5" fill="#9b2335" opacity=".85"/>
+  <rect x="55" y="21" width="18" height="10" rx="4" fill="#fff"/>
+  <rect x="78" y="72" width="28" height="34" rx="8" fill="#ffffff"/>
+  <path d="M85 82h14M85 89h9" stroke="#9b2335" stroke-width="4" stroke-linecap="round"/>
+  <path d="M86 97l5 5 9-11" fill="none" stroke="#177245" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
