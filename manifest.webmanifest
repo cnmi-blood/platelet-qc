@@ -1,16 +1,26 @@
 {
-  "name": "Platelet Preparation & QC",
+  "name": "CNMI Blood Component QC - Platelet",
   "short_name": "Platelet QC",
-  "description": "ระบบบันทึก คำนวณ และเก็บหลักฐานการเตรียมเกล็ดเลือด CNMI Blood Bank",
+  "description": "Platelet Preparation & QC — ระบบบันทึก คำนวณ และจัดเก็บหลักฐานการเตรียมเกล็ดเลือด CNMI Blood Bank",
   "lang": "th",
-  "start_url": "./",
+  "start_url": "./#/platelet",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#f6f7f9",
   "theme_color": "#8b1e2d",
   "icons": [
-    {"src":"assets/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
-    {"src":"assets/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }

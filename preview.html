@@ -11,8 +11,6 @@
   <meta name="robots" content="noindex,nofollow" />
   <title>Platelet Preparation & QC | CNMI Blood Component QC</title>
   <link rel="icon" href="assets/platelet.svg" />
-  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png" />
-  <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -53,7 +51,7 @@
         <label for="loginPassword">รหัสผ่าน</label>
         <input id="loginPassword" type="password" autocomplete="current-password" minlength="8" placeholder="อย่างน้อย 8 ตัวอักษร" required />
         <button class="btn primary" type="submit">เข้าสู่ระบบ</button>
-        <button class="btn ghost" type="button" id="forgotPasswordBtn">ลืมรหัสผ่าน / ติดต่อ Admin</button>
+        <button class="btn ghost" type="button" id="forgotPasswordBtn">ลืมรหัสผ่าน</button>
       </form>
       <p id="loginMessage" class="muted small"></p>
       <div class="notice info small"><strong>ครั้งแรก:</strong> ใช้รหัสผ่านตั้งต้นที่ Admin ให้ แล้วระบบจะบังคับให้เปลี่ยนรหัสผ่านใหม่ก่อนเข้าใช้งาน</div>
@@ -77,14 +75,14 @@
     </div>
   </section>
 
-  <div id="appShell" class="hidden">
+  <div id="appShell">
     <header class="topbar">
       <button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="เปิดเมนู">☰</button>
       <div class="brand">
         <img src="assets/platelet.svg" alt="" />
         <div><strong>CNMI Blood Component QC</strong><span>Platelet Preparation & QC · CNMI Blood Bank</span></div>
       </div>
-      <div class="topbar-mode"><span id="currentModeBadge" class="mode-badge">Staff mode</span></div>
+      <div class="topbar-mode"><span id="currentModeBadge" class="mode-badge admin">Admin mode</span></div>
     </header>
 
     <div class="app-layout">
@@ -94,28 +92,25 @@
           <button data-view="dashboard" class="active">ภาพรวม Platelet QC</button>
           <button data-view="record">บันทึก Platelet QC</button>
           <button data-view="records">รายการ Platelet QC</button>
-          <div id="adminNavLabel" class="sidebar-section-label hidden">Admin</div>
-          <button data-view="settings" id="settingsTab" class="hidden">จัดการระบบ Platelet QC</button>
-          <button data-view="audit" id="auditTab" class="hidden">ประวัติการใช้งาน</button>
+          <button data-view="settings" id="settingsTab">จัดการระบบ Platelet QC</button>
         </nav>
 
         <div class="sidebar-spacer"></div>
 
-        <button id="installAppBtn" class="sidebar-action install-app-btn hidden" type="button">ติดตั้งแอป</button>
         <button id="changePasswordBtn" class="sidebar-action" type="button">เปลี่ยนรหัสผ่าน</button>
 
-        <div id="adminModePanel" class="admin-mode-panel hidden">
+        <div id="adminModePanel" class="admin-mode-panel">
           <div id="modeMenu" class="mode-menu hidden">
             <button type="button" data-ui-mode="staff"><strong>โหมดผู้ใช้งานทั่วไป</strong><span>ซ่อนเมนูและสิทธิ์จัดการของ Admin</span></button>
             <button type="button" data-ui-mode="admin"><strong>โหมดผู้ดูแลระบบ</strong><span>เปิดเมนูตั้งค่า ตรวจทวน และปลดล็อก</span></button>
           </div>
           <button id="modeMenuBtn" class="user-mode-card" type="button" aria-expanded="false">
-            <div class="user-mode-name"><strong id="headerUser">-</strong><span id="headerRole">-</span></div>
-            <div class="user-mode-current"><span id="modeDot" class="mode-dot"></span><span id="modeButtonLabel">Staff mode</span><span class="mode-chevron">⌄</span></div>
+            <div class="user-mode-name"><strong id="headerUser">มัส</strong><span id="headerRole">Admin</span></div>
+            <div class="user-mode-current"><span id="modeDot" class="mode-dot admin"></span><span id="modeButtonLabel">Admin mode</span><span class="mode-chevron">⌄</span></div>
           </button>
         </div>
 
-        <div id="regularUserCard" class="regular-user-card">
+        <div id="regularUserCard" class="regular-user-card hidden">
           <strong id="regularUserName">-</strong>
           <span id="regularUserRole">-</span>
         </div>
@@ -126,13 +121,12 @@
 
       <div class="content-shell">
         <main class="container">
-          <section id="view-dashboard" class="view"></section>
+          <section id="view-dashboard" class="view"><div class="page-head"><div><h1>ภาพรวม</h1><p class="muted">ตัวอย่างหน้าเมนู Sidebar</p></div></div><div class="grid cards"><div class="card metric"><div class="label">เดือนนี้</div><div class="value">12</div><div class="sub">รายการ</div></div><div class="card metric"><div class="label">รอ pH</div><div class="value">3</div><div class="sub">รายการ</div></div></div></section>
           <section id="view-record" class="view hidden"></section>
           <section id="view-records" class="view hidden"></section>
           <section id="view-settings" class="view hidden"></section>
-          <section id="view-audit" class="view hidden"></section>
         </main>
-        <footer class="footer">CNMI Blood Component QC · Platelet module v4.6.0 · bloodqc.cnmiblood.com/#/platelet</footer>
+        <footer class="footer">Platelet QC v4.2.0 · Admin สลับ Staff/Admin mode ได้ · เมนูด้านข้าง · รองรับมือถือ</footer>
       </div>
     </div>
   </div>
@@ -159,47 +153,6 @@
     </form>
   </dialog>
 
-  <dialog id="adminResetPasswordDialog" class="dialog password-dialog">
-    <div class="dialog-head">
-      <div><h2>Reset Password</h2><p id="adminResetTarget" class="muted">-</p></div>
-      <button class="icon-btn" id="closeAdminResetPasswordBtn" aria-label="ปิด">×</button>
-    </div>
-    <form id="adminResetPasswordForm" class="password-dialog-body">
-      <div class="notice info small">Admin กำหนดรหัสผ่านชั่วคราวใหม่ แล้วผู้ใช้จะถูกบังคับให้เปลี่ยนรหัสผ่านเองเมื่อเข้าสู่ระบบครั้งถัดไป</div>
-      <div class="field"><label for="adminTempPassword">รหัสผ่านชั่วคราวใหม่</label><input id="adminTempPassword" type="password" minlength="8" autocomplete="new-password" placeholder="อย่างน้อย 8 ตัวอักษร" required></div>
-      <div class="field"><label for="adminTempPasswordConfirm">ยืนยันรหัสผ่าน</label><input id="adminTempPasswordConfirm" type="password" minlength="8" autocomplete="new-password" required></div>
-      <p id="adminResetPasswordMessage" class="muted small"></p>
-      <div class="actions"><button class="btn" type="button" id="cancelAdminResetPasswordBtn">ยกเลิก</button><button class="btn primary" type="submit">Reset password</button></div>
-    </form>
-  </dialog>
-
-  <dialog id="installDialog" class="dialog install-dialog">
-    <div class="dialog-head">
-      <div><h2 id="installDialogTitle">ติดตั้งแอปบนโทรศัพท์</h2><p id="installDialogSubtitle" class="muted">เปิด Platelet QC จากหน้าจอโฮมได้เหมือนแอป</p></div>
-      <button class="icon-btn" id="closeInstallDialogBtn" aria-label="ปิด">×</button>
-    </div>
-    <div class="install-dialog-body">
-      <div id="iosInstallGuide" class="install-guide hidden">
-        <div class="install-step"><span>1</span><div><strong>เปิดเว็บนี้ด้วย Safari</strong><p>ถ้าเปิดอยู่ใน Chrome หรือ Browser อื่น ให้เปิดลิงก์นี้ใน Safari ก่อน</p></div></div>
-        <div class="install-step"><span>2</span><div><strong>กดปุ่ม Share</strong><p>ปุ่มรูปสี่เหลี่ยมมีลูกศรชี้ขึ้น ที่แถบเครื่องมือ Safari</p></div></div>
-        <div class="install-step"><span>3</span><div><strong>เลือก “เพิ่มไปยังหน้าจอโฮม”</strong><p>หรือ “Add to Home Screen” แล้วกด “เพิ่ม / Add”</p></div></div>
-        <div class="notice info small"><strong>หลังติดตั้ง:</strong> จะมีไอคอน Platelet QC บนหน้าจอโฮม กดเข้าใช้งานได้เหมือนแอปทั่วไป</div>
-      </div>
-      <div id="androidInstallGuide" class="install-guide hidden">
-        <div class="install-step"><span>1</span><div><strong>ใช้ Chrome บน Android</strong><p>เปิดหน้า Platelet QC นี้ใน Chrome</p></div></div>
-        <div class="install-step"><span>2</span><div><strong>กดเมนู ⋮</strong><p>มุมขวาบน แล้วเลือก “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”</p></div></div>
-        <div class="install-step"><span>3</span><div><strong>กดติดตั้ง</strong><p>ระบบจะสร้างไอคอน Platelet QC บนหน้าจอหลัก</p></div></div>
-      </div>
-      <div id="genericInstallGuide" class="install-guide hidden">
-        <p>อุปกรณ์นี้ยังไม่แสดงหน้าติดตั้งอัตโนมัติ ลองเปิดเมนูของ Browser แล้วหา “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”</p>
-      </div>
-      <div class="actions"><button class="btn primary" type="button" id="installDialogOkBtn">เข้าใจแล้ว</button></div>
-    </div>
-  </dialog>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js"></script>
-  <script src="pwa.js"></script>
-  <script src="app.js"></script>
+  
 </body>
 </html>

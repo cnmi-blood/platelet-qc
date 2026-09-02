@@ -1,4 +1,4 @@
-/* Platelet Preparation & QC v4.5.0 - plain JS / Supabase */
+/* CNMI Blood Component QC · Platelet module v4.6.0 - plain JS / Supabase */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -13,6 +13,30 @@
   const qcTH = s => ({incomplete:'ข้อมูลยังไม่ครบ',pass:'ผ่านเกณฑ์',review:'ต้องตรวจสอบ'})[s] || s;
   const measuredTH = iso => iso ? dateTH(iso) : 'ยังไม่บันทึก';
   const state = { sb:null, session:null, user:null, profile:null, settings:null, records:[], profiles:[], currentRecordId:null, currentEvidence:[], currentPool:[], lastLoginPassword:null, uiMode:'staff', auditUserFilter:'', resetTargetId:null };
+  const PLATELET_ROUTES = {
+    dashboard:'#/platelet',
+    record:'#/platelet/new',
+    records:'#/platelet/records',
+    settings:'#/platelet/admin',
+    audit:'#/platelet/audit'
+  };
+  function routeForView(v){ return PLATELET_ROUTES[v] || PLATELET_ROUTES.dashboard; }
+  function viewFromHash(){
+    const h=(location.hash||'').replace(/\/+$/,'');
+    if(h==='#/platelet/new') return 'record';
+    if(h==='#/platelet/records') return 'records';
+    if(h==='#/platelet/admin') return 'settings';
+    if(h==='#/platelet/audit') return 'audit';
+    return 'dashboard';
+  }
+  function isKnownPlateletRoute(){
+    const h=(location.hash||'').replace(/\/+$/,'');
+    return !h || h==='#' || Object.values(PLATELET_ROUTES).includes(h);
+  }
+  function normalizePlateletRoute(){
+    if(!isKnownPlateletRoute()) history.replaceState(null,'',location.pathname+location.search+PLATELET_ROUTES.dashboard);
+    else if(!location.hash || location.hash==='#') history.replaceState(null,'',location.pathname+location.search+PLATELET_ROUTES.dashboard);
+  }
 
   function showToast(msg,type='') { const t=$('#toast'); t.textContent=msg; t.className=`toast show ${type}`; clearTimeout(showToast._t); showToast._t=setTimeout(()=>t.className='toast',3500); }
   function errText(e){ return e?.message || String(e || 'เกิดข้อผิดพลาด'); }
@@ -62,6 +86,7 @@
     if(!isAdmin) state.uiMode=state.profile.role;
     $('#settingsTab')?.classList.toggle('hidden',!adminUi());
     $('#auditTab')?.classList.toggle('hidden',!adminUi());
+    $('#adminNavLabel')?.classList.toggle('hidden',!adminUi());
     $('#adminModePanel')?.classList.toggle('hidden',!isAdmin);
     $('#regularUserCard')?.classList.toggle('hidden',isAdmin);
     const label=adminUi()?'Admin mode':'Staff mode';
@@ -151,7 +176,8 @@
       sessionStorage.setItem(loginKey,'1');
       await loadProfiles();
     }
-    switchView('dashboard');
+    normalizePlateletRoute();
+    switchView(viewFromHash(),true);
   }
 
   async function showForcedPassword(recoveryMode=false){
@@ -261,12 +287,28 @@
     }catch(e2){$('#adminResetPasswordMessage').textContent=errText(e2);}
   });
 
-  function switchView(v){
+  function switchView(v,fromRoute=false){
     if(['settings','audit'].includes(v)&&!adminUi()) v='dashboard';
-    $$('#mainTabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===v)); $$('.view').forEach(x=>x.classList.add('hidden')); $(`#view-${v}`).classList.remove('hidden');
-    if(v==='dashboard') renderDashboard(); if(v==='records') renderRecordsList(); if(v==='record') renderRecordForm(); if(v==='settings') renderSettings(); if(v==='audit') renderAuditLog();
+    if(!fromRoute){
+      const target=routeForView(v);
+      if(location.hash!==target){ location.hash=target; return; }
+    }
+    $$('#mainTabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
+    $$('.view').forEach(x=>x.classList.add('hidden'));
+    $(`#view-${v}`).classList.remove('hidden');
+    if(v==='dashboard') renderDashboard();
+    if(v==='records') renderRecordsList();
+    if(v==='record') renderRecordForm();
+    if(v==='settings') renderSettings();
+    if(v==='audit') renderAuditLog();
     if(window.innerWidth<=760) window.scrollTo({top:0,behavior:'smooth'});
   }
+  window.addEventListener('hashchange',()=>{
+    if($('#appShell') && !$('#appShell').classList.contains('hidden')){
+      normalizePlateletRoute();
+      switchView(viewFromHash(),true);
+    }
+  });
   function statusBadge(s){ return `<span class="badge ${esc(s)}">${esc(statusTH(s))}</span>`; }
   function qcBadge(s){ return `<span class="badge ${esc(s)}">${esc(qcTH(s))}</span>`; }
   function pHBadge(r){ if(!r.ph_measured_at||!r.expiry_at) return ''; return sameBangkokDate(r.ph_measured_at,r.expiry_at)?'<span class="badge pass">pH ตรงวัน Exp.</span>':'<span class="badge late">pH ไม่ตรงวัน Exp.</span>'; }
@@ -276,7 +318,7 @@
     const rec=state.records, month=rec.filter(r=>r.collection_at && r.collection_at>=firstOfMonthISO());
     const wait=rec.filter(waitingPH).length, submitted=rec.filter(r=>r.status==='submitted').length, attention=rec.filter(r=>r.qc_status==='review').length, locked=rec.filter(r=>r.status==='locked').length;
     $('#view-dashboard').innerHTML=`
-      <div class="page-head"><div><h1>ภาพรวม</h1><p class="muted">ติดตามรายการที่กำลังทำ รอ pH รอตรวจทวน และผลที่ต้องตรวจสอบ</p></div><div class="actions"><button class="btn primary" id="dashNew">+ บันทึกใหม่</button></div></div>
+      <div class="page-head"><div><h1>ภาพรวม Platelet QC</h1><p class="muted">ติดตามการบันทึกและผล QC ของการเตรียมเกล็ดเลือดที่กำลังดำเนินการ</p></div><div class="actions"><button class="btn primary" id="dashNew">+ บันทึก Platelet QC</button></div></div>
       <div class="grid cards">
         ${metric('เดือนนี้',month.length,'รายการ')}${metric('รอ pH',wait,'ยังบันทึกไม่ครบ')}${metric('รอตรวจทวน',submitted,'Submitted')}${metric('ต้องตรวจสอบ',attention,'QC / Timing')}${metric('LOCK แล้ว',locked,'เก็บเป็นบันทึกแล้ว')}
       </div>
@@ -291,7 +333,7 @@
   function bindRecordLinks(root=document){ $$('.record-link',root).forEach(b=>b.onclick=()=>openDetail(b.dataset.id)); }
 
   function renderRecordsList(){
-    $('#view-records').innerHTML=`<div class="page-head"><div><h1>รายการทั้งหมด</h1><p class="muted">ค้นหาและเปิดดูข้อมูลย้อนหลัง</p></div><div class="actions"><button class="btn" id="exportCsv">Export CSV</button><button class="btn primary" id="listNew">+ บันทึกใหม่</button></div></div>
+    $('#view-records').innerHTML=`<div class="page-head"><div><h1>รายการ Platelet QC</h1><p class="muted">ค้นหาและเปิดดูข้อมูลการเตรียมเกล็ดเลือดย้อนหลัง</p></div><div class="actions"><button class="btn" id="exportCsv">Export CSV</button><button class="btn primary" id="listNew">+ บันทึก Platelet QC</button></div></div>
       <div class="panel"><div class="filters"><input id="fSearch" placeholder="ค้นหา Product No. / ผลิตภัณฑ์"><select id="fStatus"><option value="">ทุกสถานะ</option><option value="draft">ร่าง</option><option value="submitted">รอตรวจทวน</option><option value="locked">LOCK</option></select><select id="fQc"><option value="">ทุก QC</option><option value="pass">ผ่าน</option><option value="review">ต้องตรวจสอบ</option><option value="incomplete">ไม่ครบ</option></select><select id="fProduct"><option value="">ทุกผลิตภัณฑ์</option><option>LDPPC Reveos</option><option>LDPPC Haemonetics</option><option>SDP Trima</option><option>SDP Amicus</option></select><button class="btn" id="fClear">ล้าง</button></div><div id="recordsTableHost"></div></div>`;
     const apply=()=>{ const q=$('#fSearch').value.trim().toLowerCase(),s=$('#fStatus').value,qc=$('#fQc').value,p=$('#fProduct').value; const rows=state.records.filter(r=>(!q||`${r.product_no} ${r.product_type}`.toLowerCase().includes(q))&&(!s||r.status===s)&&(!qc||r.qc_status===qc)&&(!p||r.product_type===p)); $('#recordsTableHost').innerHTML=recordsTable(rows); bindRecordLinks($('#recordsTableHost')); return rows; };
     ['#fSearch','#fStatus','#fQc','#fProduct'].forEach(x=>$(x).addEventListener('input',apply)); $('#fClear').onclick=()=>{['#fSearch','#fStatus','#fQc','#fProduct'].forEach(x=>$(x).value='');apply();};
@@ -312,7 +354,7 @@
     }
     const locked=r?.status==='locked', submitted=r?.status==='submitted', editable=!locked && (!submitted || reviewerUi());
     $('#view-record').innerHTML=`
-      <div class="page-head"><div><h1>${r?'แก้ไข / ตรวจรายการ':'บันทึกใหม่'}</h1><p class="muted">กรอกทีละช่วงได้ เช่น วันนี้บันทึก CBC ก่อน แล้วกลับมาใส่ ADAM / pH ภายหลัง ระบบจะคำนวณผลให้อัตโนมัติ</p></div><div class="status-line">${r?statusBadge(r.status)+qcBadge(r.qc_status)+pHBadge(r):''}</div></div>
+      <div class="page-head"><div><h1>${r?'แก้ไข / ตรวจ Platelet QC':'บันทึก Platelet QC'}</h1><p class="muted">บันทึก คำนวณ และเก็บหลักฐานการเตรียมเกล็ดเลือด โดยกรอกค่าตรวจแต่ละช่วงคนละวันได้</p></div><div class="status-line">${r?statusBadge(r.status)+qcBadge(r.qc_status)+pHBadge(r):''}</div></div>
       ${locked?'<div class="notice good"><strong>รายการนี้ LOCK แล้ว</strong> ข้อมูลถูกป้องกันการแก้ไข หากพบข้อผิดพลาดให้ Admin ปลดล็อกพร้อมบันทึกเหตุผล</div>':''}
       ${!locked?'<div class="notice info"><strong>บันทึกต่างวันได้</strong><br>แต่ละค่าตรวจอาจทำคนละวัน/คนละคน จึงมีช่องวัน-เวลาวัดแยกของ CBC, ADAM และ pH พร้อมเก็บหลักฐานแยกหมวด</div>':''}
       <form id="recordForm">
@@ -402,7 +444,7 @@
 
   async function renderSettings(){
     if(!adminUi()){switchView('dashboard');return;} await loadProfiles(); const s=state.settings;
-    $('#view-settings').innerHTML=`<div class="page-head"><div><h1>ตั้งค่า Admin</h1><p class="muted">สร้างผู้ใช้ Reset password กำหนดสิทธิ์ และตั้งเกณฑ์ QC</p></div><div class="actions"><button class="btn" id="openAuditFromSettings">Audit Log</button></div></div>
+    $('#view-settings').innerHTML=`<div class="page-head"><div><h1>จัดการระบบ Platelet QC</h1><p class="muted">จัดการผู้ใช้งาน สิทธิ์การเข้าถึง รหัสผ่าน และเกณฑ์ QC ของการเตรียมเกล็ดเลือด</p></div><div class="actions"><button class="btn" id="openAuditFromSettings">ประวัติการใช้งาน</button></div></div>
       <div class="panel"><h2>สร้างบัญชีเจ้าหน้าที่</h2><p class="section-note">Admin สร้างบัญชี @mahidol.ac.th และกำหนดรหัสผ่านชั่วคราวได้จากหน้านี้ ผู้ใช้จะถูกบังคับให้เปลี่ยนรหัสผ่านเมื่อ Login ครั้งแรก</p>
         <div class="user-create-grid">
           <div class="field"><label>Mahidol ID / Username</label><div class="email-field"><input id="new_username" autocomplete="off" placeholder="เช่น somchai.som"><span>@mahidol.ac.th</span></div></div>
@@ -414,9 +456,9 @@
         </div><p id="createUserMessage" class="muted small"></p>
         <div class="notice info small"><strong>ความปลอดภัย:</strong> การสร้างบัญชีและ Reset password ทำผ่าน Supabase Edge Function เท่านั้น ไม่มี Service Role / Secret key อยู่ใน GitHub Pages</div>
       </div>
-      <div class="panel"><h2>รายชื่อผู้ใช้งานระบบ</h2><p class="section-note">สถานะ Last Login เริ่มเก็บใน Audit Log ตั้งแต่ v4.5 เป็นต้นไป</p><div class="table-wrap"><table class="data-table users-table"><thead><tr><th>Username</th><th>ชื่อ</th><th>ตำแหน่ง</th><th>Role</th><th>Active</th><th>First Login</th><th>Last Login</th><th>จัดการ</th></tr></thead><tbody>${state.profiles.map(p=>`<tr data-user-id="${p.id}"><td><strong>${esc((p.email||'').split('@')[0])}</strong><div class="muted small">${esc(p.email)}</div></td><td><input class="u-name" value="${esc(p.display_name||'')}"></td><td><input class="u-position" value="${esc(p.position||'')}" placeholder="ตำแหน่ง"></td><td><select class="role-select u-role">${['staff','reviewer','admin'].map(r=>`<option value="${r}" ${p.role===r?'selected':''}>${roleTH(r)}</option>`).join('')}</select></td><td><label class="toggle-cell"><input class="u-active" type="checkbox" ${p.is_active?'checked':''}> <span>${p.is_active?'Active':'ปิดใช้'}</span></label></td><td><span class="password-state ${p.must_change_password?'pending':'ok'}">${p.must_change_password?'รอเปลี่ยนรหัส':'ตั้งรหัสแล้ว'}</span></td><td class="nowrap">${dateTH(p.last_login_at)}</td><td><div class="row-actions"><button class="btn small-btn u-save" data-id="${p.id}">บันทึก</button><button class="btn small-btn u-reset" data-id="${p.id}" ${p.id===state.user.id?'disabled title="ใช้เมนูเปลี่ยนรหัสผ่านของตนเอง"':''}>Reset password</button><button class="btn small-btn u-audit" data-id="${p.id}">Audit</button></div></td></tr>`).join('')}</tbody></table></div></div>
-      <div class="notice warning"><strong>ก่อนใช้ Production:</strong> ตรวจยืนยันเกณฑ์เหล่านี้กับ WI/ข้อกำหนดที่หน่วยอนุมัติ การแก้ค่าจะถูกบันทึก Audit Log</div>
-      <div class="panel"><h2>เกณฑ์ QC</h2><div class="form-grid">${settingField('Platelet yield ขั้นต่ำ','s_yield',s.platelet_yield_min)}${settingField('Equivalent Unit factor','s_factor',s.equivalent_unit_factor)}${settingField('Residual WBC สูงสุด','s_wbc',s.residual_wbc_max)}${settingField('pH ขั้นต่ำ','s_ph',s.ph_min)}${settingField('อายุผลิตภัณฑ์ (วัน)','s_expiry',s.expiry_days,1)}${settingField('PLT repeat ต่างกันสูงสุด (%)','s_diff',s.plt_repeat_diff_max_pct)}</div><div class="switch-row" style="margin-top:14px"><label><input id="s_cbc" type="checkbox" ${s.require_cbc_evidence?'checked':''}> บังคับหลักฐาน CBC</label><label><input id="s_adam" type="checkbox" ${s.require_adam_evidence?'checked':''}> บังคับหลักฐาน ADAM</label><label><input id="s_ph_ev" type="checkbox" ${s.require_ph_evidence?'checked':''}> บังคับหลักฐาน pH</label></div><div class="actions" style="margin-top:14px"><button class="btn primary" id="saveSettings">บันทึกเกณฑ์</button></div></div>`;
+      <div class="panel"><h2>ผู้ใช้งานระบบ Platelet QC</h2><p class="section-note">บัญชีเดียวใช้สำหรับ Platelet QC และออกแบบไว้ให้รองรับโมดูล Blood Component QC อื่นในอนาคต</p><div class="table-wrap"><table class="data-table users-table"><thead><tr><th>Username</th><th>ชื่อ</th><th>ตำแหน่ง</th><th>Role</th><th>Active</th><th>First Login</th><th>Last Login</th><th>จัดการ</th></tr></thead><tbody>${state.profiles.map(p=>`<tr data-user-id="${p.id}"><td><strong>${esc((p.email||'').split('@')[0])}</strong><div class="muted small">${esc(p.email)}</div></td><td><input class="u-name" value="${esc(p.display_name||'')}"></td><td><input class="u-position" value="${esc(p.position||'')}" placeholder="ตำแหน่ง"></td><td><select class="role-select u-role">${['staff','reviewer','admin'].map(r=>`<option value="${r}" ${p.role===r?'selected':''}>${roleTH(r)}</option>`).join('')}</select></td><td><label class="toggle-cell"><input class="u-active" type="checkbox" ${p.is_active?'checked':''}> <span>${p.is_active?'Active':'ปิดใช้'}</span></label></td><td><span class="password-state ${p.must_change_password?'pending':'ok'}">${p.must_change_password?'รอเปลี่ยนรหัส':'ตั้งรหัสแล้ว'}</span></td><td class="nowrap">${dateTH(p.last_login_at)}</td><td><div class="row-actions"><button class="btn small-btn u-save" data-id="${p.id}">บันทึก</button><button class="btn small-btn u-reset" data-id="${p.id}" ${p.id===state.user.id?'disabled title="ใช้เมนูเปลี่ยนรหัสผ่านของตนเอง"':''}>Reset password</button><button class="btn small-btn u-audit" data-id="${p.id}">Audit</button></div></td></tr>`).join('')}</tbody></table></div></div>
+      <div class="notice warning"><strong>ก่อนเริ่มใช้ระบบ Platelet QC จริง:</strong> ตรวจสอบเกณฑ์ QC ของเกล็ดเลือดให้ตรงกับ WI และข้อกำหนดที่หน่วยอนุมัติ การเปลี่ยนค่าเกณฑ์จะมีผลต่อการประเมินรายการที่บันทึกหลังจากนั้น และถูกบันทึกใน Audit Log</div>
+      <div class="panel"><h2>เกณฑ์ QC เกล็ดเลือด</h2><div class="form-grid">${settingField('Platelet yield ขั้นต่ำ','s_yield',s.platelet_yield_min)}${settingField('Equivalent Unit factor','s_factor',s.equivalent_unit_factor)}${settingField('Residual WBC สูงสุด','s_wbc',s.residual_wbc_max)}${settingField('pH ขั้นต่ำ','s_ph',s.ph_min)}${settingField('อายุผลิตภัณฑ์ (วัน)','s_expiry',s.expiry_days,1)}${settingField('PLT repeat ต่างกันสูงสุด (%)','s_diff',s.plt_repeat_diff_max_pct)}</div><div class="switch-row" style="margin-top:14px"><label><input id="s_cbc" type="checkbox" ${s.require_cbc_evidence?'checked':''}> บังคับหลักฐาน CBC</label><label><input id="s_adam" type="checkbox" ${s.require_adam_evidence?'checked':''}> บังคับหลักฐาน ADAM</label><label><input id="s_ph_ev" type="checkbox" ${s.require_ph_evidence?'checked':''}> บังคับหลักฐาน pH</label></div><div class="actions" style="margin-top:14px"><button class="btn primary" id="saveSettings">บันทึกเกณฑ์</button></div></div>`;
     $('#createUserBtn').onclick=createUserByAdmin; $('#saveSettings').onclick=saveSettings; $('#openAuditFromSettings').onclick=()=>{state.auditUserFilter='';switchView('audit');};
     $$('.u-save').forEach(b=>b.onclick=()=>saveUser(b.dataset.id));
     $$('.u-reset').forEach(b=>b.onclick=()=>openAdminReset(b.dataset.id));
@@ -452,7 +494,7 @@
     await loadProfiles();
     const {data,error}=await state.sb.from('audit_logs').select('*').order('created_at',{ascending:false}).limit(1000); if(error){showToast(errText(error),'error');return;}
     const all=data||[];
-    $('#view-audit').innerHTML=`<div class="page-head"><div><h1>Audit Log</h1><p class="muted">ทวนสอบว่าใครเข้าระบบ เปิดดู แก้ไข ส่งตรวจทวน LOCK จัดการผู้ใช้ หรือเปลี่ยนการตั้งค่า</p></div><div class="actions"><button class="btn" id="auditRefresh">รีเฟรช</button></div></div>
+    $('#view-audit').innerHTML=`<div class="page-head"><div><h1>ประวัติการใช้งาน (Audit Log)</h1><p class="muted">ทวนสอบการใช้งาน Platelet QC ว่าใครเข้าระบบ เปิดดู แก้ไข แนบหลักฐาน ส่งตรวจทวน LOCK หรือจัดการระบบ</p></div><div class="actions"><button class="btn" id="auditRefresh">รีเฟรช</button></div></div>
       <div class="panel"><div class="audit-filters"><select id="auditUser"><option value="">ผู้ใช้ทุกคน</option>${state.profiles.map(p=>`<option value="${p.id}" ${state.auditUserFilter===p.id?'selected':''}>${esc(p.display_name||p.email)}</option>`).join('')}</select><input id="auditSearch" placeholder="ค้นหา action / Product No. / Email"><select id="auditType"><option value="">ทุกประเภท</option><option value="session">Session</option><option value="record">Record</option><option value="pool_units">Pool</option><option value="evidence_files">Evidence</option><option value="profile">Profile</option><option value="settings">Settings</option><option value="user_admin">User Admin</option><option value="account">Account</option><option value="report">Report</option></select><button class="btn" id="auditClear">ล้างตัวกรอง</button></div><div id="auditHost"></div></div>`;
     const render=()=>{
       const uid=$('#auditUser').value,q=$('#auditSearch').value.trim().toLowerCase(),typ=$('#auditType').value;
