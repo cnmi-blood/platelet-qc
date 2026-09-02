@@ -9,6 +9,9 @@
   const isMobile = isIOS || isAndroid || /Mobile/i.test(ua);
   const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 
+  // Keep the install label generic even when the user is inside a specific module.
+  document.title = 'Blood QC';
+
   function setInstallButton() {
     const buttons = $$('.install-app-btn');
     if (!buttons.length) return;

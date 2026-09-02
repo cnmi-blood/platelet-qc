@@ -1,5 +1,5 @@
 {
-  "name": "CNMI Blood Component QC",
+  "name": "Blood QC",
   "short_name": "Blood QC",
   "description": "ระบบบันทึกการเตรียมและควบคุมคุณภาพส่วนประกอบโลหิตของ CNMI Blood Bank",
   "lang": "th",
@@ -22,5 +22,6 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "id": "./"
 }
