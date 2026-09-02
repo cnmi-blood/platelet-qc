@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.0.0 - multi-module shell / Platelet active */
+/* CNMI Blood Component QC v5.0.1 - concise multi-module shell / Platelet active */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -70,10 +70,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.0.0 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.0.1 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.0.0 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.0.1 · bloodqc.cnmiblood.com';
     }
     document.title=route.module?`${MODULE_META[route.module].label} | CNMI Blood Component QC`:'CNMI Blood Component QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -92,7 +92,7 @@
   function cfgReady(){ return C.SUPABASE_URL && C.SUPABASE_KEY && !C.SUPABASE_URL.includes('PASTE_') && !C.SUPABASE_KEY.includes('PASTE_'); }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'5.0.0',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.0.1',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -385,35 +385,30 @@
     const month=rec.filter(r=>r.collection_at && r.collection_at>=firstOfMonthISO());
     const qc=month.filter(r=>r.record_purpose==='qc').length;
     $('#view-home').innerHTML=`
-      <div class="page-head"><div><h1>CNMI Blood Component QC</h1><p class="muted">ระบบกลางสำหรับบันทึกการเตรียมและควบคุมคุณภาพส่วนประกอบโลหิต แยกการทำงานเป็นแต่ละ Module</p></div></div>
+      <div class="page-head"><div><h1>CNMI Blood Component QC</h1><p class="muted">ระบบบันทึกและควบคุมคุณภาพส่วนประกอบโลหิต</p></div></div>
       <div class="module-grid">
         <article class="module-card active-module">
-          <div class="module-card-head"><div><span class="module-kicker">เปิดใช้งาน</span><h2>Platelet</h2><p>Platelet Preparation & QC</p></div><span class="module-status live">ใช้งานจริง</span></div>
-          <div class="module-stats"><span><strong>${month.length}</strong> รายการเดือนนี้</span><span><strong>${qc}</strong> รายการที่ใช้เป็น QC</span></div>
+          <div class="module-card-head"><div><h2>Platelet</h2><p>Preparation & QC</p></div><span class="module-status live">ใช้งานจริง</span></div>
+          <div class="module-stats"><span><strong>${month.length}</strong> รายการเดือนนี้</span><span><strong>${qc}</strong> ใช้เป็น QC</span></div>
           <div class="module-actions"><button class="btn primary" data-go-route="#/platelet">ภาพรวม</button><button class="btn" data-go-route="#/platelet/new">บันทึกใหม่</button><button class="btn" data-go-route="#/platelet/records">รายการ</button></div>
-          <code>bloodqc.cnmiblood.com/#/platelet</code>
         </article>
-        ${futureModuleCard('rbc','RBC','Red Cell Preparation & QC')}
-        ${futureModuleCard('plasma','Plasma','Plasma Preparation & QC')}
+        ${futureModuleCard('rbc','RBC')}
+        ${futureModuleCard('plasma','Plasma')}
       </div>
-      ${adminUi()?`<div class="panel core-admin-panel"><h2>Admin กลาง</h2><p class="section-note">บัญชีผู้ใช้งานและ Audit Log ใช้ร่วมกันทุก Module</p><div class="actions left-actions"><button class="btn" data-go-route="#/admin/users">ผู้ใช้งานระบบ</button><button class="btn" data-go-route="#/admin/audit">ประวัติการใช้งาน</button></div></div>`:''}
-      <div class="notice info small"><strong>โครง URL เตรียมไว้แล้ว:</strong> Platelet ใช้งานจริง ส่วน RBC และ Plasma มี Route แยกครบ แต่ยังไม่เปิดฟอร์มและยังไม่สร้างตารางข้อมูลจนกว่าจะเริ่มพัฒนา Module นั้น</div>`;
+      ${adminUi()?`<div class="panel core-admin-panel"><h2>Admin</h2><div class="actions left-actions"><button class="btn" data-go-route="#/admin/users">ผู้ใช้งานระบบ</button><button class="btn" data-go-route="#/admin/audit">ประวัติการใช้งาน</button></div></div>`:''}`;
     bindRouteButtons($('#view-home'));
   }
 
-  function futureModuleCard(module,label,desc){
-    return `<article class="module-card future-module"><div class="module-card-head"><div><span class="module-kicker">เตรียมโครงไว้</span><h2>${label}</h2><p>${desc}</p></div><span class="module-status planned">ยังไม่เปิดใช้</span></div><p class="muted small">Route พร้อมสำหรับ Overview / New / Records / QC Settings โดยยังไม่กระทบข้อมูล Platelet</p><div class="module-actions"><button class="btn" data-go-route="#/${module}">ดูโครง Module</button></div><code>bloodqc.cnmiblood.com/#/${module}</code></article>`;
+  function futureModuleCard(module,label){
+    return `<article class="module-card future-module"><div class="module-card-head"><div><h2>${label}</h2></div><span class="module-status planned">ยังไม่เปิดใช้</span></div></article>`;
   }
 
   function renderModulePlaceholder(module,page='dashboard'){
     const meta=MODULE_META[module]||{label:module?.toUpperCase()||'-',title:'Module'};
     const pageTitle={dashboard:'ภาพรวม',record:'บันทึกใหม่',records:'รายการทั้งหมด',settings:'QC Settings'}[page]||'ภาพรวม';
-    const base=`#/${module}`;
     $('#view-module').innerHTML=`
-      <div class="page-head"><div><div class="breadcrumb"><button class="link-btn" data-go-route="#/">Blood Component QC</button><span>›</span><span>${esc(meta.label)}</span></div><h1>${esc(meta.label)} · ${pageTitle}</h1><p class="muted">โครง Module นี้เตรียมไว้แล้ว แต่ยังไม่เปิดใช้งานจริง</p></div><div class="actions"><button class="btn" data-go-route="#/">กลับหน้าหลัก</button></div></div>
-      <div class="panel module-placeholder-panel"><span class="module-status planned">ยังไม่เปิดใช้งาน</span><h2>${esc(meta.title)}</h2><p>ตอนนี้ยังไม่มีฟอร์ม ข้อมูล หรือเกณฑ์ QC ของ ${esc(meta.label)} ในระบบ เพื่อไม่ให้ปะปนกับ Platelet ก่อนที่หน่วยงานจะกำหนด Workflow และเกณฑ์ของ Module นี้</p>
-        <div class="route-plan"><div><span>Overview</span><code>bloodqc.cnmiblood.com${base}</code></div><div><span>New</span><code>bloodqc.cnmiblood.com${base}/new</code></div><div><span>Records</span><code>bloodqc.cnmiblood.com${base}/records</code></div><div><span>QC Settings · Admin</span><code>bloodqc.cnmiblood.com${base}/qc_settings</code></div></div>
-      </div>`;
+      <div class="page-head"><div><div class="breadcrumb"><button class="link-btn" data-go-route="#/">Blood Component QC</button><span>›</span><span>${esc(meta.label)}</span></div><h1>${esc(meta.label)} · ${pageTitle}</h1></div><div class="actions"><button class="btn" data-go-route="#/">กลับหน้าหลัก</button></div></div>
+      <div class="panel module-placeholder-panel"><span class="module-status planned">ยังไม่เปิดใช้งาน</span><h2>${esc(meta.label)}</h2></div>`;
     bindRouteButtons($('#view-module'));
   }
 
@@ -426,7 +421,7 @@
     const submitted=rec.filter(r=>r.status==='submitted').length;
     const attention=rec.filter(r=>r.record_purpose==='qc'&&r.qc_status==='review').length;
     $('#view-dashboard').innerHTML=`
-      <div class="page-head"><div><h1>ภาพรวม Platelet</h1><p class="muted">ติดตามการเตรียมเกล็ดเลือดทั้งหมด และแยกรายการที่กำหนดใช้เป็น QC</p></div><div class="actions"><button class="btn primary" id="dashNew">+ บันทึก Platelet</button></div></div>
+      <div class="page-head"><div><h1>ภาพรวม Platelet</h1><p class="muted">Prepare และ QC</p></div><div class="actions"><button class="btn primary" id="dashNew">+ บันทึก Platelet</button></div></div>
       <div class="grid cards">
         ${metric('เดือนนี้',month.length,'รายการทั้งหมด')}${metric('Prepare',prepare,'รายการปกติ')}${metric('ใช้เป็น QC',qc,'รายการ QC')}${metric('รอตรวจทวน',submitted,'Submitted')}${metric('QC ต้องตรวจสอบ',attention,'เฉพาะรายการ QC')}
       </div>
@@ -445,7 +440,7 @@
 
   function renderRecordsList(){
     const deletedControl=adminUi()?`<label class="inline-check"><input type="checkbox" id="fDeleted" ${state.showDeletedRecords?'checked':''}> แสดงรายการที่ลบแล้ว</label>`:'';
-    $('#view-records').innerHTML=`<div class="page-head"><div><h1>รายการ Platelet</h1><p class="muted">ค้นหาและเปิดดูข้อมูลการเตรียมเกล็ดเลือด ทั้ง Prepare และรายการที่ใช้เป็น QC</p></div><div class="actions"><button class="btn" id="exportCsv">Export CSV</button><button class="btn primary" id="listNew">+ บันทึก Platelet</button></div></div>
+    $('#view-records').innerHTML=`<div class="page-head"><div><h1>รายการ Platelet</h1><p class="muted">รายการ Prepare และ QC</p></div><div class="actions"><button class="btn" id="exportCsv">Export CSV</button><button class="btn primary" id="listNew">+ บันทึก Platelet</button></div></div>
       <div class="panel"><div class="filters"><input id="fSearch" placeholder="ค้นหา Product No. / ผลิตภัณฑ์"><select id="fPurpose"><option value="">Prepare + QC</option><option value="prepare">Prepare ตามปกติ</option><option value="qc">ใช้เป็น QC</option></select><select id="fStatus"><option value="">ทุกสถานะ</option><option value="draft">ร่าง</option><option value="submitted">รอตรวจทวน</option><option value="locked">LOCK</option></select><select id="fQc"><option value="">ทุกผล QC</option><option value="pass">ผ่านเกณฑ์ QC</option><option value="review">ต้องตรวจสอบ QC</option><option value="incomplete">ข้อมูล QC ยังไม่ครบ</option></select><select id="fProduct"><option value="">ทุกผลิตภัณฑ์</option>${activeProducts().map(x=>`<option>${esc(x.product_type)}</option>`).join('')}</select><button class="btn" id="fClear">ล้าง</button></div>${deletedControl}<div id="recordsTableHost" style="margin-top:12px"></div></div>`;
     const apply=()=>{
       const q=$('#fSearch').value.trim().toLowerCase(),purpose=$('#fPurpose').value,s=$('#fStatus').value,qc=$('#fQc').value,p=$('#fProduct').value;
@@ -482,7 +477,7 @@
       ${locked&&adminUi()&&!deleted?'<div class="notice warning"><strong>Admin correction</strong> รายการนี้ LOCK แล้ว แต่ Admin สามารถแก้ไขได้โดยระบุเหตุผล ระบบจะเพิ่ม Revision และบันทึกค่าก่อน/หลังใน Audit Log</div>':''}
       ${!locked&&!deleted?'<div class="notice info"><strong>บันทึกต่างวันได้</strong><br>CBC, ADAM และ pH สามารถกรอกภายหลังโดยเจ้าหน้าที่คนละคนได้ พร้อมเก็บวันเวลาและหลักฐานแยกกัน</div>':''}
       <form id="recordForm">
-      <div class="panel purpose-panel"><h2>1. รายการนี้ใช้ทำอะไร</h2><div class="purpose-selector" role="radiogroup" aria-label="ประเภทการบันทึก"><label class="purpose-option ${purpose==='prepare'?'selected':''}"><input type="radio" name="record_purpose" value="prepare" ${purpose==='prepare'?'checked':''} ${editable?'':'disabled'}><span><strong>Prepare ตามปกติ</strong><small>ค่าเริ่มต้น · บันทึกการเตรียมเกล็ดเลือดตามงานประจำ</small></span></label><label class="purpose-option ${purpose==='qc'?'selected':''}"><input type="radio" name="record_purpose" value="qc" ${purpose==='qc'?'checked':''} ${editable?'':'disabled'}><span><strong>ใช้เป็น QC</strong><small>เลือกเมื่อหน่วยกำหนดถุงนี้ให้เป็นตัวอย่าง QC</small></span></label></div><p class="section-note purpose-note">ไม่มีการสุ่ม QC อัตโนมัติ ถ้าเป็น Prepare ไม่ต้องแตะอะไรเพิ่ม</p></div>
+      <div class="panel purpose-panel"><h2>1. ประเภทรายการ</h2><div class="purpose-selector" role="radiogroup" aria-label="ประเภทการบันทึก"><label class="purpose-option ${purpose==='prepare'?'selected':''}"><input type="radio" name="record_purpose" value="prepare" ${purpose==='prepare'?'checked':''} ${editable?'':'disabled'}><span><strong>Prepare</strong><small>ค่าเริ่มต้น</small></span></label><label class="purpose-option ${purpose==='qc'?'selected':''}"><input type="radio" name="record_purpose" value="qc" ${purpose==='qc'?'checked':''} ${editable?'':'disabled'}><span><strong>ใช้เป็น QC</strong></span></label></div></div>
       ${adminCorrection?`<div class="panel admin-correction-panel"><h2>การแก้ไขโดย Admin</h2><p class="section-note">กรณีเจ้าหน้าที่แจ้งว่าลงผลผิด ให้ระบุเหตุผลก่อนบันทึก เช่น “เจ้าหน้าที่แจ้งว่า PLT ลงผลผิด ตรวจสอบหลักฐานใหม่แล้วแก้ไข” ระบบจะเก็บค่าก่อนและหลังไว้ใน Audit Log แนะนำให้คงหลักฐานเดิมและแนบหลักฐานใหม่เพิ่ม</p><div class="field"><label>เหตุผลการแก้ไขโดย Admin</label><textarea id="admin_edit_reason" placeholder="ระบุเหตุผลและสิ่งที่ตรวจสอบก่อนแก้ไข"></textarea></div></div>`:''}
       <div class="panel"><h2>2. ข้อมูลผลิตภัณฑ์</h2><div class="form-grid">
         ${field('Product No.','product_no',r?.product_no,'text',false,'','required')}
@@ -725,7 +720,7 @@
 
   async function renderSettings(){
     if(!adminUi()){location.hash=ROUTES.platelet.dashboard;return;} const s=state.settings;
-    $('#view-settings').innerHTML=`<div class="page-head"><div><div class="breadcrumb"><button class="link-btn" data-go-route="#/">Blood Component QC</button><span>›</span><button class="link-btn" data-go-route="#/platelet">Platelet</button><span>›</span><span>QC Settings</span></div><h1>ตั้งค่า Platelet QC</h1><p class="muted">ค่าการเตรียม LDPPC และเกณฑ์สำหรับรายการ Platelet ที่กำหนดใช้เป็น QC</p></div><div class="actions"><button class="btn" data-go-route="#/admin/audit">ประวัติการใช้งาน</button></div></div>
+    $('#view-settings').innerHTML=`<div class="page-head"><div><div class="breadcrumb"><button class="link-btn" data-go-route="#/">Blood Component QC</button><span>›</span><button class="link-btn" data-go-route="#/platelet">Platelet</button><span>›</span><span>QC Settings</span></div><h1>ตั้งค่า Platelet QC</h1></div><div class="actions"><button class="btn" data-go-route="#/admin/audit">ประวัติการใช้งาน</button></div></div>
       <div class="panel"><h2>ค่าคำนวณ Volume จากน้ำหนัก</h2><p class="section-note">เจ้าหน้าที่กรอกน้ำหนักที่ชั่งได้เป็นกรัม ระบบใช้สูตร (น้ำหนักที่ชั่งได้ − น้ำหนักถุงเปล่า) ÷ Density และเก็บค่าที่ใช้คำนวณไว้กับแต่ละรายการเพื่อทวนสอบย้อนหลัง</p><div class="table-wrap"><table class="data-table product-setting-table"><thead><tr><th>ผลิตภัณฑ์</th><th>น้ำหนักถุงเปล่า (g)</th><th>Density</th><th>Pool</th><th></th></tr></thead><tbody>${state.productSettings.filter(x=>x.is_active).map(x=>`<tr data-product-type="${esc(x.product_type)}"><td><strong>${esc(x.product_type)}</strong></td><td><input class="ps-tare" type="number" step="0.01" min="0" value="${esc(x.tare_weight_g)}"></td><td><input class="ps-density" type="number" step="0.001" min="0.001" value="${esc(x.density)}"></td><td>${x.requires_pool?'LDPPC 3–6 Units':'–'}</td><td><button class="btn small-btn ps-save" type="button" data-product="${esc(x.product_type)}">บันทึก</button></td></tr>`).join('')}</tbody></table></div></div>
       <div class="panel"><h2>เกณฑ์การ Pool และฉลาก LDPPC</h2><p class="section-note">ใช้กับทั้ง Prepare ตามปกติและรายการที่ใช้เป็น QC ไม่เกี่ยวกับการเลือกว่าจะนับรายการนั้นเป็น QC หรือไม่</p><div class="form-grid">${settingField('Pool PYI เกณฑ์ปกติ ≥','s_pool_standard',s.pool_pyi_standard_min)}${settingField('Pool PYI อนุโลมขั้นต่ำ','s_pool_conditional',s.pool_pyi_conditional_min)}${settingField('Platelet yield ช่วงอนุโลม ต้อง ≥','s_pool_yield',s.pool_conditional_yield_min)}</div><div class="notice info small" style="margin-top:12px">ค่าเริ่มต้น: Pool PYI ≥ 280 ผ่านเกณฑ์ปกติ · Pool PYI 260–&lt;280 ให้ Pool ได้กรณีจำเป็น แต่ต้องมี Platelet yield ≥ 2.00 ×10¹¹ cells/unit จึงผ่านสำหรับฉลากปกติ</div></div>
       <div class="notice warning"><strong>ก่อนเริ่มใช้งานจริง:</strong> ตรวจสอบค่าน้ำหนักถุง/Density เกณฑ์ Pool/ฉลาก และเกณฑ์ QC ให้ตรงกับ WI/ข้อกำหนดที่หน่วยอนุมัติ การเปลี่ยนค่าจะถูกบันทึกใน Audit Log</div>
