@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.0.4 - concise multi-module shell / Platelet active */
+/* CNMI Blood Component QC v5.0.5 - concise multi-module shell / Platelet active */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -26,7 +26,7 @@
   const productOptions = selected => activeProducts().map(x=>`<option value="${esc(x.product_type)}" ${selected===x.product_type?'selected':''}>${esc(x.product_type)}</option>`).join('');
   const ROUTES = {
     home:'#/',
-    platelet:{dashboard:'#/platelet',record:'#/platelet/new',records:'#/platelet/records',settings:'#/platelet/qc_settings'},
+    platelet:{dashboard:'#/platelet',record:'#/platelet/new',records:'#/platelet/records',guide:'#/platelet/guide',settings:'#/platelet/qc_settings'},
     rbc:{dashboard:'#/rbc',record:'#/rbc/new',records:'#/rbc/records',settings:'#/rbc/qc_settings'},
     plasma:{dashboard:'#/plasma',record:'#/plasma/new',records:'#/plasma/records',settings:'#/plasma/qc_settings'},
     users:'#/admin/users',
@@ -49,7 +49,7 @@
     plasma:{label:'Plasma',title:'Plasma Preparation & QC',active:false}
   };
   function routeForView(v){
-    const m={home:ROUTES.home,dashboard:ROUTES.platelet.dashboard,record:ROUTES.platelet.record,records:ROUTES.platelet.records,settings:ROUTES.platelet.settings,users:ROUTES.users,audit:ROUTES.audit};
+    const m={home:ROUTES.home,dashboard:ROUTES.platelet.dashboard,record:ROUTES.platelet.record,records:ROUTES.platelet.records,guide:ROUTES.platelet.guide,settings:ROUTES.platelet.settings,users:ROUTES.users,audit:ROUTES.audit};
     return m[v] || ROUTES.home;
   }
   function cleanHash(){ return (location.hash||'').replace(/\/+$/,'') || '#/'; }
@@ -63,7 +63,10 @@
     for(const [module,routes] of Object.entries({platelet:ROUTES.platelet,rbc:ROUTES.rbc,plasma:ROUTES.plasma})){
       for(const [page,hash] of Object.entries(routes)){
         if(h===hash){
-          if(module==='platelet') return {view:page==='dashboard'?'dashboard':page==='record'?'record':page==='records'?'records':'settings',module,page,hash,adminOnly:page==='settings'};
+          if(module==='platelet'){
+            const viewMap={dashboard:'dashboard',record:'record',records:'records',guide:'guide',settings:'settings'};
+            return {view:viewMap[page]||'dashboard',module,page,hash,adminOnly:page==='settings'};
+          }
           return {view:'module',module,page,hash,adminOnly:page==='settings'};
         }
       }
@@ -81,10 +84,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.0.4 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.0.5 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.0.4 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.0.5 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -103,7 +106,7 @@
   function cfgReady(){ return C.SUPABASE_URL && C.SUPABASE_KEY && !C.SUPABASE_URL.includes('PASTE_') && !C.SUPABASE_KEY.includes('PASTE_'); }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'5.0.4',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.0.5',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -424,6 +427,7 @@
     if(v==='dashboard') renderDashboard();
     if(v==='records') renderRecordsList();
     if(v==='record') renderRecordForm();
+    if(v==='guide') renderPlateletGuide();
     if(v==='settings') renderSettings();
     if(v==='users') renderUsers();
     if(v==='audit') renderAuditLog();
@@ -457,7 +461,7 @@
         <article class="module-card active-module">
           <div class="module-card-head"><div><h2>Platelet</h2><p>Preparation & QC</p></div><span class="module-status live">ใช้งานจริง</span></div>
           <div class="module-stats"><span><strong>${month.length}</strong> รายการเดือนนี้</span><span><strong>${qc}</strong> ใช้เป็น QC</span></div>
-          <div class="module-actions"><button class="btn primary" data-go-route="#/platelet">ภาพรวม</button><button class="btn" data-go-route="#/platelet/new">บันทึกใหม่</button><button class="btn" data-go-route="#/platelet/records">รายการ</button></div>
+          <div class="module-actions"><button class="btn primary" data-go-route="#/platelet">ภาพรวม</button><button class="btn" data-go-route="#/platelet/new">บันทึกใหม่</button><button class="btn" data-go-route="#/platelet/records">รายการ</button><button class="btn" data-go-route="#/platelet/guide">คู่มือ</button></div>
         </article>
         ${futureModuleCard('rbc','RBC')}
         ${futureModuleCard('plasma','Plasma')}
@@ -468,6 +472,21 @@
 
   function futureModuleCard(module,label){
     return `<article class="module-card future-module"><div class="module-card-head"><div><h2>${label}</h2></div><span class="module-status planned">ยังไม่เปิดใช้</span></div></article>`;
+  }
+
+  function renderPlateletGuide(){
+    $('#view-guide').innerHTML=`
+      <div class="page-head"><div><h1>คู่มือ Platelet</h1><p class="muted">สรุปวิธีใช้งานสำหรับเจ้าหน้าที่</p></div><div class="actions"><button class="btn primary" data-go-route="#/platelet/new">+ บันทึก Platelet</button></div></div>
+      <div class="guide-grid">
+        <section class="guide-card"><div class="guide-no">1</div><div><h2>เลือก Prepare หรือ QC</h2><p><strong>Prepare</strong> เป็นค่าเริ่มต้น ใช้บันทึกการเตรียมตามปกติและคำนวณค่าให้ครบ แต่ไม่ตัดสินผล QC</p><p><strong>ใช้เป็น QC</strong> เลือกเฉพาะถุงที่หน่วยกำหนดให้นับเป็น QC</p></div></section>
+        <section class="guide-card"><div class="guide-no">2</div><div><h2>กรอกข้อมูลผลิตภัณฑ์</h2><p>กรอก Product No., ชนิดผลิตภัณฑ์, Group, วัน-เวลาเริ่มเจาะ และ <strong>น้ำหนักที่ชั่งได้เป็น g</strong></p><div class="guide-callout">ระบบใส่น้ำหนักถุงเปล่าและ Density ตามชนิดผลิตภัณฑ์ แล้วคำนวณ Volume = (น้ำหนักที่ชั่งได้ − น้ำหนักถุงเปล่า) ÷ Density</div><p>วัน-เวลาหมดอายุคำนวณจากวัน-เวลาเริ่มเจาะตามค่าที่ Admin กำหนด</p></div></section>
+        <section class="guide-card"><div class="guide-no">3</div><div><h2>LDPPC: Pool PYI</h2><p>กรอก Unit No. และ PYI จำนวน 3–6 ถุง ระบบรวม Pool PYI ให้อัตโนมัติ</p><div class="guide-rule-row"><span class="guide-rule good">PYI ≥ ${fmt(state.settings.pool_pyi_standard_min,0)} · ปกติ</span><span class="guide-rule warn">${fmt(state.settings.pool_pyi_conditional_min,0)}–${fmt(state.settings.pool_pyi_standard_min-1,0)} · กรณีจำเป็น</span></div><p>ช่วงกรณีจำเป็น ต้องตรวจ CBC และมี Platelet yield ≥ ${fmt(state.settings.pool_conditional_yield_min,2)} ×10¹¹ cells/unit จึงผ่านสำหรับฉลากปกติ</p></div></section>
+        <section class="guide-card"><div class="guide-no">4</div><div><h2>ผล CBC, ADAM และ pH</h2><p>ผลทั้ง 3 ส่วน <strong>กรอกคนละวันหรือคนละคนได้</strong> ให้บันทึกวัน-เวลาที่วัดจริงในแต่ละช่อง</p><p>ถ้า pH วัดไม่ตรงวันหมดอายุ ระบบจะเตือนและให้ระบุเหตุผลก่อนส่งตรวจทวน</p></div></section>
+        <section class="guide-card"><div class="guide-no">5</div><div><h2>แนบหลักฐาน</h2><p>ถ่ายรูปหรือเลือกไฟล์ของ CBC / ADAM / pH แยกกัน ไฟล์เก็บใน Private Storage</p><div class="guide-callout"><strong>ถ้ามีการแก้หลัง LOCK:</strong> ให้คงหลักฐานเดิมไว้ และแนบหลักฐานใหม่เพิ่ม เพื่อทวนสอบย้อนหลังได้</div></div></section>
+        <section class="guide-card"><div class="guide-no">6</div><div><h2>บันทึก → ตรวจทวน → LOCK</h2><p><strong>บันทึก</strong> ใช้เก็บเป็น Draft และกลับมาเติมผลภายหลังได้ เมื่อข้อมูลพร้อมจึง <strong>ส่งตรวจทวน</strong> และผู้มีสิทธิ์จึง LOCK รายการ</p><p>Admin แก้รายการที่ LOCK แล้วได้เมื่อจำเป็น แต่ต้องระบุเหตุผล ระบบเก็บค่าก่อน–หลัง ผู้แก้ วันเวลา และ Revision ใน Audit Log</p></div></section>
+      </div>
+      <div class="panel guide-terms"><h2>คำที่ใช้ในระบบ</h2><div class="term-grid"><div><strong>Prepare</strong><span>รายการเตรียมตามปกติ</span></div><div><strong>QC</strong><span>รายการที่นำไปประเมินเกณฑ์ QC</span></div><div><strong>Draft</strong><span>ยังกรอกต่อได้</span></div><div><strong>Submitted</strong><span>ส่งให้ตรวจทวนแล้ว</span></div><div><strong>LOCK</strong><span>ตรวจทวนเสร็จและล็อกข้อมูล</span></div><div><strong>Revision</strong><span>ครั้งที่แก้ไขหลังการล็อก</span></div></div></div>`;
+    bindRouteButtons($('#view-guide'));
   }
 
   function renderModulePlaceholder(module,page='dashboard'){
@@ -538,37 +557,36 @@
     const purpose=r?.record_purpose||'prepare';
     const adminCorrection=r&&adminUi()&&!deleted;
     $('#view-record').innerHTML=`
-      <div class="page-head"><div><h1>${r?'แก้ไข / ตรวจรายการ Platelet':'บันทึก Platelet'}</h1><p class="muted">ใช้ฟอร์มเดียวกันทุกถุง ค่าเริ่มต้นเป็น Prepare ตามปกติ ถ้าถุงนี้ใช้เป็น QC ให้เลือก “ใช้เป็น QC” ที่ด้านบน</p></div><div class="status-line">${r?purposeBadge(purpose)+deletedBadge(r)+statusBadge(r.status)+qcBadgeForRecord(r)+pHBadge(r):purposeBadge('prepare')}</div></div>
+      <div class="page-head"><div><h1>${r?'แก้ไข / ตรวจรายการ Platelet':'บันทึก Platelet'}</h1></div><div class="page-head-tools"><button type="button" class="btn small-btn" id="recordGuideBtn">คู่มือ</button><div class="status-line">${r?purposeBadge(purpose)+deletedBadge(r)+statusBadge(r.status)+qcBadgeForRecord(r)+pHBadge(r):purposeBadge('prepare')}</div></div></div>
       ${deleted?`<div class="notice bad"><strong>รายการนี้ถูกลบออกจากการใช้งานแล้ว</strong><br>เหตุผล: ${esc(r.delete_reason||'–')} · ${dateTH(r.deleted_at)} · โดย ${esc(profileName(r.deleted_by))}</div>`:''}
       ${locked&&!adminUi()?'<div class="notice good"><strong>รายการนี้ LOCK แล้ว</strong> ข้อมูลถูกป้องกันการแก้ไข หากพบข้อผิดพลาดให้แจ้ง Admin พร้อมหลักฐาน</div>':''}
       ${locked&&adminUi()&&!deleted?'<div class="notice warning"><strong>Admin correction</strong> รายการนี้ LOCK แล้ว แต่ Admin สามารถแก้ไขได้โดยระบุเหตุผล ระบบจะเพิ่ม Revision และบันทึกค่าก่อน/หลังใน Audit Log</div>':''}
-      ${!locked&&!deleted?'<div class="notice info"><strong>บันทึกต่างวันได้</strong><br>CBC, ADAM และ pH สามารถกรอกภายหลังโดยเจ้าหน้าที่คนละคนได้ พร้อมเก็บวันเวลาและหลักฐานแยกกัน</div>':''}
       <form id="recordForm">
       <div class="panel purpose-panel"><h2>1. ประเภทรายการ</h2><div class="purpose-selector" role="radiogroup" aria-label="ประเภทการบันทึก"><label class="purpose-option ${purpose==='prepare'?'selected':''}"><input type="radio" name="record_purpose" value="prepare" ${purpose==='prepare'?'checked':''} ${editable?'':'disabled'}><span><strong>Prepare</strong><small>ค่าเริ่มต้น</small></span></label><label class="purpose-option ${purpose==='qc'?'selected':''}"><input type="radio" name="record_purpose" value="qc" ${purpose==='qc'?'checked':''} ${editable?'':'disabled'}><span><strong>ใช้เป็น QC</strong></span></label></div></div>
-      ${adminCorrection?`<div class="panel admin-correction-panel"><h2>การแก้ไขโดย Admin</h2><p class="section-note">กรณีเจ้าหน้าที่แจ้งว่าลงผลผิด ให้ระบุเหตุผลก่อนบันทึก เช่น “เจ้าหน้าที่แจ้งว่า PLT ลงผลผิด ตรวจสอบหลักฐานใหม่แล้วแก้ไข” ระบบจะเก็บค่าก่อนและหลังไว้ใน Audit Log แนะนำให้คงหลักฐานเดิมและแนบหลักฐานใหม่เพิ่ม</p><div class="field"><label>เหตุผลการแก้ไขโดย Admin</label><textarea id="admin_edit_reason" placeholder="ระบุเหตุผลและสิ่งที่ตรวจสอบก่อนแก้ไข"></textarea></div></div>`:''}
+      ${adminCorrection?`<div class="panel admin-correction-panel"><div class="section-title-row"><h2>การแก้ไขโดย Admin</h2><span class="section-badge warning">เก็บก่อน–หลังใน Audit Log</span></div><div class="field"><label>เหตุผลการแก้ไขโดย Admin</label><textarea id="admin_edit_reason" placeholder="เช่น เจ้าหน้าที่แจ้งผลผิด ตรวจหลักฐานใหม่แล้วแก้ไข"></textarea></div></div>`:''}
       <div class="panel"><h2>2. ข้อมูลผลิตภัณฑ์</h2><div class="form-grid">
         ${field('Product No.','product_no',r?.product_no,'text',false,'','required')}
         <div class="field"><label class="required">ผลิตภัณฑ์</label><select id="product_type" ${editable?'':'disabled'}><option value="">เลือก</option>${productOptions(r?.product_type)}${r?.product_type&&!productSetting(r.product_type)?`<option value="${esc(r.product_type)}" selected>${esc(r.product_type)} (ข้อมูลเดิม)</option>`:''}</select></div>
         <div class="field"><label>Group</label><select id="blood_group" ${editable?'':'disabled'}><option value="">เลือก</option>${['O','A','B','AB'].map(x=>`<option ${r?.blood_group===x?'selected':''}>${x}</option>`).join('')}</select></div>
         ${field('วัน-เวลาเริ่มเจาะถุงที่ 1','collection_at',inputFromISO(r?.collection_at),'datetime-local',false,'','required')}
         ${field('น้ำหนักที่ชั่งได้ (g)','gross_weight_g',r?.gross_weight_g,'number',false,'0.01','required')}
-        <div class="field"><label>น้ำหนักถุงเปล่า (g)</label><input id="bag_tare_weight_g" readonly value="${esc(r?.bag_tare_weight_g??'')}"><span class="hint">ระบบกำหนดตามชนิดผลิตภัณฑ์</span></div>
-        <div class="field"><label>Density</label><input id="density" readonly value="${esc(r?.density??'')}"><span class="hint">ระบบกำหนดตามชนิดผลิตภัณฑ์</span></div>
-        <div class="field"><label>Volume ที่คำนวณได้ (mL)</label><input id="volume_ml" readonly value="${esc(r?.volume_ml??'')}"><span class="hint">(น้ำหนักที่ชั่งได้ − น้ำหนักถุงเปล่า) ÷ Density</span></div>
-        <div class="field"><label>วัน-เวลาหมดอายุ</label><input id="expiry_preview" readonly value="${esc(inputFromISO(r?.expiry_at))}"><span class="hint">คำนวณอัตโนมัติจากวัน/เวลาเริ่มเจาะ + ${state.settings.expiry_days} วัน</span></div>
+        <div class="field"><label>น้ำหนักถุงเปล่า (g) <span class="field-badge">อัตโนมัติ</span></label><input id="bag_tare_weight_g" readonly value="${esc(r?.bag_tare_weight_g??'')}"></div>
+        <div class="field"><label>Density <span class="field-badge">อัตโนมัติ</span></label><input id="density" readonly value="${esc(r?.density??'')}"></div>
+        <div class="field"><label>Volume (mL) <span class="field-badge">คำนวณอัตโนมัติ</span></label><input id="volume_ml" readonly value="${esc(r?.volume_ml??'')}"></div>
+        <div class="field"><label>วัน-เวลาหมดอายุ <span class="field-badge">อัตโนมัติ</span></label><input id="expiry_preview" readonly value="${esc(inputFromISO(r?.expiry_at))}"></div>
         <div class="field span2"><label>ผู้บันทึกครั้งแรก</label><input readonly value="${esc(r?dateTH(r.created_at)+' · '+profileName(r.created_by):(state.profile.display_name||state.profile.email))}"></div>
       </div></div>
-      <div class="panel" id="poolPanel"><h2>3. Units ที่ใช้ Pool (เฉพาะ LDPPC)</h2><p class="section-note">ใส่ 3–6 ถุง ระบบรวม Pool PYI ให้อัตโนมัติ · เกณฑ์ปกติ Pool PYI ≥ ${fmt(state.settings.pool_pyi_standard_min,0)} · กรณีจำเป็น Pool PYI ${fmt(state.settings.pool_pyi_conditional_min,0)} ถึง &lt;${fmt(state.settings.pool_pyi_standard_min,0)} ให้ Pool ได้ แต่ต้องตรวจ CBC และ Platelet yield ≥ ${fmt(state.settings.pool_conditional_yield_min,2)} ×10¹¹ cells/unit จึงถือว่าผ่านสำหรับฉลากปกติ</p><div class="table-wrap"><table class="pool-table"><thead><tr><th>#</th><th>Unit No.</th><th>PYI</th></tr></thead><tbody>${[1,2,3,4,5,6].map(i=>{const u=pool.find(x=>x.position===i);return `<tr><td>${i}</td><td><input class="pool-unit" data-pos="${i}" value="${esc(u?.unit_no||'')}" ${editable?'':'disabled'} placeholder="Unit No."></td><td><input class="pool-pyi" data-pos="${i}" type="number" step="0.01" min="0" value="${esc(u?.pyi??'')}" ${editable?'':'disabled'} placeholder="PYI"></td></tr>`}).join('')}</tbody></table></div><div class="pool-summary-grid"><div class="calc-box"><span>Pool PYI</span><strong id="poolSum">${fmt(r?.pool_pyi,2)}</strong></div><div class="calc-box pool-rule-box"><span>สถานะการ Pool / ฉลาก</span><div id="poolRuleStatus">${poolReleaseBadge(r?.pool_release_status)}</div><small id="poolRuleHint"></small></div></div></div>
-      <div class="panel"><h2>4. ผล Platelet จาก CBC</h2><p class="section-note">บันทึกวัน-เวลาที่ตรวจ CBC จริง เผื่อกรอกภายหลังหรือกรอกโดยเจ้าหน้าที่คนละคน</p><div class="form-grid">
+      <div class="panel" id="poolPanel"><div class="section-title-row"><h2>3. Units ที่ใช้ Pool (เฉพาะ LDPPC)</h2><div class="rule-chips"><span class="rule-chip">PYI ≥ ${fmt(state.settings.pool_pyi_standard_min,0)}</span><span class="rule-chip warn">${fmt(state.settings.pool_pyi_conditional_min,0)}–${fmt(state.settings.pool_pyi_standard_min-1,0)} → Yield ≥ ${fmt(state.settings.pool_conditional_yield_min,2)}</span></div></div><div class="table-wrap"><table class="pool-table"><thead><tr><th>#</th><th>Unit No.</th><th>PYI</th></tr></thead><tbody>${[1,2,3,4,5,6].map(i=>{const u=pool.find(x=>x.position===i);return `<tr><td>${i}</td><td><input class="pool-unit" data-pos="${i}" value="${esc(u?.unit_no||'')}" ${editable?'':'disabled'} placeholder="Unit No."></td><td><input class="pool-pyi" data-pos="${i}" type="number" step="0.01" min="0" value="${esc(u?.pyi??'')}" ${editable?'':'disabled'} placeholder="PYI"></td></tr>`}).join('')}</tbody></table></div><div class="pool-summary-grid"><div class="calc-box"><span>Pool PYI</span><strong id="poolSum">${fmt(r?.pool_pyi,2)}</strong></div><div class="calc-box pool-rule-box"><span>สถานะการ Pool / ฉลาก</span><div id="poolRuleStatus">${poolReleaseBadge(r?.pool_release_status)}</div><small id="poolRuleHint"></small></div></div></div>
+      <div class="panel"><h2>4. ผล Platelet จาก CBC</h2><div class="form-grid">
         <div class="field"><label>เครื่อง</label><select id="plt_instrument" ${editable?'':'disabled'}><option value="">เลือก</option>${['Mindray','Sysmex'].map(x=>`<option ${r?.plt_instrument===x?'selected':''}>${x}</option>`).join('')}</select></div>
         ${field('PLT ครั้งที่ 1 (K/µL)','plt_value_1',r?.plt_value_1,'number',false,'0.01')}${field('PLT ครั้งที่ 2 (K/µL)','plt_value_2',r?.plt_value_2,'number',false,'0.01')}
         ${field('วัน-เวลาที่วัด CBC','plt_measured_at',inputFromISO(r?.plt_measured_at),'datetime-local')}
         <div class="field"><label>ค่าที่ใช้คำนวณ</label><select id="plt_use_mode" ${editable?'':'disabled'}>${[['first','ครั้งที่ 1'],['second','ครั้งที่ 2'],['average','ค่าเฉลี่ยครั้งที่ 1–2']].map(([v,t])=>`<option value="${v}" ${(r?.plt_use_mode||'first')===v?'selected':''}>${t}</option>`).join('')}</select></div>
       </div></div>
-      <div class="panel"><h2>5. WBC จาก ADAM</h2><p class="section-note">บันทึกวัน-เวลาที่อ่านค่า ADAM จริงได้แยกจาก CBC</p><div class="form-grid">${field('WBC (/µL)','wbc_adam',r?.wbc_adam,'number',false,'0.0001')}${field('วัน-เวลาที่วัด ADAM','wbc_measured_at',inputFromISO(r?.wbc_measured_at),'datetime-local')}</div></div>
-      <div class="panel"><h2>6. pH ณ วันหมดอายุ</h2><p class="section-note">ถ้าวัดไม่ตรงวันหมดอายุ ระบบจะเตือนและให้ระบุเหตุผลก่อนส่งตรวจทวน</p><div class="form-grid">${field('pH','ph_value',r?.ph_value,'number',false,'0.001')}${field('วัน-เวลาที่วัด pH','ph_measured_at',inputFromISO(r?.ph_measured_at),'datetime-local')}<div class="field span2"><label>เหตุผล ถ้าวัด pH ไม่ตรงวันหมดอายุ</label><input id="ph_deviation_reason" value="${esc(r?.ph_deviation_reason||'')}" ${editable?'':'disabled'} placeholder="เช่น เครื่องขัดข้อง / วัดล่าช้า 2 วัน"></div></div></div>
+      <div class="panel"><h2>5. WBC จาก ADAM</h2><div class="form-grid">${field('WBC (/µL)','wbc_adam',r?.wbc_adam,'number',false,'0.0001')}${field('วัน-เวลาที่วัด ADAM','wbc_measured_at',inputFromISO(r?.wbc_measured_at),'datetime-local')}</div></div>
+      <div class="panel"><h2>6. pH ณ วันหมดอายุ</h2><div class="form-grid">${field('pH','ph_value',r?.ph_value,'number',false,'0.001')}${field('วัน-เวลาที่วัด pH','ph_measured_at',inputFromISO(r?.ph_measured_at),'datetime-local')}<div class="field span2"><label>เหตุผล ถ้าวัด pH ไม่ตรงวันหมดอายุ</label><input id="ph_deviation_reason" value="${esc(r?.ph_deviation_reason||'')}" ${editable?'':'disabled'} placeholder="เช่น เครื่องขัดข้อง / วัดล่าช้า 2 วัน"></div></div></div>
       <div class="panel"><h2>7. ผลคำนวณอัตโนมัติ</h2><div class="calc-grid"><div class="calc-box"><span>PLT ที่ใช้</span><strong id="cPlt">${fmt(r?.plt_used,2)}</strong><small>K/µL</small></div><div class="calc-box"><span>Platelet yield</span><strong id="cYield">${fmt(r?.platelet_yield,3)}</strong><small>×10¹¹ cells/unit</small></div><div class="calc-box"><span>Equivalent Units</span><strong id="cEq">${fmt(r?.equivalent_units,2)}</strong><small>factor ${state.settings.equivalent_unit_factor}</small></div><div class="calc-box"><span>Residual WBC</span><strong id="cWbc">${fmt(r?.residual_wbc,3)}</strong><small>×10⁶ cells/unit</small></div></div><div id="calcWarnings" style="margin-top:12px"></div></div>
-      <div class="panel"><h2>8. หลักฐานจากเครื่อง</h2><p class="section-note">ไฟล์เก็บใน Private Storage หาก Admin แก้ไขหลัง LOCK แนะนำให้คงไฟล์เดิมและแนบหลักฐานใหม่เพิ่มเพื่อทวนสอบย้อนหลัง</p><div class="evidence-grid">${evidenceBox('cbc','CBC / PLT')}${evidenceBox('adam','ADAM / WBC')}${evidenceBox('ph','pH')}</div></div>
+      <div class="panel"><div class="section-title-row"><h2>8. หลักฐานจากเครื่อง</h2><span class="section-badge">Private</span></div><div class="evidence-grid">${evidenceBox('cbc','CBC / PLT')}${evidenceBox('adam','ADAM / WBC')}${evidenceBox('ph','pH')}</div></div>
       <div class="panel"><h2>9. หมายเหตุ</h2><textarea id="notes" ${editable?'':'disabled'} placeholder="บันทึกเหตุการณ์หรือข้อมูลเพิ่มเติม">${esc(r?.notes||'')}</textarea></div>
       <div class="sticky-actions"><div class="left"><button type="button" class="btn" id="cancelEdit">กลับรายการทั้งหมด</button></div><div class="right ${!r?'new-record-actions':''}">${!r&&editable?'<button type="button" class="btn clear-form-btn" id="clearForm">ล้างฟอร์ม</button>':''}${editable?'<button type="button" class="btn" id="saveDraft">บันทึก</button>':''}${r&&r.status==='draft'&&editable?'<button type="button" class="btn primary" id="submitReview">ส่งตรวจทวน</button>':''}${r&&r.status==='submitted'&&reviewerUi()?'<button type="button" class="btn good" id="lockRecord">ตรวจทวนและ LOCK</button>':''}${r&&r.status==='locked'&&adminUi()&&!deleted?'<button type="button" class="btn danger" id="unlockRecord">ปลดล็อกเป็น Draft</button>':''}</div></div>
       </form>`;
@@ -576,7 +594,7 @@
     $$('input[name="record_purpose"]').forEach(el=>el.addEventListener('change',()=>{$$('.purpose-option').forEach(x=>x.classList.toggle('selected',$('input',x)?.checked));updateCalcPreview();}));
     $('#product_type').addEventListener('change',()=>{applyProductWeightConfig(null);togglePool();updateCalcPreview();}); ['collection_at','gross_weight_g','plt_value_1','plt_value_2','plt_use_mode','wbc_adam','ph_value','ph_measured_at','plt_measured_at','wbc_measured_at'].forEach(id=>$('#'+id)?.addEventListener('input',updateCalcPreview));
     $$('.pool-pyi,.pool-unit').forEach(x=>x.addEventListener('input',updatePoolPreview));
-    $('#cancelEdit').onclick=()=>switchView('records'); if($('#clearForm')) $('#clearForm').onclick=clearNewRecordForm; if($('#saveDraft')) $('#saveDraft').onclick=()=>saveRecord(false); if($('#submitReview')) $('#submitReview').onclick=submitRecord; if($('#lockRecord')) $('#lockRecord').onclick=lockRecord; if($('#unlockRecord')) $('#unlockRecord').onclick=unlockRecord;
+    $('#recordGuideBtn').onclick=()=>switchView('guide'); $('#cancelEdit').onclick=()=>switchView('records'); if($('#clearForm')) $('#clearForm').onclick=clearNewRecordForm; if($('#saveDraft')) $('#saveDraft').onclick=()=>saveRecord(false); if($('#submitReview')) $('#submitReview').onclick=submitRecord; if($('#lockRecord')) $('#lockRecord').onclick=lockRecord; if($('#unlockRecord')) $('#unlockRecord').onclick=unlockRecord;
   }
 
   function field(label,id,value,type='text',readonly=false,step='',required=''){ const disabled=readonly?'readonly':''; return `<div class="field"><label class="${required}">${label}</label><input id="${id}" type="${type}" value="${esc(value??'')}" ${step?`step="${step}"`:''} ${type==='number'?'min="0"':''} ${disabled}></div>`; }
@@ -605,11 +623,10 @@
     const poolPyi=currentPoolSum(),c=calcFrontend(),st=poolReleaseState(poolPyi,c.y);
     $('#poolRuleStatus').innerHTML=poolReleaseBadge(st);
     const std=Number(state.settings.pool_pyi_standard_min??280),cond=Number(state.settings.pool_pyi_conditional_min??260),yieldMin=Number(state.settings.pool_conditional_yield_min??2);
-    const hint=st==='standard'?`Pool PYI ≥ ${fmt(std,0)} ใช้เกณฑ์ปกติ`:
-      st==='conditional_pending'?`Pool PYI ${fmt(poolPyi,2)} อยู่ช่วงอนุโลม ${fmt(cond,0)}–<${fmt(std,0)} · ต้องมี Platelet yield ≥ ${fmt(yieldMin,2)} ×10¹¹ cells/unit`:
-      st==='conditional_pass'?`Pool PYI ${fmt(poolPyi,2)} อยู่ช่วงอนุโลม และ Yield ${fmt(c.y,3)} ≥ ${fmt(yieldMin,2)} · ผ่านสำหรับฉลากปกติ`:
-      st==='conditional_fail'?`Pool PYI ${fmt(poolPyi,2)} อยู่ช่วงอนุโลม แต่ Yield ${fmt(c.y,3)} < ${fmt(yieldMin,2)} · ไม่ผ่านเงื่อนไขฉลากปกติ`:
-      st==='below_min'?`Pool PYI ${fmt(poolPyi,2)} ต่ำกว่า ${fmt(cond,0)} · ไม่เข้าเงื่อนไขอนุโลม`:'กรอก PYI ของ Units ที่ใช้ Pool';
+    const hint=st==='conditional_pending'?`รอ Platelet yield ≥ ${fmt(yieldMin,2)}`:
+      st==='conditional_pass'?`Yield ${fmt(c.y,3)} ≥ ${fmt(yieldMin,2)}`:
+      st==='conditional_fail'?`Yield ${fmt(c.y,3)} < ${fmt(yieldMin,2)}`:
+      st==='below_min'?`ต่ำกว่า ${fmt(cond,0)}`:'';
     if($('#poolRuleHint')) $('#poolRuleHint').textContent=hint;
   }
   function clearNewRecordForm(){
@@ -632,7 +649,7 @@
     const pm=$('#ph_measured_at')?.value, ex=$('#expiry_preview')?.value; if(pm&&ex&&pm.slice(0,10)!==ex.slice(0,10))w.push('วันที่วัด pH ไม่ตรงวันหมดอายุ ต้องใส่เหตุผลก่อนส่งตรวจทวน');
     if(w.length) $('#calcWarnings').innerHTML=`<div class="notice warning"><strong>ต้องตรวจสอบ</strong><br>${w.map(esc).join('<br>')}</div>`;
     else if(isQc) $('#calcWarnings').innerHTML='<div class="notice good">ยังไม่พบเงื่อนไขเตือนตามเกณฑ์ QC จากค่าที่กรอก</div>';
-    else $('#calcWarnings').innerHTML='<div class="notice info"><strong>Prepare ตามปกติ</strong> ระบบคำนวณค่าให้ครบ แต่ไม่นำรายการนี้ไปตัดสินผ่าน/ไม่ผ่าน QC</div>';
+    else $('#calcWarnings').innerHTML='';
     updatePoolRuleStatus();
   }
   function evidenceBox(cat,title){ return `<div class="evidence-box"><h3>${title}</h3><div class="muted small">มือถือถ่ายรูปหลักฐานได้ทันที หรือเลือกภาพ/PDF ที่มีอยู่</div><input class="hidden-file-input" type="file" id="camera_${cat}" accept="image/*" capture="environment"><input class="hidden-file-input" type="file" id="file_${cat}" accept="image/*,application/pdf"><div class="evidence-pick-actions"><button type="button" class="btn primary small-btn camera-pick" data-cat="${cat}">ถ่ายรูป</button><button type="button" class="btn small-btn file-pick" data-cat="${cat}">เลือกไฟล์</button></div><div class="evidence-list" id="list_${cat}"></div></div>`; }
@@ -762,7 +779,7 @@
       ${r.deleted_at?`<div class="notice bad"><strong>ลบออกจากรายการใช้งานแล้ว</strong><br>${esc(r.delete_reason||'–')} · ${dateTH(r.deleted_at)} · ${esc(profileName(r.deleted_by))}</div>`:''}
       <div class="divider"></div><div class="detail-grid">${dcell('ประเภท',purposeTH(r.record_purpose))}${dcell('กำหนดประเภทเมื่อ',dateTH(r.purpose_selected_at))}${dcell('กำหนดโดย',profileName(r.purpose_selected_by))}${dcell('Group',r.blood_group)}${dcell('วัน-เวลาเริ่มเจาะ',dateTH(r.collection_at))}${dcell('วัน-เวลาหมดอายุ',dateTH(r.expiry_at))}${dcell('น้ำหนักที่ชั่งได้',fmt(r.gross_weight_g,2)+' g')}${dcell('น้ำหนักถุงเปล่า',fmt(r.bag_tare_weight_g,2)+' g')}${dcell('Density',fmt(r.density,2))}${dcell('Volume',fmt(r.volume_ml,2)+' mL')}${dcell('Pool PYI',fmt(r.pool_pyi,2))}${dcell('สถานะ Pool / ฉลาก',poolReleaseTH(r.pool_release_status))}${dcell('เครื่อง CBC',r.plt_instrument)}${dcell('วันเวลาวัด CBC',measuredTH(r.plt_measured_at))}${dcell('PLT ที่ใช้',fmt(r.plt_used,2)+' K/µL')}${dcell('Platelet yield',fmt(r.platelet_yield,3)+' ×10¹¹')}${dcell('Equivalent Units',fmt(r.equivalent_units,2))}${dcell('WBC ADAM',fmt(r.wbc_adam,4)+' /µL')}${dcell('วันเวลาวัด ADAM',measuredTH(r.wbc_measured_at))}${dcell('Residual WBC',fmt(r.residual_wbc,3)+' ×10⁶')}${dcell('pH',fmt(r.ph_value,3))}${dcell('วันเวลาวัด pH',dateTH(r.ph_measured_at))}${dcell('ผู้บันทึก',profileName(r.created_by))}${dcell('ผู้ LOCK',profileName(r.locked_by))}</div>
       ${r.pool_release_status&&r.pool_release_status!=='not_applicable'?`<div class="notice ${['standard','conditional_pass'].includes(r.pool_release_status)?'good':['conditional_pending'].includes(r.pool_release_status)?'warning':'bad'}"><strong>การ Pool / ฉลาก:</strong> ${esc(poolReleaseTH(r.pool_release_status))}${r.pool_release_status==='conditional_pending'?` · ต้องมี Platelet yield ≥ ${fmt(state.settings.pool_conditional_yield_min,2)} ×10¹¹ cells/unit`:''}</div>`:''}
-      ${r.record_purpose==='qc'?`<div class="notice ${r.qc_status==='pass'?'good':r.qc_status==='review'?'warning':'info'}"><strong>ผลประเมิน QC:</strong> ${esc(qcTH(r.qc_status))}</div>`:'<div class="notice info"><strong>Prepare ตามปกติ</strong> ค่าตรวจและผลคำนวณยังถูกเก็บครบ แต่รายการนี้ไม่นำไปนับเป็น QC</div>'}
+      ${r.record_purpose==='qc'?`<div class="notice ${r.qc_status==='pass'?'good':r.qc_status==='review'?'warning':'info'}"><strong>ผลประเมิน QC:</strong> ${esc(qcTH(r.qc_status))}</div>`:'<div class="compact-status"><span class="badge prepare-purpose">Prepare · ไม่ประเมิน QC</span></div>'}
       ${r.ph_deviation_reason?`<div class="notice warning"><strong>เหตุผล pH ไม่ตรงวัน Exp.</strong><br>${esc(r.ph_deviation_reason)}</div>`:''}${r.notes?`<div class="panel"><h3>หมายเหตุ</h3>${esc(r.notes)}</div>`:''}
       <div class="panel"><h3>Units ที่ใช้ Pool</h3>${pool?.length?`<div class="table-wrap"><table class="data-table"><thead><tr><th>#</th><th>Unit No.</th><th>PYI</th></tr></thead><tbody>${pool.map(x=>`<tr><td>${x.position}</td><td>${esc(x.unit_no)}</td><td>${fmt(x.pyi,2)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">ไม่ใช่ LDPPC / ไม่มีข้อมูล Pool</div>'}</div>
       <div class="panel"><h3>หลักฐาน</h3><div class="evidence-list">${ev?.length?ev.map(x=>`<div class="evidence-item"><span class="name">${esc(x.category.toUpperCase())} · ${esc(x.original_name)}${x.change_reason?`<small class="evidence-reason">เหตุผล Admin: ${esc(x.change_reason)}</small>`:''}</span><button class="btn small-btn detail-evidence" data-path="${esc(x.storage_path)}">ดู</button></div>`).join(''):'<div class="muted">ยังไม่มีหลักฐาน</div>'}</div></div>
