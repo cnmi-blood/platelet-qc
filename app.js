@@ -249,7 +249,7 @@
 
   function renderRecordsList(){
     $('#view-records').innerHTML=`<div class="page-head"><div><h1>รายการทั้งหมด</h1><p class="muted">ค้นหาและเปิดดูข้อมูลย้อนหลัง</p></div><div class="actions"><button class="btn" id="exportCsv">Export CSV</button><button class="btn primary" id="listNew">+ บันทึกใหม่</button></div></div>
-      <div class="panel"><div class="filters"><input id="fSearch" placeholder="ค้นหา Product No. / ผลิตภัณฑ์"><select id="fStatus"><option value="">ทุกสถานะ</option><option value="draft">ร่าง</option><option value="submitted">รอตรวจทวน</option><option value="locked">LOCK</option></select><select id="fQc"><option value="">ทุก QC</option><option value="pass">ผ่าน</option><option value="review">ต้องตรวจสอบ</option><option value="incomplete">ไม่ครบ</option></select><select id="fProduct"><option value="">ทุกผลิตภัณฑ์</option><option>LDPPC Reveos</option><option>SDP Trima</option><option>SDP Amicus</option></select><button class="btn" id="fClear">ล้าง</button></div><div id="recordsTableHost"></div></div>`;
+      <div class="panel"><div class="filters"><input id="fSearch" placeholder="ค้นหา Product No. / ผลิตภัณฑ์"><select id="fStatus"><option value="">ทุกสถานะ</option><option value="draft">ร่าง</option><option value="submitted">รอตรวจทวน</option><option value="locked">LOCK</option></select><select id="fQc"><option value="">ทุก QC</option><option value="pass">ผ่าน</option><option value="review">ต้องตรวจสอบ</option><option value="incomplete">ไม่ครบ</option></select><select id="fProduct"><option value="">ทุกผลิตภัณฑ์</option><option>LDPPC Reveos</option><option>LDPPC Haemonetics</option><option>SDP Trima</option><option>SDP Amicus</option></select><button class="btn" id="fClear">ล้าง</button></div><div id="recordsTableHost"></div></div>`;
     const apply=()=>{ const q=$('#fSearch').value.trim().toLowerCase(),s=$('#fStatus').value,qc=$('#fQc').value,p=$('#fProduct').value; const rows=state.records.filter(r=>(!q||`${r.product_no} ${r.product_type}`.toLowerCase().includes(q))&&(!s||r.status===s)&&(!qc||r.qc_status===qc)&&(!p||r.product_type===p)); $('#recordsTableHost').innerHTML=recordsTable(rows); bindRecordLinks($('#recordsTableHost')); return rows; };
     ['#fSearch','#fStatus','#fQc','#fProduct'].forEach(x=>$(x).addEventListener('input',apply)); $('#fClear').onclick=()=>{['#fSearch','#fStatus','#fQc','#fProduct'].forEach(x=>$(x).value='');apply();};
     $('#listNew').onclick=()=>{state.currentRecordId=null;switchView('record');}; $('#exportCsv').onclick=()=>exportCSV(apply()); apply();
@@ -275,7 +275,7 @@
       <form id="recordForm">
       <div class="panel"><h2>1. ข้อมูลผลิตภัณฑ์</h2><div class="form-grid">
         ${field('Product No.','product_no',r?.product_no,'text',false,'','required')}
-        <div class="field"><label class="required">ผลิตภัณฑ์</label><select id="product_type" ${editable?'':'disabled'}><option value="">เลือก</option>${['LDPPC Reveos','SDP Trima','SDP Amicus'].map(x=>`<option ${r?.product_type===x?'selected':''}>${x}</option>`).join('')}</select></div>
+        <div class="field"><label class="required">ผลิตภัณฑ์</label><select id="product_type" ${editable?'':'disabled'}><option value="">เลือก</option>${['LDPPC Reveos','LDPPC Haemonetics','SDP Trima','SDP Amicus'].map(x=>`<option ${r?.product_type===x?'selected':''}>${x}</option>`).join('')}</select></div>
         <div class="field"><label>Group</label><select id="blood_group" ${editable?'':'disabled'}><option value="">เลือก</option>${['O','A','B','AB'].map(x=>`<option ${r?.blood_group===x?'selected':''}>${x}</option>`).join('')}</select></div>
         ${field('วัน-เวลาเริ่มเจาะถุงที่ 1','collection_at',inputFromISO(r?.collection_at),'datetime-local',false,'','required')}
         ${field('Volume (mL)','volume_ml',r?.volume_ml,'number',false,'0.1','required')}
@@ -303,7 +303,7 @@
   }
   function field(label,id,value,type='text',readonly=false,step='',required=''){ const disabled=readonly?'readonly':''; return `<div class="field"><label class="${required}">${label}</label><input id="${id}" type="${type}" value="${esc(value??'')}" ${step?`step="${step}"`:''} ${type==='number'?'min="0"':''} ${disabled}></div>`; }
   function setEditable(editable){ if(editable) return; $$('#recordForm input,#recordForm select,#recordForm textarea').forEach(el=>{if(!el.readOnly) el.disabled=true;}); }
-  function togglePool(){ const show=$('#product_type').value==='LDPPC Reveos'; $('#poolPanel').classList.toggle('hidden',!show); }
+  function togglePool(){ const show=$('#product_type').value.startsWith('LDPPC '); $('#poolPanel').classList.toggle('hidden',!show); }
   function updatePoolPreview(){ const sum=$$('.pool-pyi').reduce((s,x)=>s+(num(x.value)||0),0); $('#poolSum').textContent=fmt(sum,2); }
   function calcFrontend(){
     const volume=num($('#volume_ml')?.value), p1=num($('#plt_value_1')?.value),p2=num($('#plt_value_2')?.value),mode=$('#plt_use_mode')?.value,wbc=num($('#wbc_adam')?.value),ph=num($('#ph_value')?.value); let used=null;
@@ -328,7 +328,7 @@
   async function saveRecord(silent=false,auto=false){
     try{ const payload=collectRecord(); if(!payload.product_no||!payload.product_type){if(auto)showToast('กรอก Product No. และผลิตภัณฑ์ก่อนแนบไฟล์','error');else showToast('กรุณากรอก Product No. และผลิตภัณฑ์','error');return false;} let id=state.currentRecordId;
       if(id){const {error}=await state.sb.from('platelet_records').update(payload).eq('id',id);if(error)throw error;} else {const {data,error}=await state.sb.from('platelet_records').insert({...payload,created_by:state.user.id}).select('id').single();if(error)throw error;id=data.id;state.currentRecordId=id;}
-      if(payload.product_type==='LDPPC Reveos') await savePool(id); else {await state.sb.from('pool_units').delete().eq('record_id',id);}
+      if(payload.product_type?.startsWith('LDPPC ')) await savePool(id); else {await state.sb.from('pool_units').delete().eq('record_id',id);}
       await loadRecords(); if(!silent)showToast('บันทึกร่างแล้ว','good'); if(!auto) await renderRecordForm(); return true;
     }catch(e){showToast(errText(e),'error');return false;}
   }

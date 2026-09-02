@@ -1,4 +1,4 @@
-const VERSION = 'platelet-qc-v4.3.0';
+const VERSION = 'platelet-qc-v4.4.0';
 self.addEventListener('install', event => self.skipWaiting());
 self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', event => {
