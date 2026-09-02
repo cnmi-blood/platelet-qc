@@ -7,10 +7,10 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="Platelet QC" />
+  <meta name="apple-mobile-web-app-title" content="Blood QC" />
   <meta name="format-detection" content="telephone=no" />
   <meta name="robots" content="noindex,nofollow" />
-  <title>Platelet Preparation & QC | CNMI Blood Component QC</title>
+  <title>CNMI Blood Component QC</title>
   <link rel="icon" href="assets/platelet.svg" />
   <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png" />
   <link rel="manifest" href="manifest.webmanifest" />
@@ -43,9 +43,9 @@
   <section id="loginScreen" class="center-screen hidden">
     <div class="auth-card">
       <img src="assets/platelet.svg" class="app-logo" alt="" />
-      <h1>Platelet Preparation & QC</h1>
-      <p class="muted">ระบบบันทึกการเตรียมเกล็ดเลือด และแยกรายการที่ใช้เป็น QC ใช้ Mahidol ID และรหัสผ่านที่ Admin กำหนดให้</p>
-      <button class="btn install-app-btn auth-install-btn hidden" type="button">เพิ่ม Platelet QC เป็นแอป</button>
+      <h1>CNMI Blood Component QC</h1>
+      <p class="muted">ระบบบันทึกการเตรียมและควบคุมคุณภาพส่วนประกอบโลหิตของ CNMI Blood Bank ใช้ Mahidol ID และรหัสผ่านที่ Admin กำหนดให้</p>
+      <button class="btn install-app-btn auth-install-btn hidden" type="button">เพิ่ม Blood QC เป็นแอป</button>
       <form id="loginForm" class="stack">
         <label for="loginEmail">Mahidol ID / Email</label>
         <div class="email-field">
@@ -84,32 +84,41 @@
       <button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="เปิดเมนู">☰</button>
       <div class="brand">
         <img src="assets/platelet.svg" alt="" />
-        <div><strong>CNMI Blood Component QC</strong><span>Platelet Preparation & QC · CNMI Blood Bank</span></div>
+        <div><strong>CNMI Blood Component QC</strong><span id="brandSubtitle">Blood Component Preparation & QC · CNMI Blood Bank</span></div>
       </div>
       <div class="topbar-mode"><span id="currentModeBadge" class="mode-badge">Staff mode</span></div>
     </header>
 
     <div class="app-layout">
       <aside id="sideNav" class="sidebar" aria-label="เมนูหลัก">
-        <div class="sidebar-title">Platelet</div>
+        <div class="sidebar-title">Blood Component QC</div>
         <nav class="tabs side-tabs" id="mainTabs">
-          <button data-view="dashboard" class="active">ภาพรวม Platelet</button>
-          <button data-view="record">บันทึก Platelet</button>
-          <button data-view="records">รายการ Platelet</button>
-          <div id="adminNavLabel" class="sidebar-section-label hidden">Admin</div>
-          <button data-view="settings" id="settingsTab" class="hidden">จัดการระบบ Platelet</button>
-          <button data-view="audit" id="auditTab" class="hidden">ประวัติการใช้งาน</button>
+          <button data-route="#/" id="homeTab" class="active">ภาพรวมระบบ</button>
+
+          <div class="sidebar-section-label">Platelet</div>
+          <button data-route="#/platelet" id="plateletDashboardTab">ภาพรวม Platelet</button>
+          <button data-route="#/platelet/new" id="plateletNewTab">บันทึก Platelet</button>
+          <button data-route="#/platelet/records" id="plateletRecordsTab">รายการ Platelet</button>
+          <button data-route="#/platelet/qc_settings" id="settingsTab" class="hidden">ตั้งค่า Platelet QC</button>
+
+          <div class="sidebar-section-label">โมดูล</div>
+          <button data-route="#/rbc" id="rbcTab">RBC <span class="nav-coming">เตรียมไว้</span></button>
+          <button data-route="#/plasma" id="plasmaTab">Plasma <span class="nav-coming">เตรียมไว้</span></button>
+
+          <div id="adminNavLabel" class="sidebar-section-label hidden">Admin กลาง</div>
+          <button data-route="#/admin/users" id="usersTab" class="hidden">ผู้ใช้งานระบบ</button>
+          <button data-route="#/admin/audit" id="auditTab" class="hidden">ประวัติการใช้งาน</button>
         </nav>
 
         <div class="sidebar-spacer"></div>
 
-        <button class="sidebar-action install-app-btn hidden" type="button">ติดตั้ง Platelet QC</button>
+        <button class="sidebar-action install-app-btn hidden" type="button">ติดตั้ง Blood QC</button>
         <button id="changePasswordBtn" class="sidebar-action" type="button">เปลี่ยนรหัสผ่าน</button>
 
         <div id="adminModePanel" class="admin-mode-panel hidden">
           <div id="modeMenu" class="mode-menu hidden">
             <button type="button" data-ui-mode="staff"><strong>โหมดผู้ใช้งานทั่วไป</strong><span>ซ่อนเมนูและสิทธิ์จัดการของ Admin</span></button>
-            <button type="button" data-ui-mode="admin"><strong>โหมดผู้ดูแลระบบ</strong><span>เปิดเมนูตั้งค่า ตรวจทวน และปลดล็อก</span></button>
+            <button type="button" data-ui-mode="admin"><strong>โหมดผู้ดูแลระบบ</strong><span>เปิดเมนูตั้งค่า ตรวจทวน และจัดการระบบ</span></button>
           </div>
           <button id="modeMenuBtn" class="user-mode-card" type="button" aria-expanded="false">
             <div class="user-mode-name"><strong id="headerUser">-</strong><span id="headerRole">-</span></div>
@@ -128,13 +137,16 @@
 
       <div class="content-shell">
         <main class="container">
-          <section id="view-dashboard" class="view"></section>
+          <section id="view-home" class="view"></section>
+          <section id="view-dashboard" class="view hidden"></section>
           <section id="view-record" class="view hidden"></section>
           <section id="view-records" class="view hidden"></section>
           <section id="view-settings" class="view hidden"></section>
+          <section id="view-module" class="view hidden"></section>
+          <section id="view-users" class="view hidden"></section>
           <section id="view-audit" class="view hidden"></section>
         </main>
-        <footer class="footer">CNMI Blood Component QC · Platelet module v4.9.1 · bloodqc.cnmiblood.com/#/platelet</footer>
+        <footer id="appFooter" class="footer">CNMI Blood Component QC · v5.0.0 · bloodqc.cnmiblood.com</footer>
       </div>
     </div>
   </div>
@@ -177,7 +189,7 @@
 
   <dialog id="installDialog" class="dialog install-dialog">
     <div class="dialog-head">
-      <div><h2 id="installDialogTitle">ติดตั้งแอปบนโทรศัพท์</h2><p id="installDialogSubtitle" class="muted">เปิด Platelet QC จากหน้าจอโฮมได้เหมือนแอป</p></div>
+      <div><h2 id="installDialogTitle">ติดตั้งแอปบนโทรศัพท์</h2><p id="installDialogSubtitle" class="muted">เปิด Blood QC จากหน้าจอโฮมได้เหมือนแอป</p></div>
       <button class="icon-btn" id="closeInstallDialogBtn" aria-label="ปิด">×</button>
     </div>
     <div class="install-dialog-body">
@@ -185,12 +197,12 @@
         <div class="install-step"><span>1</span><div><strong>เปิดเว็บนี้ด้วย Safari</strong><p>ถ้าเปิดอยู่ใน Chrome หรือ Browser อื่น ให้เปิดลิงก์นี้ใน Safari ก่อน</p></div></div>
         <div class="install-step"><span>2</span><div><strong>กดปุ่ม Share</strong><p>ปุ่มรูปสี่เหลี่ยมมีลูกศรชี้ขึ้น ที่แถบเครื่องมือ Safari</p></div></div>
         <div class="install-step"><span>3</span><div><strong>เลือก “เพิ่มไปยังหน้าจอโฮม”</strong><p>หรือ “Add to Home Screen” แล้วกด “เพิ่ม / Add”</p></div></div>
-        <div class="notice info small"><strong>หลังติดตั้ง:</strong> จะมีไอคอน Platelet QC บนหน้าจอโฮม กดเข้าใช้งานได้เหมือนแอปทั่วไป</div>
+        <div class="notice info small"><strong>หลังติดตั้ง:</strong> จะมีไอคอน Blood QC บนหน้าจอโฮม กดเข้าใช้งานได้เหมือนแอปทั่วไป</div>
       </div>
       <div id="androidInstallGuide" class="install-guide hidden">
-        <div class="install-step"><span>1</span><div><strong>ใช้ Chrome บน Android</strong><p>เปิดหน้า Platelet QC นี้ใน Chrome</p></div></div>
+        <div class="install-step"><span>1</span><div><strong>ใช้ Chrome บน Android</strong><p>เปิดหน้า Blood QC นี้ใน Chrome</p></div></div>
         <div class="install-step"><span>2</span><div><strong>กดเมนู ⋮</strong><p>มุมขวาบน แล้วเลือก “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”</p></div></div>
-        <div class="install-step"><span>3</span><div><strong>กดติดตั้ง</strong><p>ระบบจะสร้างไอคอน Platelet QC บนหน้าจอหลัก</p></div></div>
+        <div class="install-step"><span>3</span><div><strong>กดติดตั้ง</strong><p>ระบบจะสร้างไอคอน Blood QC บนหน้าจอหลัก</p></div></div>
       </div>
       <div id="genericInstallGuide" class="install-guide hidden">
         <p>อุปกรณ์นี้ยังไม่แสดงหน้าติดตั้งอัตโนมัติ ลองเปิดเมนูของ Browser แล้วหา “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”</p>

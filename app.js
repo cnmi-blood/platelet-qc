@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC · Platelet module v4.9.0 - plain JS / Supabase */
+/* CNMI Blood Component QC v5.0.0 - multi-module shell / Platelet active */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -20,33 +20,66 @@
     return `<span class="badge ${cls}">${esc(poolReleaseTH(s))}</span>`;
   };
   const measuredTH = iso => iso ? dateTH(iso) : 'ยังไม่บันทึก';
-  const state = { sb:null, session:null, user:null, profile:null, settings:null, productSettings:[], records:[], profiles:[], currentRecordId:null, currentEvidence:[], currentPool:[], lastLoginPassword:null, uiMode:'staff', auditUserFilter:'', resetTargetId:null, showDeletedRecords:false };
+  const state = { sb:null, session:null, user:null, profile:null, settings:null, productSettings:[], records:[], profiles:[], currentRecordId:null, currentEvidence:[], currentPool:[], lastLoginPassword:null, uiMode:'staff', auditUserFilter:'', resetTargetId:null, showDeletedRecords:false, currentView:'home', currentModule:null, currentPage:null };
   const productSetting = type => state.productSettings.find(x=>x.product_type===type);
   const activeProducts = () => state.productSettings.filter(x=>x.is_active).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||a.product_type.localeCompare(b.product_type));
   const productOptions = selected => activeProducts().map(x=>`<option value="${esc(x.product_type)}" ${selected===x.product_type?'selected':''}>${esc(x.product_type)}</option>`).join('');
-  const PLATELET_ROUTES = {
-    dashboard:'#/platelet',
-    record:'#/platelet/new',
-    records:'#/platelet/records',
-    settings:'#/platelet/admin',
-    audit:'#/platelet/audit'
+  const ROUTES = {
+    home:'#/',
+    platelet:{dashboard:'#/platelet',record:'#/platelet/new',records:'#/platelet/records',settings:'#/platelet/qc_settings'},
+    rbc:{dashboard:'#/rbc',record:'#/rbc/new',records:'#/rbc/records',settings:'#/rbc/qc_settings'},
+    plasma:{dashboard:'#/plasma',record:'#/plasma/new',records:'#/plasma/records',settings:'#/plasma/qc_settings'},
+    users:'#/admin/users',
+    audit:'#/admin/audit'
   };
-  function routeForView(v){ return PLATELET_ROUTES[v] || PLATELET_ROUTES.dashboard; }
-  function viewFromHash(){
-    const h=(location.hash||'').replace(/\/+$/,'');
-    if(h==='#/platelet/new') return 'record';
-    if(h==='#/platelet/records') return 'records';
-    if(h==='#/platelet/admin') return 'settings';
-    if(h==='#/platelet/audit') return 'audit';
-    return 'dashboard';
+  const MODULE_META = {
+    platelet:{label:'Platelet',title:'Platelet Preparation & QC',active:true},
+    rbc:{label:'RBC',title:'RBC Preparation & QC',active:false},
+    plasma:{label:'Plasma',title:'Plasma Preparation & QC',active:false}
+  };
+  function routeForView(v){
+    const m={home:ROUTES.home,dashboard:ROUTES.platelet.dashboard,record:ROUTES.platelet.record,records:ROUTES.platelet.records,settings:ROUTES.platelet.settings,users:ROUTES.users,audit:ROUTES.audit};
+    return m[v] || ROUTES.home;
   }
-  function isKnownPlateletRoute(){
-    const h=(location.hash||'').replace(/\/+$/,'');
-    return !h || h==='#' || Object.values(PLATELET_ROUTES).includes(h);
+  function cleanHash(){ return (location.hash||'').replace(/\/+$/,'') || '#/'; }
+  function parseRoute(){
+    let h=cleanHash();
+    const legacy={'#/platelet/admin':ROUTES.platelet.settings,'#/platelet/audit':ROUTES.audit};
+    if(legacy[h]){ history.replaceState(null,'',location.pathname+location.search+legacy[h]); h=legacy[h]; }
+    if(h==='#/' || h==='#') return {view:'home',module:null,page:'home',hash:ROUTES.home};
+    if(h===ROUTES.users) return {view:'users',module:null,page:'users',hash:h,adminOnly:true};
+    if(h===ROUTES.audit) return {view:'audit',module:null,page:'audit',hash:h,adminOnly:true};
+    for(const [module,routes] of Object.entries({platelet:ROUTES.platelet,rbc:ROUTES.rbc,plasma:ROUTES.plasma})){
+      for(const [page,hash] of Object.entries(routes)){
+        if(h===hash){
+          if(module==='platelet') return {view:page==='dashboard'?'dashboard':page==='record'?'record':page==='records'?'records':'settings',module,page,hash,adminOnly:page==='settings'};
+          return {view:'module',module,page,hash,adminOnly:page==='settings'};
+        }
+      }
+    }
+    return {view:'home',module:null,page:'home',hash:ROUTES.home,unknown:true};
   }
-  function normalizePlateletRoute(){
-    if(!isKnownPlateletRoute()) history.replaceState(null,'',location.pathname+location.search+PLATELET_ROUTES.dashboard);
-    else if(!location.hash || location.hash==='#') history.replaceState(null,'',location.pathname+location.search+PLATELET_ROUTES.dashboard);
+  function normalizeAppRoute(){
+    const r=parseRoute();
+    if(r.unknown) history.replaceState(null,'',location.pathname+location.search+ROUTES.home);
+    return parseRoute();
+  }
+  function updateRouteChrome(route){
+    const sub=$('#brandSubtitle');
+    const footer=$('#appFooter');
+    if(route.module){
+      const meta=MODULE_META[route.module];
+      if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.0.0 · bloodqc.cnmiblood.com${route.hash}`;
+    }else{
+      if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.0.0 · bloodqc.cnmiblood.com';
+    }
+    document.title=route.module?`${MODULE_META[route.module].label} | CNMI Blood Component QC`:'CNMI Blood Component QC';
+    $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
+    const exact=$(`#mainTabs button[data-route="${route.hash}"]`);
+    if(exact) exact.classList.add('active');
+    else if(route.module){ $(`#${route.module}Tab`)?.classList.add('active'); }
   }
 
   function showToast(msg,type='') { const t=$('#toast'); t.textContent=msg; t.className=`toast show ${type}`; clearTimeout(showToast._t); showToast._t=setTimeout(()=>t.className='toast',3500); }
@@ -59,7 +92,7 @@
   function cfgReady(){ return C.SUPABASE_URL && C.SUPABASE_KEY && !C.SUPABASE_URL.includes('PASTE_') && !C.SUPABASE_KEY.includes('PASTE_'); }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'4.9.0',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.0.0',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -88,7 +121,7 @@
   }
   function reviewerUi(){ return ['reviewer','admin'].includes(effectiveRole()); }
   function adminUi(){ return effectiveRole()==='admin'; }
-  function activeView(){ return $('#mainTabs button.active')?.dataset.view || 'dashboard'; }
+  function activeView(){ return state.currentView || 'home'; }
   function closeSidebar(){ $('#sideNav')?.classList.remove('open'); $('#sidebarBackdrop')?.classList.add('hidden'); $('#mobileMenuBtn')?.setAttribute('aria-expanded','false'); }
   function openSidebar(){ $('#sideNav')?.classList.add('open'); $('#sidebarBackdrop')?.classList.remove('hidden'); $('#mobileMenuBtn')?.setAttribute('aria-expanded','true'); }
   function applyUiMode(render=true){
@@ -96,6 +129,7 @@
     const isAdmin=state.profile.role==='admin';
     if(!isAdmin) state.uiMode=state.profile.role;
     $('#settingsTab')?.classList.toggle('hidden',!adminUi());
+    $('#usersTab')?.classList.toggle('hidden',!adminUi());
     $('#auditTab')?.classList.toggle('hidden',!adminUi());
     $('#adminNavLabel')?.classList.toggle('hidden',!adminUi());
     $('#adminModePanel')?.classList.toggle('hidden',!isAdmin);
@@ -108,16 +142,16 @@
     if($('#headerRole')) $('#headerRole').textContent=roleTH(state.profile.role);
     if($('#regularUserName')) $('#regularUserName').textContent=state.profile.display_name || state.profile.email.split('@')[0];
     if($('#regularUserRole')) $('#regularUserRole').textContent=roleTH(state.profile.role);
-    if(!adminUi() && ['settings','audit'].includes(activeView())) switchView('dashboard');
+    if(!adminUi() && ['settings','users','audit'].includes(activeView())){ const r=parseRoute(); location.hash=r.module?ROUTES[r.module].dashboard:ROUTES.home; return; }
     if(render){
       const v=activeView();
-      if(v==='dashboard') renderDashboard(); else if(v==='records') renderRecordsList(); else if(v==='record') renderRecordForm(); else if(v==='settings'&&adminUi()) renderSettings(); else if(v==='audit'&&adminUi()) renderAuditLog();
+      if(v==='home') renderHome(); else if(v==='dashboard') renderDashboard(); else if(v==='records') renderRecordsList(); else if(v==='record') renderRecordForm(); else if(v==='settings'&&adminUi()) renderSettings(); else if(v==='users'&&adminUi()) renderUsers(); else if(v==='audit'&&adminUi()) renderAuditLog(); else if(v==='module') renderModulePlaceholder(state.currentModule,state.currentPage);
     }
   }
   function setUiMode(mode){
     if(state.profile?.role!=='admin') return;
     state.uiMode=mode==='admin'?'admin':'staff';
-    localStorage.setItem('platelet_ui_mode',state.uiMode);
+    localStorage.setItem('bloodqc_ui_mode',state.uiMode);
     $('#modeMenu')?.classList.add('hidden'); $('#modeMenuBtn')?.setAttribute('aria-expanded','false');
     applyUiMode(true); logActivity('ui_mode_change','session',null,{mode:state.uiMode}).catch(()=>{}); showToast(state.uiMode==='admin'?'เปิดโหมดผู้ดูแลระบบแล้ว':'กลับสู่โหมดผู้ใช้งานทั่วไปแล้ว','good');
   }
@@ -178,17 +212,17 @@
     hideAuthScreens();
     $('#appShell').classList.remove('hidden');
     const p=state.profile;
-    state.uiMode=p.role==='admin' ? (localStorage.getItem('platelet_ui_mode')==='admin'?'admin':'staff') : p.role;
+    state.uiMode=p.role==='admin' ? ((localStorage.getItem('bloodqc_ui_mode')||localStorage.getItem('platelet_ui_mode'))==='admin'?'admin':'staff') : p.role;
     await loadSettings(); await loadProductSettings(); await loadProfiles(); await loadRecords();
     applyUiMode(false);
-    const loginKey=`platelet_login_${state.user.id}_${String(state.session?.access_token||'').slice(-16)}`;
+    const loginKey=`bloodqc_login_${state.user.id}_${String(state.session?.access_token||'').slice(-16)}`;
     if(!sessionStorage.getItem(loginKey)){
       await logActivity('login','session',null,{platform:navigator.platform||'',standalone:window.matchMedia?.('(display-mode: standalone)')?.matches||false});
       sessionStorage.setItem(loginKey,'1');
       await loadProfiles();
     }
-    normalizePlateletRoute();
-    switchView(viewFromHash(),true);
+    const route=normalizeAppRoute();
+    switchView(route.view,true,route);
   }
 
   async function showForcedPassword(recoveryMode=false){
@@ -255,7 +289,7 @@
   $('#forceLogoutBtn').addEventListener('click',()=>state.sb.auth.signOut());
   $('#logoutBtn').addEventListener('click',logoutWithAudit);
   $('#closeDetailBtn').addEventListener('click',()=>$('#detailDialog').close());
-  $('#mainTabs').addEventListener('click',e=>{ const b=e.target.closest('button[data-view]'); if(b){ switchView(b.dataset.view); closeSidebar(); } });
+  $('#mainTabs').addEventListener('click',e=>{ const b=e.target.closest('button[data-route]'); if(b){ location.hash=b.dataset.route; closeSidebar(); } });
   $('#mobileMenuBtn').addEventListener('click',()=>$('#sideNav').classList.contains('open')?closeSidebar():openSidebar());
   $('#sidebarBackdrop').addEventListener('click',closeSidebar);
   $('#modeMenuBtn').addEventListener('click',()=>{ const m=$('#modeMenu'); const willOpen=m.classList.contains('hidden'); m.classList.toggle('hidden',!willOpen); $('#modeMenuBtn').setAttribute('aria-expanded',willOpen?'true':'false'); });
@@ -295,30 +329,44 @@
     try{
       await invokeAdminUsers({action:'reset_password',user_id:state.resetTargetId,password:p1});
       $('#adminResetPasswordDialog').close(); showToast('Reset password แล้ว ผู้ใช้ต้องเปลี่ยนรหัสเมื่อ Login ครั้งถัดไป','good');
-      await loadProfiles(); renderSettings();
+      await loadProfiles(); if(state.currentView==='users') renderUsers();
     }catch(e2){$('#adminResetPasswordMessage').textContent=errText(e2);}
   });
 
-  function switchView(v,fromRoute=false){
-    if(['settings','audit'].includes(v)&&!adminUi()) v='dashboard';
+  function switchView(v,fromRoute=false,routeObj=null){
+    let route=routeObj || (fromRoute?parseRoute():null);
     if(!fromRoute){
       const target=routeForView(v);
       if(location.hash!==target){ location.hash=target; return; }
+      route=parseRoute();
     }
-    $$('#mainTabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
+    route=route||parseRoute();
+    if(route.adminOnly&&!adminUi()){
+      location.hash=route.module?ROUTES[route.module].dashboard:ROUTES.home;
+      return;
+    }
+    state.currentView=v;
+    state.currentModule=route.module||null;
+    state.currentPage=route.page||null;
+    updateRouteChrome(route);
     $$('.view').forEach(x=>x.classList.add('hidden'));
-    $(`#view-${v}`).classList.remove('hidden');
+    const host=$(`#view-${v}`);
+    if(!host){ location.hash=ROUTES.home; return; }
+    host.classList.remove('hidden');
+    if(v==='home') renderHome();
     if(v==='dashboard') renderDashboard();
     if(v==='records') renderRecordsList();
     if(v==='record') renderRecordForm();
     if(v==='settings') renderSettings();
+    if(v==='users') renderUsers();
     if(v==='audit') renderAuditLog();
+    if(v==='module') renderModulePlaceholder(route.module,route.page);
     if(window.innerWidth<=760) window.scrollTo({top:0,behavior:'smooth'});
   }
   window.addEventListener('hashchange',()=>{
     if($('#appShell') && !$('#appShell').classList.contains('hidden')){
-      normalizePlateletRoute();
-      switchView(viewFromHash(),true);
+      const route=normalizeAppRoute();
+      switchView(route.view,true,route);
     }
   });
   function statusBadge(s){ return `<span class="badge ${esc(s)}">${esc(statusTH(s))}</span>`; }
@@ -327,6 +375,47 @@
   function deletedBadge(r){ return r?.deleted_at ? '<span class="badge deleted">ลบแล้ว</span>' : ''; }
   function pHBadge(r){ if(!r.ph_measured_at||!r.expiry_at) return ''; return sameBangkokDate(r.ph_measured_at,r.expiry_at)?'<span class="badge pass">pH ตรงวัน Exp.</span>':'<span class="badge late">pH ไม่ตรงวัน Exp.</span>'; }
   function waitingPH(r){ return r.status==='draft' && !r.ph_value && r.expiry_at; }
+
+  function bindRouteButtons(root=document){
+    $$('[data-go-route]',root).forEach(b=>b.onclick=()=>{location.hash=b.dataset.goRoute;});
+  }
+
+  function renderHome(){
+    const rec=state.records.filter(r=>!r.deleted_at);
+    const month=rec.filter(r=>r.collection_at && r.collection_at>=firstOfMonthISO());
+    const qc=month.filter(r=>r.record_purpose==='qc').length;
+    $('#view-home').innerHTML=`
+      <div class="page-head"><div><h1>CNMI Blood Component QC</h1><p class="muted">ระบบกลางสำหรับบันทึกการเตรียมและควบคุมคุณภาพส่วนประกอบโลหิต แยกการทำงานเป็นแต่ละ Module</p></div></div>
+      <div class="module-grid">
+        <article class="module-card active-module">
+          <div class="module-card-head"><div><span class="module-kicker">เปิดใช้งาน</span><h2>Platelet</h2><p>Platelet Preparation & QC</p></div><span class="module-status live">ใช้งานจริง</span></div>
+          <div class="module-stats"><span><strong>${month.length}</strong> รายการเดือนนี้</span><span><strong>${qc}</strong> รายการที่ใช้เป็น QC</span></div>
+          <div class="module-actions"><button class="btn primary" data-go-route="#/platelet">ภาพรวม</button><button class="btn" data-go-route="#/platelet/new">บันทึกใหม่</button><button class="btn" data-go-route="#/platelet/records">รายการ</button></div>
+          <code>bloodqc.cnmiblood.com/#/platelet</code>
+        </article>
+        ${futureModuleCard('rbc','RBC','Red Cell Preparation & QC')}
+        ${futureModuleCard('plasma','Plasma','Plasma Preparation & QC')}
+      </div>
+      ${adminUi()?`<div class="panel core-admin-panel"><h2>Admin กลาง</h2><p class="section-note">บัญชีผู้ใช้งานและ Audit Log ใช้ร่วมกันทุก Module</p><div class="actions left-actions"><button class="btn" data-go-route="#/admin/users">ผู้ใช้งานระบบ</button><button class="btn" data-go-route="#/admin/audit">ประวัติการใช้งาน</button></div></div>`:''}
+      <div class="notice info small"><strong>โครง URL เตรียมไว้แล้ว:</strong> Platelet ใช้งานจริง ส่วน RBC และ Plasma มี Route แยกครบ แต่ยังไม่เปิดฟอร์มและยังไม่สร้างตารางข้อมูลจนกว่าจะเริ่มพัฒนา Module นั้น</div>`;
+    bindRouteButtons($('#view-home'));
+  }
+
+  function futureModuleCard(module,label,desc){
+    return `<article class="module-card future-module"><div class="module-card-head"><div><span class="module-kicker">เตรียมโครงไว้</span><h2>${label}</h2><p>${desc}</p></div><span class="module-status planned">ยังไม่เปิดใช้</span></div><p class="muted small">Route พร้อมสำหรับ Overview / New / Records / QC Settings โดยยังไม่กระทบข้อมูล Platelet</p><div class="module-actions"><button class="btn" data-go-route="#/${module}">ดูโครง Module</button></div><code>bloodqc.cnmiblood.com/#/${module}</code></article>`;
+  }
+
+  function renderModulePlaceholder(module,page='dashboard'){
+    const meta=MODULE_META[module]||{label:module?.toUpperCase()||'-',title:'Module'};
+    const pageTitle={dashboard:'ภาพรวม',record:'บันทึกใหม่',records:'รายการทั้งหมด',settings:'QC Settings'}[page]||'ภาพรวม';
+    const base=`#/${module}`;
+    $('#view-module').innerHTML=`
+      <div class="page-head"><div><div class="breadcrumb"><button class="link-btn" data-go-route="#/">Blood Component QC</button><span>›</span><span>${esc(meta.label)}</span></div><h1>${esc(meta.label)} · ${pageTitle}</h1><p class="muted">โครง Module นี้เตรียมไว้แล้ว แต่ยังไม่เปิดใช้งานจริง</p></div><div class="actions"><button class="btn" data-go-route="#/">กลับหน้าหลัก</button></div></div>
+      <div class="panel module-placeholder-panel"><span class="module-status planned">ยังไม่เปิดใช้งาน</span><h2>${esc(meta.title)}</h2><p>ตอนนี้ยังไม่มีฟอร์ม ข้อมูล หรือเกณฑ์ QC ของ ${esc(meta.label)} ในระบบ เพื่อไม่ให้ปะปนกับ Platelet ก่อนที่หน่วยงานจะกำหนด Workflow และเกณฑ์ของ Module นี้</p>
+        <div class="route-plan"><div><span>Overview</span><code>bloodqc.cnmiblood.com${base}</code></div><div><span>New</span><code>bloodqc.cnmiblood.com${base}/new</code></div><div><span>Records</span><code>bloodqc.cnmiblood.com${base}/records</code></div><div><span>QC Settings · Admin</span><code>bloodqc.cnmiblood.com${base}/qc_settings</code></div></div>
+      </div>`;
+    bindRouteButtons($('#view-module'));
+  }
 
   function renderDashboard(){
     const rec=state.records.filter(r=>!r.deleted_at);
@@ -635,29 +724,30 @@
   }
 
   async function renderSettings(){
-    if(!adminUi()){switchView('dashboard');return;} await loadProfiles(); const s=state.settings;
-    $('#view-settings').innerHTML=`<div class="page-head"><div><h1>จัดการระบบ Platelet</h1><p class="muted">จัดการผู้ใช้งาน สิทธิ์ รหัสผ่าน ค่าการเตรียม LDPPC และเกณฑ์สำหรับรายการที่ใช้เป็น QC</p></div><div class="actions"><button class="btn" id="openAuditFromSettings">ประวัติการใช้งาน</button></div></div>
-      <div class="panel"><h2>สร้างบัญชีเจ้าหน้าที่</h2><p class="section-note">Admin สร้างบัญชี @mahidol.ac.th และกำหนดรหัสผ่านชั่วคราวได้จากหน้านี้ ผู้ใช้จะถูกบังคับให้เปลี่ยนรหัสผ่านเมื่อ Login ครั้งแรก</p>
-        <div class="user-create-grid">
-          <div class="field"><label>Mahidol ID / Username</label><div class="email-field"><input id="new_username" autocomplete="off" placeholder="เช่น somchai.som"><span>@mahidol.ac.th</span></div></div>
-          <div class="field"><label>ชื่อ-นามสกุล / ชื่อที่แสดง</label><input id="new_display_name" placeholder="ชื่อที่แสดงในระบบ"></div>
-          <div class="field"><label>ตำแหน่ง</label><input id="new_position" placeholder="เช่น นักเทคนิคการแพทย์"></div>
-          <div class="field"><label>สิทธิ์</label><select id="new_role"><option value="staff">Staff</option><option value="reviewer">Reviewer</option><option value="admin">Admin</option></select></div>
-          <div class="field user-create-password"><label>รหัสผ่านชั่วคราว</label><input id="new_temp_password" type="password" minlength="8" autocomplete="new-password" placeholder="อย่างน้อย 8 ตัวอักษร"></div>
-          <div class="field user-create-action"><label>&nbsp;</label><button class="btn primary" id="createUserBtn" type="button">+ สร้างบัญชี</button></div>
-        </div><p id="createUserMessage" class="muted small"></p>
-        <div class="notice info small"><strong>ความปลอดภัย:</strong> การสร้างบัญชีและ Reset password ทำผ่าน Supabase Edge Function เท่านั้น ไม่มี Service Role / Secret key อยู่ใน GitHub Pages</div>
-      </div>
-      <div class="panel"><h2>ผู้ใช้งานระบบ Platelet</h2><p class="section-note">บัญชีเดียวใช้สำหรับการบันทึก Prepare และ QC ของ Platelet และรองรับโมดูลอื่นในอนาคต</p><div class="table-wrap"><table class="data-table users-table"><thead><tr><th>Username</th><th>ชื่อ</th><th>ตำแหน่ง</th><th>Role</th><th>Active</th><th>First Login</th><th>Last Login</th><th>จัดการ</th></tr></thead><tbody>${state.profiles.map(p=>`<tr data-user-id="${p.id}"><td><strong>${esc((p.email||'').split('@')[0])}</strong><div class="muted small">${esc(p.email)}</div></td><td><input class="u-name" value="${esc(p.display_name||'')}"></td><td><input class="u-position" value="${esc(p.position||'')}" placeholder="ตำแหน่ง"></td><td><select class="role-select u-role">${['staff','reviewer','admin'].map(r=>`<option value="${r}" ${p.role===r?'selected':''}>${roleTH(r)}</option>`).join('')}</select></td><td><label class="toggle-cell"><input class="u-active" type="checkbox" ${p.is_active?'checked':''}> <span>${p.is_active?'Active':'ปิดใช้'}</span></label></td><td><span class="password-state ${p.must_change_password?'pending':'ok'}">${p.must_change_password?'รอเปลี่ยนรหัส':'ตั้งรหัสแล้ว'}</span></td><td class="nowrap">${dateTH(p.last_login_at)}</td><td><div class="row-actions"><button class="btn small-btn u-save" data-id="${p.id}">บันทึก</button><button class="btn small-btn u-reset" data-id="${p.id}" ${p.id===state.user.id?'disabled title="ใช้เมนูเปลี่ยนรหัสผ่านของตนเอง"':''}>Reset password</button><button class="btn small-btn u-audit" data-id="${p.id}">Audit</button></div></td></tr>`).join('')}</tbody></table></div></div>
+    if(!adminUi()){location.hash=ROUTES.platelet.dashboard;return;} const s=state.settings;
+    $('#view-settings').innerHTML=`<div class="page-head"><div><div class="breadcrumb"><button class="link-btn" data-go-route="#/">Blood Component QC</button><span>›</span><button class="link-btn" data-go-route="#/platelet">Platelet</button><span>›</span><span>QC Settings</span></div><h1>ตั้งค่า Platelet QC</h1><p class="muted">ค่าการเตรียม LDPPC และเกณฑ์สำหรับรายการ Platelet ที่กำหนดใช้เป็น QC</p></div><div class="actions"><button class="btn" data-go-route="#/admin/audit">ประวัติการใช้งาน</button></div></div>
       <div class="panel"><h2>ค่าคำนวณ Volume จากน้ำหนัก</h2><p class="section-note">เจ้าหน้าที่กรอกน้ำหนักที่ชั่งได้เป็นกรัม ระบบใช้สูตร (น้ำหนักที่ชั่งได้ − น้ำหนักถุงเปล่า) ÷ Density และเก็บค่าที่ใช้คำนวณไว้กับแต่ละรายการเพื่อทวนสอบย้อนหลัง</p><div class="table-wrap"><table class="data-table product-setting-table"><thead><tr><th>ผลิตภัณฑ์</th><th>น้ำหนักถุงเปล่า (g)</th><th>Density</th><th>Pool</th><th></th></tr></thead><tbody>${state.productSettings.filter(x=>x.is_active).map(x=>`<tr data-product-type="${esc(x.product_type)}"><td><strong>${esc(x.product_type)}</strong></td><td><input class="ps-tare" type="number" step="0.01" min="0" value="${esc(x.tare_weight_g)}"></td><td><input class="ps-density" type="number" step="0.001" min="0.001" value="${esc(x.density)}"></td><td>${x.requires_pool?'LDPPC 3–6 Units':'–'}</td><td><button class="btn small-btn ps-save" type="button" data-product="${esc(x.product_type)}">บันทึก</button></td></tr>`).join('')}</tbody></table></div></div>
       <div class="panel"><h2>เกณฑ์การ Pool และฉลาก LDPPC</h2><p class="section-note">ใช้กับทั้ง Prepare ตามปกติและรายการที่ใช้เป็น QC ไม่เกี่ยวกับการเลือกว่าจะนับรายการนั้นเป็น QC หรือไม่</p><div class="form-grid">${settingField('Pool PYI เกณฑ์ปกติ ≥','s_pool_standard',s.pool_pyi_standard_min)}${settingField('Pool PYI อนุโลมขั้นต่ำ','s_pool_conditional',s.pool_pyi_conditional_min)}${settingField('Platelet yield ช่วงอนุโลม ต้อง ≥','s_pool_yield',s.pool_conditional_yield_min)}</div><div class="notice info small" style="margin-top:12px">ค่าเริ่มต้น: Pool PYI ≥ 280 ผ่านเกณฑ์ปกติ · Pool PYI 260–&lt;280 ให้ Pool ได้กรณีจำเป็น แต่ต้องมี Platelet yield ≥ 2.00 ×10¹¹ cells/unit จึงผ่านสำหรับฉลากปกติ</div></div>
       <div class="notice warning"><strong>ก่อนเริ่มใช้งานจริง:</strong> ตรวจสอบค่าน้ำหนักถุง/Density เกณฑ์ Pool/ฉลาก และเกณฑ์ QC ให้ตรงกับ WI/ข้อกำหนดที่หน่วยอนุมัติ การเปลี่ยนค่าจะถูกบันทึกใน Audit Log</div>
       <div class="panel"><h2>เกณฑ์สำหรับรายการที่ใช้เป็น QC</h2><p class="section-note">ใช้ประเมินเฉพาะรายการที่เลือก “ใช้เป็น QC” เท่านั้น รายการ Prepare ตามปกติยังเก็บผลครบแต่ไม่นำไปตัดสิน QC</p><div class="form-grid">${settingField('Platelet yield ขั้นต่ำ','s_yield',s.platelet_yield_min)}${settingField('Equivalent Unit factor','s_factor',s.equivalent_unit_factor)}${settingField('Residual WBC สูงสุด','s_wbc',s.residual_wbc_max)}${settingField('pH ขั้นต่ำ','s_ph',s.ph_min)}${settingField('อายุผลิตภัณฑ์ (วัน)','s_expiry',s.expiry_days,1)}${settingField('PLT repeat ต่างกันสูงสุด (%)','s_diff',s.plt_repeat_diff_max_pct)}</div><div class="switch-row" style="margin-top:14px"><label><input id="s_cbc" type="checkbox" ${s.require_cbc_evidence?'checked':''}> บังคับหลักฐาน CBC</label><label><input id="s_adam" type="checkbox" ${s.require_adam_evidence?'checked':''}> บังคับหลักฐาน ADAM</label><label><input id="s_ph_ev" type="checkbox" ${s.require_ph_evidence?'checked':''}> บังคับหลักฐาน pH</label></div><div class="actions" style="margin-top:14px"><button class="btn primary" id="saveSettings">บันทึกเกณฑ์</button></div></div>`;
-    $('#createUserBtn').onclick=createUserByAdmin; $('#saveSettings').onclick=saveSettings; $('#openAuditFromSettings').onclick=()=>{state.auditUserFilter='';switchView('audit');};
+    $('#saveSettings').onclick=saveSettings;
+    $$('.ps-save').forEach(b=>b.onclick=()=>saveProductSetting(b.dataset.product));
+    bindRouteButtons($('#view-settings'));
+  }
+
+  async function renderUsers(){
+    if(!adminUi()){location.hash=ROUTES.home;return;} await loadProfiles();
+    $('#view-users').innerHTML=`<div class="page-head"><div><div class="breadcrumb"><button class="link-btn" data-go-route="#/">Blood Component QC</button><span>›</span><span>Admin</span></div><h1>ผู้ใช้งานระบบ</h1><p class="muted">บัญชีเดียวใช้ร่วมกันทุก Module ของ CNMI Blood Component QC</p></div><div class="actions"><button class="btn" data-go-route="#/admin/audit">ประวัติการใช้งาน</button></div></div>
+      <div class="panel"><h2>สร้างบัญชีเจ้าหน้าที่</h2><p class="section-note">Admin สร้างบัญชี @mahidol.ac.th และกำหนดรหัสผ่านชั่วคราว ผู้ใช้จะถูกบังคับให้เปลี่ยนรหัสผ่านเมื่อ Login ครั้งแรก</p>
+        <div class="user-create-grid"><div class="field"><label>Mahidol ID / Username</label><div class="email-field"><input id="new_username" autocomplete="off" placeholder="เช่น somchai.som"><span>@mahidol.ac.th</span></div></div><div class="field"><label>ชื่อ-นามสกุล / ชื่อที่แสดง</label><input id="new_display_name" placeholder="ชื่อที่แสดงในระบบ"></div><div class="field"><label>ตำแหน่ง</label><input id="new_position" placeholder="เช่น นักเทคนิคการแพทย์"></div><div class="field"><label>สิทธิ์</label><select id="new_role"><option value="staff">Staff</option><option value="reviewer">Reviewer</option><option value="admin">Admin</option></select></div><div class="field user-create-password"><label>รหัสผ่านชั่วคราว</label><input id="new_temp_password" type="password" minlength="8" autocomplete="new-password" placeholder="อย่างน้อย 8 ตัวอักษร"></div><div class="field user-create-action"><label>&nbsp;</label><button class="btn primary" id="createUserBtn" type="button">+ สร้างบัญชี</button></div></div><p id="createUserMessage" class="muted small"></p>
+        <div class="notice info small"><strong>ความปลอดภัย:</strong> การสร้างบัญชีและ Reset password ทำผ่าน Supabase Edge Function เท่านั้น ไม่มี Service Role / Secret key อยู่ใน GitHub Pages</div>
+      </div>
+      <div class="panel"><h2>รายชื่อผู้ใช้งาน</h2><p class="section-note">จัดการชื่อ ตำแหน่ง สิทธิ์ เปิด/ปิดใช้งาน Reset password และเปิด Audit ของแต่ละคน</p><div class="table-wrap"><table class="data-table users-table"><thead><tr><th>Username</th><th>ชื่อ</th><th>ตำแหน่ง</th><th>Role</th><th>Active</th><th>First Login</th><th>Last Login</th><th>จัดการ</th></tr></thead><tbody>${state.profiles.map(p=>`<tr data-user-id="${p.id}"><td><strong>${esc((p.email||'').split('@')[0])}</strong><div class="muted small">${esc(p.email)}</div></td><td><input class="u-name" value="${esc(p.display_name||'')}"></td><td><input class="u-position" value="${esc(p.position||'')}" placeholder="ตำแหน่ง"></td><td><select class="role-select u-role">${['staff','reviewer','admin'].map(r=>`<option value="${r}" ${p.role===r?'selected':''}>${roleTH(r)}</option>`).join('')}</select></td><td><label class="toggle-cell"><input class="u-active" type="checkbox" ${p.is_active?'checked':''}> <span>${p.is_active?'Active':'ปิดใช้'}</span></label></td><td><span class="password-state ${p.must_change_password?'pending':'ok'}">${p.must_change_password?'รอเปลี่ยนรหัส':'ตั้งรหัสแล้ว'}</span></td><td class="nowrap">${dateTH(p.last_login_at)}</td><td><div class="row-actions"><button class="btn small-btn u-save" data-id="${p.id}">บันทึก</button><button class="btn small-btn u-reset" data-id="${p.id}" ${p.id===state.user.id?'disabled title="ใช้เมนูเปลี่ยนรหัสผ่านของตนเอง"':''}>Reset password</button><button class="btn small-btn u-audit" data-id="${p.id}">Audit</button></div></td></tr>`).join('')}</tbody></table></div></div>`;
+    $('#createUserBtn').onclick=createUserByAdmin;
     $$('.u-save').forEach(b=>b.onclick=()=>saveUser(b.dataset.id));
     $$('.u-reset').forEach(b=>b.onclick=()=>openAdminReset(b.dataset.id));
-    $$('.u-audit').forEach(b=>b.onclick=()=>{state.auditUserFilter=b.dataset.id;switchView('audit');});
-    $$('.ps-save').forEach(b=>b.onclick=()=>saveProductSetting(b.dataset.product));
+    $$('.u-audit').forEach(b=>b.onclick=()=>{state.auditUserFilter=b.dataset.id;location.hash=ROUTES.audit;});
+    bindRouteButtons($('#view-users'));
   }
   function settingField(l,id,v,step='0.01'){return `<div class="field"><label>${l}</label><input id="${id}" type="number" step="${step}" min="0" value="${esc(v)}"></div>`;}
   async function createUserByAdmin(){
@@ -667,7 +757,7 @@
     if(!display_name){msg.textContent='กรุณากรอกชื่อที่แสดง';return;}
     if(password.length<8){msg.textContent='รหัสผ่านชั่วคราวต้องอย่างน้อย 8 ตัวอักษร';return;}
     msg.textContent='กำลังสร้างบัญชี...';
-    try{await invokeAdminUsers({action:'create_user',username,display_name,position,role,password});msg.textContent='';showToast('สร้างบัญชีเรียบร้อย','good');await loadProfiles();renderSettings();}catch(e){msg.textContent=errText(e);}
+    try{await invokeAdminUsers({action:'create_user',username,display_name,position,role,password});msg.textContent='';showToast('สร้างบัญชีเรียบร้อย','good');await loadProfiles();renderUsers();}catch(e){msg.textContent=errText(e);}
   }
   function openAdminReset(id){
     const p=state.profiles.find(x=>x.id===id); if(!p)return; state.resetTargetId=id;
@@ -684,7 +774,7 @@
       if(id===state.user.id&&!payload.is_active)throw new Error('ไม่ควรปิดบัญชี Admin ที่กำลังใช้งานอยู่');
       const {error}=await state.sb.from('profiles').update(payload).eq('id',id);if(error)throw error;
       if(id===state.user.id){state.profile={...state.profile,...payload};applyUiMode(false);}
-      showToast('บันทึกผู้ใช้แล้ว','good');await loadProfiles();renderSettings();
+      showToast('บันทึกผู้ใช้แล้ว','good');await loadProfiles();renderUsers();
     }catch(e){showToast(errText(e),'error');}
   }
   async function renderAuditLog(){

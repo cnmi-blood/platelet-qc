@@ -27,13 +27,13 @@
     const title = $('#installDialogTitle');
     const sub = $('#installDialogSubtitle');
     if (kind === 'ios') {
-      title.textContent = 'เพิ่ม Platelet QC บน iPhone / iPad';
+      title.textContent = 'เพิ่ม Blood QC บน iPhone / iPad';
       sub.textContent = 'iPhone ไม่เปิดหน้าติดตั้งอัตโนมัติ ระบบจะแสดงขั้นตอนเพิ่มไปยังหน้าจอโฮม';
     } else if (kind === 'android') {
-      title.textContent = 'ติดตั้ง Platelet QC บน Android';
+      title.textContent = 'ติดตั้ง Blood QC บน Android';
       sub.textContent = 'ถ้าหน้าติดตั้งอัตโนมัติไม่ขึ้น ให้ทำตามขั้นตอนนี้ใน Chrome';
     } else {
-      title.textContent = 'ติดตั้ง Platelet QC';
+      title.textContent = 'ติดตั้ง Blood QC';
       sub.textContent = 'ทำตามเมนูติดตั้งของ Browser ที่ใช้งาน';
     }
     if (typeof d.showModal === 'function') d.showModal();

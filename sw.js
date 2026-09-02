@@ -1,4 +1,4 @@
-const VERSION = 'blood-component-qc-platelet-v4.9.1';
+const VERSION = 'blood-qc-v5.0.0';
 self.addEventListener('install', event => self.skipWaiting());
 self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', event => {

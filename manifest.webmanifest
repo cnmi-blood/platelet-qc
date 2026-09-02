@@ -1,9 +1,9 @@
 {
-  "name": "Platelet QC",
-  "short_name": "Platelet QC",
-  "description": "Platelet Preparation & QC — ระบบบันทึกการเตรียมเกล็ดเลือดและรายการที่ใช้เป็น QC ของ CNMI Blood Bank",
+  "name": "CNMI Blood Component QC",
+  "short_name": "Blood QC",
+  "description": "ระบบบันทึกการเตรียมและควบคุมคุณภาพส่วนประกอบโลหิตของ CNMI Blood Bank",
   "lang": "th",
-  "start_url": "./#/platelet",
+  "start_url": "./#/",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
