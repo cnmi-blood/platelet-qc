@@ -77,32 +77,58 @@
 
   <div id="appShell" class="hidden">
     <header class="topbar">
+      <button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="เปิดเมนู">☰</button>
       <div class="brand">
         <img src="assets/platelet.svg" alt="" />
         <div><strong>Platelet Preparation & QC</strong><span>CNMI Blood Bank · Calculator · Evidence · QC</span></div>
       </div>
-      <div class="userbox">
-        <div><strong id="headerUser">-</strong><span id="headerRole">-</span></div>
-        <button id="changePasswordBtn" class="btn ghost small-btn">เปลี่ยนรหัสผ่าน</button>
-        <button id="logoutBtn" class="btn ghost small-btn">ออกจากระบบ</button>
-      </div>
+      <div class="topbar-mode"><span id="currentModeBadge" class="mode-badge">Staff mode</span></div>
     </header>
 
-    <nav class="tabs" id="mainTabs">
-      <button data-view="dashboard" class="active">ภาพรวม</button>
-      <button data-view="record">บันทึกใหม่</button>
-      <button data-view="records">รายการทั้งหมด</button>
-      <button data-view="settings" id="settingsTab" class="hidden">ตั้งค่า</button>
-    </nav>
+    <div class="app-layout">
+      <aside id="sideNav" class="sidebar" aria-label="เมนูหลัก">
+        <div class="sidebar-title">เมนู</div>
+        <nav class="tabs side-tabs" id="mainTabs">
+          <button data-view="dashboard" class="active">ภาพรวม</button>
+          <button data-view="record">บันทึกใหม่</button>
+          <button data-view="records">รายการทั้งหมด</button>
+          <button data-view="settings" id="settingsTab" class="hidden">ตั้งค่า Admin</button>
+        </nav>
 
-    <main class="container">
-      <section id="view-dashboard" class="view"></section>
-      <section id="view-record" class="view hidden"></section>
-      <section id="view-records" class="view hidden"></section>
-      <section id="view-settings" class="view hidden"></section>
-    </main>
+        <div class="sidebar-spacer"></div>
 
-    <footer class="footer">Platelet QC v4.1.0 · รองรับการบันทึกวัน-เวลาวัดแยกของ CBC / ADAM / pH · ข้อมูลในระบบควรใช้ตาม WI/เกณฑ์ที่หน่วยอนุมัติ</footer>
+        <button id="changePasswordBtn" class="sidebar-action" type="button">เปลี่ยนรหัสผ่าน</button>
+
+        <div id="adminModePanel" class="admin-mode-panel hidden">
+          <div id="modeMenu" class="mode-menu hidden">
+            <button type="button" data-ui-mode="staff"><strong>โหมดผู้ใช้งานทั่วไป</strong><span>ซ่อนเมนูและสิทธิ์จัดการของ Admin</span></button>
+            <button type="button" data-ui-mode="admin"><strong>โหมดผู้ดูแลระบบ</strong><span>เปิดเมนูตั้งค่า ตรวจทวน และปลดล็อก</span></button>
+          </div>
+          <button id="modeMenuBtn" class="user-mode-card" type="button" aria-expanded="false">
+            <div class="user-mode-name"><strong id="headerUser">-</strong><span id="headerRole">-</span></div>
+            <div class="user-mode-current"><span id="modeDot" class="mode-dot"></span><span id="modeButtonLabel">Staff mode</span><span class="mode-chevron">⌄</span></div>
+          </button>
+        </div>
+
+        <div id="regularUserCard" class="regular-user-card">
+          <strong id="regularUserName">-</strong>
+          <span id="regularUserRole">-</span>
+        </div>
+
+        <button id="logoutBtn" class="sidebar-logout" type="button">ออกจากระบบ</button>
+      </aside>
+      <button id="sidebarBackdrop" class="sidebar-backdrop hidden" type="button" aria-label="ปิดเมนู"></button>
+
+      <div class="content-shell">
+        <main class="container">
+          <section id="view-dashboard" class="view"></section>
+          <section id="view-record" class="view hidden"></section>
+          <section id="view-records" class="view hidden"></section>
+          <section id="view-settings" class="view hidden"></section>
+        </main>
+        <footer class="footer">Platelet QC v4.2.0 · Admin สลับ Staff/Admin mode ได้ · เมนูด้านข้าง · รองรับมือถือ</footer>
+      </div>
+    </div>
   </div>
 
   <dialog id="detailDialog" class="dialog">
