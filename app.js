@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.0.6 - concise multi-module shell / Platelet active */
+/* CNMI Blood Component QC v5.0.8 - remove stale purpose badge from record header */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -84,10 +84,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.0.6 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.0.8 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.0.6 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.0.8 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -106,7 +106,7 @@
   function cfgReady(){ return C.SUPABASE_URL && C.SUPABASE_KEY && !C.SUPABASE_URL.includes('PASTE_') && !C.SUPABASE_KEY.includes('PASTE_'); }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'5.0.6',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.0.8',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -557,7 +557,7 @@
     const purpose=r?.record_purpose||'prepare';
     const adminCorrection=r&&adminUi()&&!deleted;
     $('#view-record').innerHTML=`
-      <div class="page-head"><div><h1>${r?'แก้ไข / ตรวจรายการ Platelet':'บันทึก Platelet'}</h1></div><div class="page-head-tools"><button type="button" class="btn small-btn" id="recordGuideBtn">คู่มือ</button><div class="status-line">${r?purposeBadge(purpose)+deletedBadge(r)+statusBadge(r.status)+qcBadgeForRecord(r)+pHBadge(r):purposeBadge('prepare')}</div></div></div>
+      <div class="page-head"><div><h1>${r?'แก้ไข / ตรวจรายการ Platelet':'บันทึก Platelet'}</h1></div><div class="page-head-tools"><button type="button" class="btn small-btn" id="recordGuideBtn">คู่มือ</button>${r?`<div class="status-line">${deletedBadge(r)}${statusBadge(r.status)}${pHBadge(r)}</div>`:''}</div></div>
       ${deleted?`<div class="notice bad"><strong>รายการนี้ถูกลบออกจากการใช้งานแล้ว</strong><br>เหตุผล: ${esc(r.delete_reason||'–')} · ${dateTH(r.deleted_at)} · โดย ${esc(profileName(r.deleted_by))}</div>`:''}
       ${locked&&!adminUi()?'<div class="notice good"><strong>รายการนี้ LOCK แล้ว</strong> ข้อมูลถูกป้องกันการแก้ไข หากพบข้อผิดพลาดให้แจ้ง Admin พร้อมหลักฐาน</div>':''}
       ${locked&&adminUi()&&!deleted?'<div class="notice warning"><strong>Admin correction</strong> รายการนี้ LOCK แล้ว แต่ Admin สามารถแก้ไขได้โดยระบุเหตุผล ระบบจะเพิ่ม Revision และบันทึกค่าก่อน/หลังใน Audit Log</div>':''}
@@ -771,18 +771,75 @@
   async function openDetail(id){
     try{
       const {data:r,error}=await state.sb.from('platelet_records').select('*').eq('id',id).single();if(error)throw error;
-      const [{data:pool},{data:ev},{data:audit}]=await Promise.all([state.sb.from('pool_units').select('*').eq('record_id',id).order('position'),state.sb.from('evidence_files').select('*').eq('record_id',id).order('created_at'),adminUi()?state.sb.from('audit_logs').select('*').eq('record_id',id).order('created_at',{ascending:false}).limit(100):Promise.resolve({data:[]})]);
+      const [{data:pool},{data:ev},{data:audit}]=await Promise.all([
+        state.sb.from('pool_units').select('*').eq('record_id',id).order('position'),
+        state.sb.from('evidence_files').select('*').eq('record_id',id).order('created_at'),
+        adminUi()?state.sb.from('audit_logs').select('*').eq('record_id',id).order('created_at',{ascending:false}).limit(100):Promise.resolve({data:[]})
+      ]);
       $('#detailTitle').textContent=r.product_no;$('#detailSubtitle').textContent=`${r.product_type} · ${purposeTH(r.record_purpose)} · Revision ${r.revision}`;
       logActivity('view_record','record',r.id,{product_no:r.product_no,product_type:r.product_type,purpose:r.record_purpose}).catch(()=>{});
       const canEdit=!r.deleted_at&&(adminUi()||r.status==='draft'||(reviewerUi()&&r.status==='submitted'));
+      const sectionMeta=(measuredAt,by,recordedAt)=>{
+        const parts=[];
+        if(measuredAt) parts.push(`<span class="detail-meta-chip"><b>วันที่ตรวจ</b> ${esc(dateTH(measuredAt))}</span>`);
+        if(by) parts.push(`<span class="detail-meta-chip"><b>ผู้กรอก</b> ${esc(profileName(by))}</span>`);
+        if(recordedAt) parts.push(`<span class="detail-meta-chip"><b>บันทึกล่าสุด</b> ${esc(dateTH(recordedAt))}</span>`);
+        return parts.join('');
+      };
+      const prepMeta=sectionMeta(null,r.prep_recorded_by||r.created_by,r.prep_recorded_at||r.created_at);
+      const pltMeta=sectionMeta(r.plt_measured_at,r.plt_recorded_by,r.plt_recorded_at);
+      const wbcMeta=sectionMeta(r.wbc_measured_at,r.wbc_recorded_by,r.wbc_recorded_at);
+      const phMeta=sectionMeta(r.ph_measured_at,r.ph_recorded_by,r.ph_recorded_at);
+      const evidenceGroups=['cbc','adam','ph','other'].map(cat=>{
+        const rows=(ev||[]).filter(x=>x.category===cat);
+        if(!rows.length)return '';
+        const title={cbc:'CBC / PLT',adam:'ADAM / WBC',ph:'pH',other:'อื่น ๆ'}[cat]||cat.toUpperCase();
+        return `<div class="evidence-group"><h4>${title}</h4>${rows.map(x=>`<div class="evidence-item"><span class="name"><strong>${esc(x.original_name)}</strong><small>${esc(profileName(x.uploaded_by))} · ${esc(dateTH(x.created_at))}</small>${x.change_reason?`<small class="evidence-reason">เหตุผล Admin: ${esc(x.change_reason)}</small>`:''}</span><button class="btn small-btn detail-evidence" data-path="${esc(x.storage_path)}">ดู</button></div>`).join('')}</div>`;
+      }).join('');
+      const poolRows=(pool||[]).map(x=>`<tr><td>${x.position}</td><td>${esc(x.unit_no)}</td><td>${fmt(x.pyi,2)}</td><td>${esc(profileName(x.updated_by||x.created_by))}</td><td class="nowrap">${esc(dateTH(x.updated_at||x.created_at))}</td></tr>`).join('');
       $('#detailBody').innerHTML=`<div class="status-line">${purposeBadge(r.record_purpose)} ${deletedBadge(r)} ${statusBadge(r.status)} ${qcBadgeForRecord(r)} ${pHBadge(r)}</div>
       ${r.deleted_at?`<div class="notice bad"><strong>ลบออกจากรายการใช้งานแล้ว</strong><br>${esc(r.delete_reason||'–')} · ${dateTH(r.deleted_at)} · ${esc(profileName(r.deleted_by))}</div>`:''}
-      <div class="divider"></div><div class="detail-grid">${dcell('ประเภท',purposeTH(r.record_purpose))}${dcell('กำหนดประเภทเมื่อ',dateTH(r.purpose_selected_at))}${dcell('กำหนดโดย',profileName(r.purpose_selected_by))}${dcell('Group',r.blood_group)}${dcell('วัน-เวลาเริ่มเจาะ',dateTH(r.collection_at))}${dcell('วัน-เวลาหมดอายุ',dateTH(r.expiry_at))}${dcell('น้ำหนักที่ชั่งได้',fmt(r.gross_weight_g,2)+' g')}${dcell('น้ำหนักถุงเปล่า',fmt(r.bag_tare_weight_g,2)+' g')}${dcell('Density',fmt(r.density,2))}${dcell('Volume',fmt(r.volume_ml,2)+' mL')}${dcell('Pool PYI',fmt(r.pool_pyi,2))}${dcell('สถานะ Pool / ฉลาก',poolReleaseTH(r.pool_release_status))}${dcell('เครื่อง CBC',r.plt_instrument)}${dcell('วันเวลาวัด CBC',measuredTH(r.plt_measured_at))}${dcell('PLT ที่ใช้',fmt(r.plt_used,2)+' K/µL')}${dcell('Platelet yield',fmt(r.platelet_yield,3)+' ×10¹¹')}${dcell('Equivalent Units',fmt(r.equivalent_units,2))}${dcell('WBC ADAM',fmt(r.wbc_adam,4)+' /µL')}${dcell('วันเวลาวัด ADAM',measuredTH(r.wbc_measured_at))}${dcell('Residual WBC',fmt(r.residual_wbc,3)+' ×10⁶')}${dcell('pH',fmt(r.ph_value,3))}${dcell('วันเวลาวัด pH',dateTH(r.ph_measured_at))}${dcell('ผู้บันทึก',profileName(r.created_by))}${dcell('ผู้ LOCK',profileName(r.locked_by))}</div>
+
+      <section class="detail-section">
+        <div class="detail-section-head"><div><h3>ข้อมูลการเตรียม</h3><p>ข้อมูลผลิตภัณฑ์และค่าที่ใช้คำนวณ Volume</p></div><div class="detail-section-meta">${prepMeta}</div></div>
+        <div class="detail-grid">${dcell('ประเภท',purposeTH(r.record_purpose))}${dcell('กำหนดประเภทเมื่อ',dateTH(r.purpose_selected_at))}${dcell('กำหนดประเภทโดย',profileName(r.purpose_selected_by))}${dcell('Group',r.blood_group)}${dcell('วัน-เวลาเริ่มเจาะ',dateTH(r.collection_at))}${dcell('วัน-เวลาหมดอายุ',dateTH(r.expiry_at))}${dcell('น้ำหนักที่ชั่งได้',fmt(r.gross_weight_g,2)+' g')}${dcell('น้ำหนักถุงเปล่า',fmt(r.bag_tare_weight_g,2)+' g')}${dcell('Density',fmt(r.density,2))}${dcell('Volume',fmt(r.volume_ml,2)+' mL')}</div>
+      </section>
+
+      ${pool?.length?`<section class="detail-section"><div class="detail-section-head"><div><h3>Pool LDPPC</h3><p>แสดงผู้บันทึกและเวลาของแต่ละ Unit</p></div><div class="detail-section-meta"><span class="detail-meta-chip"><b>Pool PYI</b> ${fmt(r.pool_pyi,2)}</span><span class="detail-meta-chip"><b>ฉลาก</b> ${esc(poolReleaseTH(r.pool_release_status))}</span></div></div><div class="table-wrap"><table class="data-table detail-pool-table"><thead><tr><th>#</th><th>Unit No.</th><th>PYI</th><th>ผู้กรอก</th><th>เวลาบันทึก</th></tr></thead><tbody>${poolRows}</tbody></table></div></section>`:''}
+
+      <section class="detail-section measurement-section">
+        <div class="detail-section-head"><div><h3>CBC / Platelet</h3><p>ผลตรวจ Platelet และค่าที่ใช้คำนวณ Yield</p></div><div class="detail-section-meta">${pltMeta||'<span class="detail-meta-chip muted-chip">ยังไม่มีผล</span>'}</div></div>
+        <div class="detail-grid">${dcell('เครื่อง CBC',r.plt_instrument)}${dcell('PLT ครั้งที่ 1',r.plt_value_1==null?'–':fmt(r.plt_value_1,2)+' K/µL')}${dcell('PLT ครั้งที่ 2',r.plt_value_2==null?'–':fmt(r.plt_value_2,2)+' K/µL')}${dcell('PLT ที่ใช้',r.plt_used==null?'–':fmt(r.plt_used,2)+' K/µL')}${dcell('Platelet yield',r.platelet_yield==null?'–':fmt(r.platelet_yield,3)+' ×10¹¹ cells/unit')}${dcell('Equivalent Units',fmt(r.equivalent_units,2))}</div>
+      </section>
+
+      <section class="detail-section measurement-section">
+        <div class="detail-section-head"><div><h3>ADAM / WBC</h3><p>ผล WBC และ Residual WBC</p></div><div class="detail-section-meta">${wbcMeta||'<span class="detail-meta-chip muted-chip">ยังไม่มีผล</span>'}</div></div>
+        <div class="detail-grid">${dcell('WBC ADAM',r.wbc_adam==null?'–':fmt(r.wbc_adam,4)+' /µL')}${dcell('Residual WBC',r.residual_wbc==null?'–':fmt(r.residual_wbc,3)+' ×10⁶ cells/unit')}</div>
+      </section>
+
+      <section class="detail-section measurement-section">
+        <div class="detail-section-head"><div><h3>pH</h3><p>ค่า pH และวันเวลาที่ตรวจ</p></div><div class="detail-section-meta">${phMeta||'<span class="detail-meta-chip muted-chip">ยังไม่มีผล</span>'}</div></div>
+        <div class="detail-grid">${dcell('pH',fmt(r.ph_value,3))}${r.ph_deviation_reason?dcell('เหตุผลที่ตรวจไม่ตรงวันหมดอายุ',r.ph_deviation_reason):''}</div>
+      </section>
+
       ${r.pool_release_status&&r.pool_release_status!=='not_applicable'?`<div class="notice ${['standard','conditional_pass'].includes(r.pool_release_status)?'good':['conditional_pending'].includes(r.pool_release_status)?'warning':'bad'}"><strong>การ Pool / ฉลาก:</strong> ${esc(poolReleaseTH(r.pool_release_status))}${r.pool_release_status==='conditional_pending'?` · ต้องมี Platelet yield ≥ ${fmt(state.settings.pool_conditional_yield_min,2)} ×10¹¹ cells/unit`:''}</div>`:''}
       ${r.record_purpose==='qc'?`<div class="notice ${r.qc_status==='pass'?'good':r.qc_status==='review'?'warning':'info'}"><strong>ผลประเมิน QC:</strong> ${esc(qcTH(r.qc_status))}</div>`:'<div class="compact-status"><span class="badge prepare-purpose">Prepare · ไม่ประเมิน QC</span></div>'}
-      ${r.ph_deviation_reason?`<div class="notice warning"><strong>เหตุผล pH ไม่ตรงวัน Exp.</strong><br>${esc(r.ph_deviation_reason)}</div>`:''}${r.notes?`<div class="panel"><h3>หมายเหตุ</h3>${esc(r.notes)}</div>`:''}
-      <div class="panel"><h3>Units ที่ใช้ Pool</h3>${pool?.length?`<div class="table-wrap"><table class="data-table"><thead><tr><th>#</th><th>Unit No.</th><th>PYI</th></tr></thead><tbody>${pool.map(x=>`<tr><td>${x.position}</td><td>${esc(x.unit_no)}</td><td>${fmt(x.pyi,2)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">ไม่ใช่ LDPPC / ไม่มีข้อมูล Pool</div>'}</div>
-      <div class="panel"><h3>หลักฐาน</h3><div class="evidence-list">${ev?.length?ev.map(x=>`<div class="evidence-item"><span class="name">${esc(x.category.toUpperCase())} · ${esc(x.original_name)}${x.change_reason?`<small class="evidence-reason">เหตุผล Admin: ${esc(x.change_reason)}</small>`:''}</span><button class="btn small-btn detail-evidence" data-path="${esc(x.storage_path)}">ดู</button></div>`).join(''):'<div class="muted">ยังไม่มีหลักฐาน</div>'}</div></div>
+      ${r.notes?`<div class="detail-section"><div class="detail-section-head"><div><h3>หมายเหตุ</h3></div></div><div class="detail-note">${esc(r.notes)}</div></div>`:''}
+
+      <section class="detail-section">
+        <div class="detail-section-head"><div><h3>หลักฐาน</h3><p>แต่ละไฟล์แสดงผู้แนบและเวลาที่แนบ</p></div></div>
+        <div class="evidence-list">${evidenceGroups||'<div class="muted">ยังไม่มีหลักฐาน</div>'}</div>
+      </section>
+
+      <section class="detail-section workflow-section">
+        <div class="detail-section-head"><div><h3>ลำดับการบันทึก</h3></div></div>
+        <div class="workflow-grid">
+          ${workflowStep('สร้างรายการ',r.created_by,r.created_at)}
+          ${workflowStep('ส่งตรวจทวน',r.submitted_by,r.submitted_at)}
+          ${workflowStep('ตรวจทวน / LOCK',r.locked_by||r.reviewed_by,r.locked_at||r.reviewed_at)}
+        </div>
+      </section>
+
       ${adminUi()?`<div class="panel"><h3>Audit trail</h3><div class="timeline">${audit?.length?audit.map(a=>auditItem(a)).join(''):'<div class="muted">ยังไม่มีประวัติ</div>'}</div></div>`:''}
       <div class="actions"><button class="btn" id="detailClose">ปิด</button>${canEdit?'<button class="btn primary" id="detailEdit">เปิดแก้ไข / ตรวจทวน</button>':''}${adminUi()&&!r.deleted_at?'<button class="btn danger" id="detailDelete">ลบรายการ</button>':''}${adminUi()&&r.deleted_at?'<button class="btn good" id="detailRestore">กู้คืนรายการ</button>':''}</div>`;
       $$('.detail-evidence').forEach(b=>b.onclick=async()=>{const {data,error}=await state.sb.storage.from('platelet-evidence').createSignedUrl(b.dataset.path,120);if(error)showToast(errText(error),'error');else window.open(data.signedUrl,'_blank','noopener');});
@@ -792,6 +849,11 @@
       if($('#detailRestore'))$('#detailRestore').onclick=()=>adminRestoreRecord(id);
       $('#detailDialog').showModal();
     }catch(e){showToast(errText(e),'error');}
+  }
+
+  function workflowStep(label,by,at){
+    const done=!!(by||at);
+    return `<div class="workflow-step ${done?'done':''}"><span class="workflow-dot"></span><div><strong>${esc(label)}</strong><small>${done?`${esc(profileName(by))} · ${esc(dateTH(at))}`:'–'}</small></div></div>`;
   }
 
   function dcell(l,v){return `<div class="detail-cell"><span>${l}</span><strong>${esc(v??'–')}</strong></div>`;}
