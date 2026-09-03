@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.2 - measurement labels */
+/* CNMI Blood Component QC v5.3.3 - Platelet CBC two-row layout */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -86,10 +86,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.3.2 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.3.3 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.2 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.3 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -713,12 +713,18 @@
         <div class="field span2"><label>ผู้บันทึกครั้งแรก</label><input readonly value="${esc(r?dateTH(r.created_at)+' · '+profileName(r.created_by):(state.profile.display_name||state.profile.email))}"></div>
       </div></div>
       <div class="panel" id="poolPanel"><div class="section-title-row"><h2>3. Units ที่ใช้ Pool (เฉพาะ LDPPC)</h2><div class="rule-chips"><span class="rule-chip">PYI ≥ ${fmt(state.settings.pool_pyi_standard_min,0)}</span><span class="rule-chip warn">${fmt(state.settings.pool_pyi_conditional_min,0)}–${fmt(state.settings.pool_pyi_standard_min-1,0)} → Yield ≥ ${fmt(state.settings.pool_conditional_yield_min,2)}</span></div></div><div class="table-wrap"><table class="pool-table"><thead><tr><th>#</th><th>Unit No.</th><th>PYI</th></tr></thead><tbody>${[1,2,3,4,5,6].map(i=>{const u=pool.find(x=>x.position===i);return `<tr><td>${i}</td><td><input class="pool-unit" data-pos="${i}" value="${esc(u?.unit_no||'')}" ${editable?'':'disabled'} placeholder="Unit No."></td><td><input class="pool-pyi" data-pos="${i}" type="number" step="0.01" min="0" value="${esc(u?.pyi??'')}" ${editable?'':'disabled'} placeholder="PYI"></td></tr>`}).join('')}</tbody></table></div><div class="pool-summary-grid"><div class="calc-box"><span>Pool PYI</span><strong id="poolSum">${fmt(r?.pool_pyi,2)}</strong></div><div class="calc-box pool-rule-box"><span>สถานะการ Pool / ฉลาก</span><div id="poolRuleStatus">${poolReleaseBadge(r?.pool_release_status)}</div><small id="poolRuleHint"></small></div></div></div>
-      <div class="panel measurement-entry-panel"><div class="section-title-row"><h2>4. ผล Platelet จาก CBC</h2><span class="section-badge">ผล + หลักฐาน</span></div><div class="form-grid">
-        <div class="field"><label>เครื่อง</label><select id="plt_instrument" ${editable?'':'disabled'}><option value="">เลือก</option>${['Mindray','Sysmex'].map(x=>`<option ${r?.plt_instrument===x?'selected':''}>${x}</option>`).join('')}</select></div>
-        ${field('PLT เครื่องที่ 1 (K/µL)','plt_value_1',r?.plt_value_1,'number',false,'0.01')}${field('PLT เครื่องที่ 2 (K/µL)','plt_value_2',r?.plt_value_2,'number',false,'0.01')}
-        ${field('วัน-เวลาที่วัด CBC','plt_measured_at',inputFromISO(r?.plt_measured_at),'datetime-local')}
-        <div class="field"><label>ค่าที่ใช้คำนวณ</label><select id="plt_use_mode" ${editable?'':'disabled'}>${[['first','เครื่องที่ 1'],['second','เครื่องที่ 2'],['average','ค่าเฉลี่ยเครื่องที่ 1–2']].map(([v,t])=>`<option value="${v}" ${(r?.plt_use_mode||'first')===v?'selected':''}>${t}</option>`).join('')}</select></div>
-      </div>${measurementEvidenceBox('cbc','หลักฐาน CBC / PLT')}</div>
+      <div class="panel measurement-entry-panel"><div class="section-title-row"><h2>4. ผล Platelet จาก CBC</h2><span class="section-badge">ผล + หลักฐาน</span></div>
+        <div class="form-grid platelet-cbc-meta">
+          <div class="field"><label>เครื่อง CBC</label><select id="plt_instrument" ${editable?'':'disabled'}><option value="">เลือก</option>${['Mindray','Sysmex'].map(x=>`<option ${r?.plt_instrument===x?'selected':''}>${x}</option>`).join('')}</select></div>
+          ${field('วัน-เวลาที่วัด CBC','plt_measured_at',inputFromISO(r?.plt_measured_at),'datetime-local')}
+          <div class="field"><label>ค่าที่ใช้คำนวณ</label><select id="plt_use_mode" ${editable?'':'disabled'}>${[['first','เครื่องที่ 1'],['second','เครื่องที่ 2'],['average','ค่าเฉลี่ยเครื่องที่ 1–2']].map(([v,t])=>`<option value="${v}" ${(r?.plt_use_mode||'first')===v?'selected':''}>${t}</option>`).join('')}</select></div>
+        </div>
+        <div class="table-wrap platelet-repeat-wrap"><table class="data-table platelet-repeat-table"><thead><tr><th></th><th>PLT (K/µL)</th></tr></thead><tbody>
+          <tr><th>เครื่องที่ 1</th><td><input id="plt_value_1" type="number" min="0" step="0.01" value="${esc(r?.plt_value_1??'')}" ${editable?'':'disabled'}></td></tr>
+          <tr><th>เครื่องที่ 2</th><td><input id="plt_value_2" type="number" min="0" step="0.01" value="${esc(r?.plt_value_2??'')}" ${editable?'':'disabled'}></td></tr>
+        </tbody></table></div>
+        ${measurementEvidenceBox('cbc','หลักฐาน CBC / PLT')}
+      </div>
       <div class="panel measurement-entry-panel"><div class="section-title-row"><h2>5. WBC จาก ADAM</h2><span class="section-badge">ผล + หลักฐาน</span></div><div class="form-grid">${field('WBC (/µL)','wbc_adam',r?.wbc_adam,'number',false,'0.0001')}${field('วัน-เวลาที่วัด ADAM','wbc_measured_at',inputFromISO(r?.wbc_measured_at),'datetime-local')}</div>${measurementEvidenceBox('adam','หลักฐาน ADAM / WBC')}</div>
       <div class="panel measurement-entry-panel"><div class="section-title-row"><h2>6. pH ณ วันหมดอายุ</h2><span class="section-badge">ผล + หลักฐาน</span></div><div class="form-grid">${field('pH','ph_value',r?.ph_value,'number',false,'0.001')}${field('วัน-เวลาที่วัด pH','ph_measured_at',inputFromISO(r?.ph_measured_at),'datetime-local')}<div class="field span2"><label>เหตุผล ถ้าวัด pH ไม่ตรงวันหมดอายุ</label><input id="ph_deviation_reason" value="${esc(r?.ph_deviation_reason||'')}" ${editable?'':'disabled'} placeholder="เช่น เครื่องขัดข้อง / วัดล่าช้า 2 วัน"></div></div>${measurementEvidenceBox('ph','หลักฐาน pH')}</div>
       <div class="panel"><h2>7. ผลคำนวณอัตโนมัติ</h2><div class="calc-grid"><div class="calc-box"><span>PLT ที่ใช้</span><strong id="cPlt">${fmt(r?.plt_used,2)}</strong><small>K/µL</small></div><div class="calc-box"><span>Platelet yield</span><strong id="cYield">${fmt(r?.platelet_yield,3)}</strong><small>×10¹¹ cells/unit</small></div><div class="calc-box"><span>Equivalent Units</span><strong id="cEq">${fmt(r?.equivalent_units,2)}</strong><small>factor ${state.settings.equivalent_unit_factor}</small></div><div class="calc-box"><span>Residual WBC</span><strong id="cWbc">${fmt(r?.residual_wbc,3)}</strong><small>×10⁶ cells/unit</small></div></div><div id="calcWarnings" style="margin-top:12px"></div></div>
@@ -955,7 +961,8 @@
 
       <section class="detail-section measurement-section">
         <div class="detail-section-head"><div><h3>CBC / Platelet</h3><p>ผลตรวจ Platelet และค่าที่ใช้คำนวณ Yield</p></div><div class="detail-section-meta">${pltMeta||'<span class="detail-meta-chip muted-chip">ยังไม่มีผล</span>'}</div></div>
-        <div class="detail-grid">${dcell('เครื่อง CBC',r.plt_instrument)}${dcell('PLT เครื่องที่ 1',r.plt_value_1==null?'–':fmt(r.plt_value_1,2)+' K/µL')}${dcell('PLT เครื่องที่ 2',r.plt_value_2==null?'–':fmt(r.plt_value_2,2)+' K/µL')}${dcell('PLT ที่ใช้',r.plt_used==null?'–':fmt(r.plt_used,2)+' K/µL')}${dcell('Platelet yield',r.platelet_yield==null?'–':fmt(r.platelet_yield,3)+' ×10¹¹ cells/unit')}${dcell('Equivalent Units',fmt(r.equivalent_units,2))}</div>
+        <div class="detail-grid">${dcell('เครื่อง CBC',r.plt_instrument)}${dcell('PLT ที่ใช้',r.plt_used==null?'–':fmt(r.plt_used,2)+' K/µL')}${dcell('Platelet yield',r.platelet_yield==null?'–':fmt(r.platelet_yield,3)+' ×10¹¹ cells/unit')}${dcell('Equivalent Units',fmt(r.equivalent_units,2))}</div>
+        <div class="table-wrap platelet-detail-repeat-wrap"><table class="data-table platelet-repeat-table"><thead><tr><th></th><th>PLT (K/µL)</th></tr></thead><tbody><tr><th>เครื่องที่ 1</th><td>${r.plt_value_1==null?'–':fmt(r.plt_value_1,2)}</td></tr><tr><th>เครื่องที่ 2</th><td>${r.plt_value_2==null?'–':fmt(r.plt_value_2,2)}</td></tr></tbody></table></div>
         ${detailEvidence('cbc')}
       </section>
 
@@ -1342,7 +1349,7 @@
   async function savePlasmaSettings(){try{const payload={volume_min_ml:num($('#ps_volume_min').value),factor_viii_min_iu_ml:num($('#ps_factor_min').value),expiry_days:Number($('#ps_expiry_days').value),require_factor_evidence:$('#ps_require_ev').checked,outlab_service_code:$('#ps_service_code').value.trim(),outlab_test_name:$('#ps_test_name').value.trim(),outlab_form_code:$('#ps_form_code').value.trim(),outlab_form_effective_text:$('#ps_form_effective').value.trim(),result_email:$('#ps_result_email').value.trim(),outlab_destination:$('#ps_destination').value.trim(),default_send_time:$('#ps_send_time').value};const {error}=await state.sb.from('plasma_qc_settings').update(payload).eq('id',1);if(error)throw error;await loadPlasmaModuleData();showToast('บันทึก Plasma settings แล้ว','good');renderPlasmaSettings();}catch(e){showToast(errText(e),'error');}}
   async function savePlasmaProductSetting(type){try{const row=$$(`.plasma-product-settings tr`).find(x=>x.dataset.type===type),tare=num($('.pptare',row).value),density=num($('.ppdensity',row).value);if(tare==null||tare<0||density==null||density<=0)throw new Error('ตรวจน้ำหนักถุงและ Density');const {error}=await state.sb.from('plasma_product_settings').update({tare_weight_g:tare,density}).eq('product_type',type);if(error)throw error;await loadPlasmaModuleData();showToast(`บันทึก ${type} แล้ว`,'good');renderPlasmaSettings();}catch(e){showToast(errText(e),'error');}}
 
-  // ===== RBC module v5.3.2 =====
+  // ===== RBC module v5.3.3 =====
   function rbcMonthKey(d=new Date()){
     return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit'}).format(d).replace('/','-');
   }

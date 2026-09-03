@@ -294,3 +294,12 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 .rbc-repeat-table{min-width:720px}.rbc-repeat-table th:first-child{width:84px}.rbc-repeat-table input{min-width:110px}.rbc-calc-table{min-width:680px}.rbc-calc-table small{display:block;color:var(--muted);font-size:10px;margin-top:2px}.rbc-filter-grid{grid-template-columns:1.4fr 1.3fr 1fr 1fr auto}.entry-attribution{margin-top:10px;padding:7px 9px;border-radius:9px;background:#f9fafb;color:#667085;font-size:11px;width:max-content;max-width:100%}.readonly-box{min-height:42px;display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;background:#f9fafb;padding:9px 11px;color:#475467}.rbc-product-settings td small{display:block;color:var(--muted);margin-top:3px}.rbc-product-settings input{min-width:105px}
 @media(max-width:1000px){.rbc-target-grid{grid-template-columns:1fr}.rbc-filter-grid{grid-template-columns:1fr 1fr}.rbc-filter-grid .btn{width:100%}}
 @media(max-width:760px){.rbc-month-select{width:100%;justify-content:space-between}.rbc-target-stats{grid-template-columns:1fr 1fr}.rbc-filter-grid{grid-template-columns:1fr}.rbc-repeat-table{min-width:650px}.rbc-records-table{min-width:1080px}.rbc-production-edit>div{display:grid;grid-template-columns:1fr auto}.entry-attribution{width:100%}}
+
+/* v5.3.3 Platelet CBC: show machine 1/2 as clear rows like RBC */
+.platelet-cbc-meta{margin-bottom:14px}
+.platelet-repeat-wrap,.platelet-detail-repeat-wrap{max-width:760px}
+.platelet-repeat-table{min-width:420px}
+.platelet-repeat-table th:first-child{width:120px;white-space:nowrap}
+.platelet-repeat-table input{width:100%;min-width:160px}
+.platelet-detail-repeat-wrap{margin-top:14px}
+@media(max-width:650px){.platelet-repeat-wrap,.platelet-detail-repeat-wrap{max-width:100%}.platelet-repeat-table{min-width:340px}.platelet-repeat-table th:first-child{width:105px}}
