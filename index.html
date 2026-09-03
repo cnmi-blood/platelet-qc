@@ -13,9 +13,9 @@
   <meta name="robots" content="noindex,nofollow" />
   <title>Blood QC</title>
   <link rel="icon" href="assets/platelet.svg" />
-  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=5.2.3" />
-  <link rel="manifest" href="manifest.webmanifest?v=5.2.3" />
-  <link rel="stylesheet" href="styles.css?v=5.2.3" />
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=5.3.0" />
+  <link rel="manifest" href="manifest.webmanifest?v=5.3.0" />
+  <link rel="stylesheet" href="styles.css?v=5.3.0" />
 </head>
 <body>
   <div id="toast" class="toast" aria-live="polite"></div>
@@ -137,11 +137,12 @@
 
           <div class="nav-module-group" data-nav-group="rbc">
             <button data-route="#/rbc" data-nav-head="rbc" id="rbcTab" class="nav-group-head" aria-expanded="false">
-              <span>ภาพรวม RBC</span><span class="nav-coming">เตรียมไว้</span><span class="nav-chevron" aria-hidden="true">⌄</span>
+              <span>ภาพรวม RBC</span><span class="nav-chevron" aria-hidden="true">⌄</span>
             </button>
             <div class="nav-submenu" data-nav-submenu="rbc">
-              <button data-route="#/rbc/new" id="rbcNewTab">บันทึก RBC <span class="nav-coming">เตรียมไว้</span></button>
-              <button data-route="#/rbc/records" id="rbcRecordsTab">รายการ RBC <span class="nav-coming">เตรียมไว้</span></button>
+              <button data-route="#/rbc/new" id="rbcNewTab">บันทึก RBC</button>
+              <button data-route="#/rbc/records" id="rbcRecordsTab">รายการ RBC</button>
+              <button data-route="#/rbc/guide" id="rbcGuideTab">คู่มือ RBC</button>
               <button data-route="#/rbc/qc_settings" id="rbcSettingsTab" class="hidden">ตั้งค่า RBC QC</button>
             </div>
           </div>
@@ -199,7 +200,7 @@
           <section id="view-users" class="view hidden"></section>
           <section id="view-audit" class="view hidden"></section>
         </main>
-        <footer id="appFooter" class="footer">CNMI Blood Component QC · v5.2.3 · bloodqc.cnmiblood.com</footer>
+        <footer id="appFooter" class="footer">CNMI Blood Component QC · v5.3.0 · bloodqc.cnmiblood.com</footer>
       </div>
     </div>
   </div>
@@ -266,7 +267,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
-  <script src="pwa.js?v=5.2.3"></script>
-  <script src="app.js?v=5.2.3"></script>
+  <script src="pwa.js?v=5.3.0"></script>
+  <script src="app.js?v=5.3.0"></script>
 </body>
 </html>
