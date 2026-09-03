@@ -213,3 +213,16 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 .workflow-step strong{display:block}.workflow-step small{display:block;color:var(--muted);margin-top:2px;line-height:1.35}
 .detail-pool-table td,.detail-pool-table th{vertical-align:top}
 @media(max-width:760px){.detail-section{padding:11px}.detail-section-head{display:block}.detail-section-meta{justify-content:flex-start;margin-top:8px}.detail-meta-chip{white-space:normal}.workflow-grid{grid-template-columns:1fr}.detail-pool-table{min-width:690px}}
+
+/* v5.0.9 — keep evidence with its measurement section and make attribution explicit */
+.measurement-entry-panel .measurement-evidence{margin-top:14px;padding-top:14px;border-top:1px solid #eaecf0}
+.measurement-evidence-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+.measurement-evidence-head strong{font-size:13px;color:#344054}
+.measurement-evidence .evidence-pick-actions{display:flex;gap:7px;flex-wrap:wrap}
+.evidence-item .evidence-name{display:flex;flex-direction:column;align-items:flex-start;min-width:0;white-space:normal;line-height:1.25}
+.evidence-item .evidence-name strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.evidence-item .evidence-name small{display:block;margin-top:3px;color:#667085;font-size:10.5px}
+.detail-section-evidence{margin-top:12px;padding-top:11px;border-top:1px dashed #d0d5dd;display:grid;gap:7px}
+.detail-evidence-title{font-weight:700;color:#475467;font-size:12px}
+.measurement-evidence-empty{margin-top:11px;padding:9px 10px;border-top:1px dashed #eaecf0;color:#98a2b3;font-size:12px}
+@media(max-width:760px){.measurement-evidence .evidence-pick-actions{display:grid;grid-template-columns:1fr 1fr}.measurement-evidence .evidence-pick-actions .btn{min-height:44px}}

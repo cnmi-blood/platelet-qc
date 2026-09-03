@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.0.8 - remove stale purpose badge from record header */
+/* CNMI Blood Component QC v5.0.9 - remove stale purpose badge from record header */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -84,10 +84,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.0.8 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.0.9 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.0.8 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.0.9 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -106,7 +106,7 @@
   function cfgReady(){ return C.SUPABASE_URL && C.SUPABASE_KEY && !C.SUPABASE_URL.includes('PASTE_') && !C.SUPABASE_KEY.includes('PASTE_'); }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'5.0.8',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.0.9',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -577,17 +577,16 @@
         <div class="field span2"><label>ผู้บันทึกครั้งแรก</label><input readonly value="${esc(r?dateTH(r.created_at)+' · '+profileName(r.created_by):(state.profile.display_name||state.profile.email))}"></div>
       </div></div>
       <div class="panel" id="poolPanel"><div class="section-title-row"><h2>3. Units ที่ใช้ Pool (เฉพาะ LDPPC)</h2><div class="rule-chips"><span class="rule-chip">PYI ≥ ${fmt(state.settings.pool_pyi_standard_min,0)}</span><span class="rule-chip warn">${fmt(state.settings.pool_pyi_conditional_min,0)}–${fmt(state.settings.pool_pyi_standard_min-1,0)} → Yield ≥ ${fmt(state.settings.pool_conditional_yield_min,2)}</span></div></div><div class="table-wrap"><table class="pool-table"><thead><tr><th>#</th><th>Unit No.</th><th>PYI</th></tr></thead><tbody>${[1,2,3,4,5,6].map(i=>{const u=pool.find(x=>x.position===i);return `<tr><td>${i}</td><td><input class="pool-unit" data-pos="${i}" value="${esc(u?.unit_no||'')}" ${editable?'':'disabled'} placeholder="Unit No."></td><td><input class="pool-pyi" data-pos="${i}" type="number" step="0.01" min="0" value="${esc(u?.pyi??'')}" ${editable?'':'disabled'} placeholder="PYI"></td></tr>`}).join('')}</tbody></table></div><div class="pool-summary-grid"><div class="calc-box"><span>Pool PYI</span><strong id="poolSum">${fmt(r?.pool_pyi,2)}</strong></div><div class="calc-box pool-rule-box"><span>สถานะการ Pool / ฉลาก</span><div id="poolRuleStatus">${poolReleaseBadge(r?.pool_release_status)}</div><small id="poolRuleHint"></small></div></div></div>
-      <div class="panel"><h2>4. ผล Platelet จาก CBC</h2><div class="form-grid">
+      <div class="panel measurement-entry-panel"><div class="section-title-row"><h2>4. ผล Platelet จาก CBC</h2><span class="section-badge">ผล + หลักฐาน</span></div><div class="form-grid">
         <div class="field"><label>เครื่อง</label><select id="plt_instrument" ${editable?'':'disabled'}><option value="">เลือก</option>${['Mindray','Sysmex'].map(x=>`<option ${r?.plt_instrument===x?'selected':''}>${x}</option>`).join('')}</select></div>
         ${field('PLT ครั้งที่ 1 (K/µL)','plt_value_1',r?.plt_value_1,'number',false,'0.01')}${field('PLT ครั้งที่ 2 (K/µL)','plt_value_2',r?.plt_value_2,'number',false,'0.01')}
         ${field('วัน-เวลาที่วัด CBC','plt_measured_at',inputFromISO(r?.plt_measured_at),'datetime-local')}
         <div class="field"><label>ค่าที่ใช้คำนวณ</label><select id="plt_use_mode" ${editable?'':'disabled'}>${[['first','ครั้งที่ 1'],['second','ครั้งที่ 2'],['average','ค่าเฉลี่ยครั้งที่ 1–2']].map(([v,t])=>`<option value="${v}" ${(r?.plt_use_mode||'first')===v?'selected':''}>${t}</option>`).join('')}</select></div>
-      </div></div>
-      <div class="panel"><h2>5. WBC จาก ADAM</h2><div class="form-grid">${field('WBC (/µL)','wbc_adam',r?.wbc_adam,'number',false,'0.0001')}${field('วัน-เวลาที่วัด ADAM','wbc_measured_at',inputFromISO(r?.wbc_measured_at),'datetime-local')}</div></div>
-      <div class="panel"><h2>6. pH ณ วันหมดอายุ</h2><div class="form-grid">${field('pH','ph_value',r?.ph_value,'number',false,'0.001')}${field('วัน-เวลาที่วัด pH','ph_measured_at',inputFromISO(r?.ph_measured_at),'datetime-local')}<div class="field span2"><label>เหตุผล ถ้าวัด pH ไม่ตรงวันหมดอายุ</label><input id="ph_deviation_reason" value="${esc(r?.ph_deviation_reason||'')}" ${editable?'':'disabled'} placeholder="เช่น เครื่องขัดข้อง / วัดล่าช้า 2 วัน"></div></div></div>
+      </div>${measurementEvidenceBox('cbc','หลักฐาน CBC / PLT')}</div>
+      <div class="panel measurement-entry-panel"><div class="section-title-row"><h2>5. WBC จาก ADAM</h2><span class="section-badge">ผล + หลักฐาน</span></div><div class="form-grid">${field('WBC (/µL)','wbc_adam',r?.wbc_adam,'number',false,'0.0001')}${field('วัน-เวลาที่วัด ADAM','wbc_measured_at',inputFromISO(r?.wbc_measured_at),'datetime-local')}</div>${measurementEvidenceBox('adam','หลักฐาน ADAM / WBC')}</div>
+      <div class="panel measurement-entry-panel"><div class="section-title-row"><h2>6. pH ณ วันหมดอายุ</h2><span class="section-badge">ผล + หลักฐาน</span></div><div class="form-grid">${field('pH','ph_value',r?.ph_value,'number',false,'0.001')}${field('วัน-เวลาที่วัด pH','ph_measured_at',inputFromISO(r?.ph_measured_at),'datetime-local')}<div class="field span2"><label>เหตุผล ถ้าวัด pH ไม่ตรงวันหมดอายุ</label><input id="ph_deviation_reason" value="${esc(r?.ph_deviation_reason||'')}" ${editable?'':'disabled'} placeholder="เช่น เครื่องขัดข้อง / วัดล่าช้า 2 วัน"></div></div>${measurementEvidenceBox('ph','หลักฐาน pH')}</div>
       <div class="panel"><h2>7. ผลคำนวณอัตโนมัติ</h2><div class="calc-grid"><div class="calc-box"><span>PLT ที่ใช้</span><strong id="cPlt">${fmt(r?.plt_used,2)}</strong><small>K/µL</small></div><div class="calc-box"><span>Platelet yield</span><strong id="cYield">${fmt(r?.platelet_yield,3)}</strong><small>×10¹¹ cells/unit</small></div><div class="calc-box"><span>Equivalent Units</span><strong id="cEq">${fmt(r?.equivalent_units,2)}</strong><small>factor ${state.settings.equivalent_unit_factor}</small></div><div class="calc-box"><span>Residual WBC</span><strong id="cWbc">${fmt(r?.residual_wbc,3)}</strong><small>×10⁶ cells/unit</small></div></div><div id="calcWarnings" style="margin-top:12px"></div></div>
-      <div class="panel"><div class="section-title-row"><h2>8. หลักฐานจากเครื่อง</h2><span class="section-badge">Private</span></div><div class="evidence-grid">${evidenceBox('cbc','CBC / PLT')}${evidenceBox('adam','ADAM / WBC')}${evidenceBox('ph','pH')}</div></div>
-      <div class="panel"><h2>9. หมายเหตุ</h2><textarea id="notes" ${editable?'':'disabled'} placeholder="บันทึกเหตุการณ์หรือข้อมูลเพิ่มเติม">${esc(r?.notes||'')}</textarea></div>
+      <div class="panel"><h2>8. หมายเหตุ</h2><textarea id="notes" ${editable?'':'disabled'} placeholder="บันทึกเหตุการณ์หรือข้อมูลเพิ่มเติม">${esc(r?.notes||'')}</textarea></div>
       <div class="sticky-actions"><div class="left"><button type="button" class="btn" id="cancelEdit">กลับรายการทั้งหมด</button></div><div class="right ${!r?'new-record-actions':''}">${!r&&editable?'<button type="button" class="btn clear-form-btn" id="clearForm">ล้างฟอร์ม</button>':''}${editable?'<button type="button" class="btn" id="saveDraft">บันทึก</button>':''}${r&&r.status==='draft'&&editable?'<button type="button" class="btn primary" id="submitReview">ส่งตรวจทวน</button>':''}${r&&r.status==='submitted'&&reviewerUi()?'<button type="button" class="btn good" id="lockRecord">ตรวจทวนและ LOCK</button>':''}${r&&r.status==='locked'&&adminUi()&&!deleted?'<button type="button" class="btn danger" id="unlockRecord">ปลดล็อกเป็น Draft</button>':''}</div></div>
       </form>`;
     setEditable(editable); applyProductWeightConfig(r); togglePool(); updateCalcPreview(); updatePoolRuleStatus(); renderEvidenceLists(r?.id,editable,locked);
@@ -652,8 +651,8 @@
     else $('#calcWarnings').innerHTML='';
     updatePoolRuleStatus();
   }
-  function evidenceBox(cat,title){ return `<div class="evidence-box"><h3>${title}</h3><div class="muted small">มือถือถ่ายรูปหลักฐานได้ทันที หรือเลือกภาพ/PDF ที่มีอยู่</div><input class="hidden-file-input" type="file" id="camera_${cat}" accept="image/*" capture="environment"><input class="hidden-file-input" type="file" id="file_${cat}" accept="image/*,application/pdf"><div class="evidence-pick-actions"><button type="button" class="btn primary small-btn camera-pick" data-cat="${cat}">ถ่ายรูป</button><button type="button" class="btn small-btn file-pick" data-cat="${cat}">เลือกไฟล์</button></div><div class="evidence-list" id="list_${cat}"></div></div>`; }
-  function renderEvidenceLists(recordId,editable,locked=false){ ['cbc','adam','ph'].forEach(cat=>{ const host=$('#list_'+cat); const arr=state.currentEvidence.filter(x=>x.category===cat); const canDelete=editable && !(locked&&adminUi()); host.innerHTML=arr.length?arr.map(e=>`<div class="evidence-item"><span class="name" title="${esc(e.original_name)}">${esc(e.original_name)}${e.change_reason?`<small class="evidence-reason">Admin: ${esc(e.change_reason)}</small>`:''}</span><span class="e-actions"><button type="button" class="btn small-btn ev-view" data-id="${e.id}">ดู</button>${canDelete?`<button type="button" class="btn small-btn danger ev-del" data-id="${e.id}">ลบ</button>`:''}</span></div>`).join(''):'<div class="muted small">ยังไม่มีไฟล์</div>'; });
+  function measurementEvidenceBox(cat,title){ return `<div class="measurement-evidence"><div class="measurement-evidence-head"><strong>${title}</strong><span class="section-badge">Private</span></div><input class="hidden-file-input" type="file" id="camera_${cat}" accept="image/*" capture="environment"><input class="hidden-file-input" type="file" id="file_${cat}" accept="image/*,application/pdf"><div class="evidence-pick-actions"><button type="button" class="btn primary small-btn camera-pick" data-cat="${cat}">ถ่ายรูป</button><button type="button" class="btn small-btn file-pick" data-cat="${cat}">เลือกไฟล์</button></div><div class="evidence-list" id="list_${cat}"></div></div>`; }
+  function renderEvidenceLists(recordId,editable,locked=false){ ['cbc','adam','ph'].forEach(cat=>{ const host=$('#list_'+cat); if(!host)return; const arr=state.currentEvidence.filter(x=>x.category===cat); const canDelete=editable && !(locked&&adminUi()); host.innerHTML=arr.length?arr.map(e=>`<div class="evidence-item"><span class="name evidence-name" title="${esc(e.original_name)}"><strong>${esc(e.original_name)}</strong><small>ผู้แนบหลักฐาน ${esc(profileName(e.uploaded_by))} · ${esc(dateTH(e.created_at))}</small>${e.change_reason?`<small class="evidence-reason">Admin: ${esc(e.change_reason)}</small>`:''}</span><span class="e-actions"><button type="button" class="btn small-btn ev-view" data-id="${e.id}">ดู</button>${canDelete?`<button type="button" class="btn small-btn danger ev-del" data-id="${e.id}">ลบ</button>`:''}</span></div>`).join(''):'<div class="muted small">ยังไม่มีหลักฐาน</div>'; });
     $$('.ev-view').forEach(b=>b.onclick=()=>viewEvidence(b.dataset.id)); $$('.ev-del').forEach(b=>b.onclick=()=>deleteEvidence(b.dataset.id));
     $$('.camera-pick').forEach(b=>{b.disabled=!editable;b.onclick=()=>$('#camera_'+b.dataset.cat).click();});
     $$('.file-pick').forEach(b=>{b.disabled=!editable;b.onclick=()=>$('#file_'+b.dataset.cat).click();});
@@ -782,20 +781,22 @@
       const sectionMeta=(measuredAt,by,recordedAt)=>{
         const parts=[];
         if(measuredAt) parts.push(`<span class="detail-meta-chip"><b>วันที่ตรวจ</b> ${esc(dateTH(measuredAt))}</span>`);
-        if(by) parts.push(`<span class="detail-meta-chip"><b>ผู้กรอก</b> ${esc(profileName(by))}</span>`);
+        if(by) parts.push(`<span class="detail-meta-chip"><b>ผู้กรอกผล</b> ${esc(profileName(by))}</span>`);
         if(recordedAt) parts.push(`<span class="detail-meta-chip"><b>บันทึกล่าสุด</b> ${esc(dateTH(recordedAt))}</span>`);
         return parts.join('');
       };
       const prepMeta=sectionMeta(null,r.prep_recorded_by||r.created_by,r.prep_recorded_at||r.created_at);
-      const pltMeta=sectionMeta(r.plt_measured_at,r.plt_recorded_by,r.plt_recorded_at);
-      const wbcMeta=sectionMeta(r.wbc_measured_at,r.wbc_recorded_by,r.wbc_recorded_at);
-      const phMeta=sectionMeta(r.ph_measured_at,r.ph_recorded_by,r.ph_recorded_at);
-      const evidenceGroups=['cbc','adam','ph','other'].map(cat=>{
+      const pltHasResult=r.plt_value_1!=null||r.plt_value_2!=null;
+      const wbcHasResult=r.wbc_adam!=null;
+      const phHasResult=r.ph_value!=null;
+      const pltMeta=pltHasResult?sectionMeta(r.plt_measured_at,r.plt_recorded_by,r.plt_recorded_at):'';
+      const wbcMeta=wbcHasResult?sectionMeta(r.wbc_measured_at,r.wbc_recorded_by,r.wbc_recorded_at):'';
+      const phMeta=phHasResult?sectionMeta(r.ph_measured_at,r.ph_recorded_by,r.ph_recorded_at):'';
+      const detailEvidence=(cat)=>{
         const rows=(ev||[]).filter(x=>x.category===cat);
-        if(!rows.length)return '';
-        const title={cbc:'CBC / PLT',adam:'ADAM / WBC',ph:'pH',other:'อื่น ๆ'}[cat]||cat.toUpperCase();
-        return `<div class="evidence-group"><h4>${title}</h4>${rows.map(x=>`<div class="evidence-item"><span class="name"><strong>${esc(x.original_name)}</strong><small>${esc(profileName(x.uploaded_by))} · ${esc(dateTH(x.created_at))}</small>${x.change_reason?`<small class="evidence-reason">เหตุผล Admin: ${esc(x.change_reason)}</small>`:''}</span><button class="btn small-btn detail-evidence" data-path="${esc(x.storage_path)}">ดู</button></div>`).join('')}</div>`;
-      }).join('');
+        if(!rows.length)return '<div class="measurement-evidence-empty">ยังไม่มีหลักฐาน</div>';
+        return `<div class="detail-section-evidence"><div class="detail-evidence-title">หลักฐาน</div>${rows.map(x=>`<div class="evidence-item"><span class="name evidence-name"><strong>${esc(x.original_name)}</strong><small>ผู้แนบหลักฐาน ${esc(profileName(x.uploaded_by))} · ${esc(dateTH(x.created_at))}</small>${x.change_reason?`<small class="evidence-reason">เหตุผล Admin: ${esc(x.change_reason)}</small>`:''}</span><button class="btn small-btn detail-evidence" data-path="${esc(x.storage_path)}">ดู</button></div>`).join('')}</div>`;
+      };
       const poolRows=(pool||[]).map(x=>`<tr><td>${x.position}</td><td>${esc(x.unit_no)}</td><td>${fmt(x.pyi,2)}</td><td>${esc(profileName(x.updated_by||x.created_by))}</td><td class="nowrap">${esc(dateTH(x.updated_at||x.created_at))}</td></tr>`).join('');
       $('#detailBody').innerHTML=`<div class="status-line">${purposeBadge(r.record_purpose)} ${deletedBadge(r)} ${statusBadge(r.status)} ${qcBadgeForRecord(r)} ${pHBadge(r)}</div>
       ${r.deleted_at?`<div class="notice bad"><strong>ลบออกจากรายการใช้งานแล้ว</strong><br>${esc(r.delete_reason||'–')} · ${dateTH(r.deleted_at)} · ${esc(profileName(r.deleted_by))}</div>`:''}
@@ -810,26 +811,25 @@
       <section class="detail-section measurement-section">
         <div class="detail-section-head"><div><h3>CBC / Platelet</h3><p>ผลตรวจ Platelet และค่าที่ใช้คำนวณ Yield</p></div><div class="detail-section-meta">${pltMeta||'<span class="detail-meta-chip muted-chip">ยังไม่มีผล</span>'}</div></div>
         <div class="detail-grid">${dcell('เครื่อง CBC',r.plt_instrument)}${dcell('PLT ครั้งที่ 1',r.plt_value_1==null?'–':fmt(r.plt_value_1,2)+' K/µL')}${dcell('PLT ครั้งที่ 2',r.plt_value_2==null?'–':fmt(r.plt_value_2,2)+' K/µL')}${dcell('PLT ที่ใช้',r.plt_used==null?'–':fmt(r.plt_used,2)+' K/µL')}${dcell('Platelet yield',r.platelet_yield==null?'–':fmt(r.platelet_yield,3)+' ×10¹¹ cells/unit')}${dcell('Equivalent Units',fmt(r.equivalent_units,2))}</div>
+        ${detailEvidence('cbc')}
       </section>
 
       <section class="detail-section measurement-section">
         <div class="detail-section-head"><div><h3>ADAM / WBC</h3><p>ผล WBC และ Residual WBC</p></div><div class="detail-section-meta">${wbcMeta||'<span class="detail-meta-chip muted-chip">ยังไม่มีผล</span>'}</div></div>
         <div class="detail-grid">${dcell('WBC ADAM',r.wbc_adam==null?'–':fmt(r.wbc_adam,4)+' /µL')}${dcell('Residual WBC',r.residual_wbc==null?'–':fmt(r.residual_wbc,3)+' ×10⁶ cells/unit')}</div>
+        ${detailEvidence('adam')}
       </section>
 
       <section class="detail-section measurement-section">
         <div class="detail-section-head"><div><h3>pH</h3><p>ค่า pH และวันเวลาที่ตรวจ</p></div><div class="detail-section-meta">${phMeta||'<span class="detail-meta-chip muted-chip">ยังไม่มีผล</span>'}</div></div>
         <div class="detail-grid">${dcell('pH',fmt(r.ph_value,3))}${r.ph_deviation_reason?dcell('เหตุผลที่ตรวจไม่ตรงวันหมดอายุ',r.ph_deviation_reason):''}</div>
+        ${detailEvidence('ph')}
       </section>
 
       ${r.pool_release_status&&r.pool_release_status!=='not_applicable'?`<div class="notice ${['standard','conditional_pass'].includes(r.pool_release_status)?'good':['conditional_pending'].includes(r.pool_release_status)?'warning':'bad'}"><strong>การ Pool / ฉลาก:</strong> ${esc(poolReleaseTH(r.pool_release_status))}${r.pool_release_status==='conditional_pending'?` · ต้องมี Platelet yield ≥ ${fmt(state.settings.pool_conditional_yield_min,2)} ×10¹¹ cells/unit`:''}</div>`:''}
       ${r.record_purpose==='qc'?`<div class="notice ${r.qc_status==='pass'?'good':r.qc_status==='review'?'warning':'info'}"><strong>ผลประเมิน QC:</strong> ${esc(qcTH(r.qc_status))}</div>`:'<div class="compact-status"><span class="badge prepare-purpose">Prepare · ไม่ประเมิน QC</span></div>'}
       ${r.notes?`<div class="detail-section"><div class="detail-section-head"><div><h3>หมายเหตุ</h3></div></div><div class="detail-note">${esc(r.notes)}</div></div>`:''}
 
-      <section class="detail-section">
-        <div class="detail-section-head"><div><h3>หลักฐาน</h3><p>แต่ละไฟล์แสดงผู้แนบและเวลาที่แนบ</p></div></div>
-        <div class="evidence-list">${evidenceGroups||'<div class="muted">ยังไม่มีหลักฐาน</div>'}</div>
-      </section>
 
       <section class="detail-section workflow-section">
         <div class="detail-section-head"><div><h3>ลำดับการบันทึก</h3></div></div>
