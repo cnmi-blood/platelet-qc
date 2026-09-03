@@ -226,3 +226,13 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 .detail-evidence-title{font-weight:700;color:#475467;font-size:12px}
 .measurement-evidence-empty{margin-top:11px;padding:9px 10px;border-top:1px dashed #eaecf0;color:#98a2b3;font-size:12px}
 @media(max-width:760px){.measurement-evidence .evidence-pick-actions{display:grid;grid-template-columns:1fr 1fr}.measurement-evidence .evidence-pick-actions .btn{min-height:44px}}
+
+/* v5.1.0 — physician reviewer workflow */
+.nav-count{display:inline-flex;min-width:20px;height:20px;align-items:center;justify-content:center;margin-left:6px;padding:0 6px;border-radius:999px;background:#fee4e2;color:#b42318;font-size:11px;font-weight:800;vertical-align:middle}
+#reviewTab:not(.hidden){display:flex;align-items:center;justify-content:space-between;gap:8px}
+.review-home-panel{border-left:4px solid #b42318}
+.review-queue-panel .review-table td:last-child{text-align:right}
+.reviewer-action-panel{border:1px solid #f6c7cd;background:#fffafb}
+.reviewer-action-panel textarea{min-height:88px}
+.reviewer-action-panel .actions{justify-content:flex-end;margin-top:10px}
+@media(max-width:760px){.review-queue-panel .table-wrap{overflow:auto}.reviewer-action-panel .actions{display:grid;grid-template-columns:1fr}.reviewer-action-panel .btn{width:100%}}
