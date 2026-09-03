@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.2.1 - Plasma/FFP QC + Factor VIII Outlab */
+/* CNMI Blood Component QC v5.2.2 - polished FFP Outlab PDF + FFP guide */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -28,7 +28,7 @@
     home:'#/',
     platelet:{dashboard:'#/platelet',record:'#/platelet/new',records:'#/platelet/records',guide:'#/platelet/guide',settings:'#/platelet/qc_settings'},
     rbc:{dashboard:'#/rbc',record:'#/rbc/new',records:'#/rbc/records',settings:'#/rbc/qc_settings'},
-    plasma:{dashboard:'#/plasma',record:'#/plasma/new',records:'#/plasma/records',settings:'#/plasma/qc_settings'},
+    plasma:{dashboard:'#/plasma',record:'#/plasma/new',records:'#/plasma/records',guide:'#/plasma/guide',settings:'#/plasma/qc_settings'},
     review:'#/review',
     users:'#/admin/users',
     audit:'#/admin/audit'
@@ -86,10 +86,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.2.1 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.2.2 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.2.1 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.2.2 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -109,7 +109,7 @@
   function cfgReady(){ return C.SUPABASE_URL && C.SUPABASE_KEY && !C.SUPABASE_URL.includes('PASTE_') && !C.SUPABASE_KEY.includes('PASTE_'); }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'5.2.1',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.2.2',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -1034,7 +1034,7 @@
   }
 
 
-  // ===== Plasma / FFP module v5.2.1 =====
+  // ===== Plasma / FFP module v5.2.2 =====
   function plasmaMonthKey(){ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit'}).format(new Date()).replace('/','-'); }
   function plasmaBatchById(id){ return state.plasmaBatches.find(x=>x.id===id); }
   function plasmaModuleReadyNotice(){
@@ -1044,6 +1044,7 @@
     if(!state.plasmaReady){ $('#view-module').innerHTML=plasmaModuleReadyNotice(); return; }
     if(page==='record') return renderPlasmaRecordForm();
     if(page==='records') return renderPlasmaRecordsList();
+    if(page==='guide') return renderPlasmaGuide();
     if(page==='settings') return renderPlasmaSettings();
     return renderPlasmaDashboard();
   }
@@ -1060,13 +1061,13 @@
     const waiting=rec.filter(r=>r.outlab_batch_id&&r.factor_viii_percent==null).length;
     const review=rec.filter(r=>r.status==='submitted').length;
     const locked=rec.filter(r=>r.status==='locked').length;
-    $('#view-module').innerHTML=`<div class="page-head"><div><h1>ภาพรวม Plasma</h1><p class="muted">FFP · Factor VIII QC</p></div><div class="actions">${staffWriteUi()?'<button class="btn" id="plasmaBatchBtn">+ สร้างใบนำส่ง</button><button class="btn primary" id="plasmaNewBtn">+ บันทึก FFP</button>':''}</div></div>
+    $('#view-module').innerHTML=`<div class="page-head"><div><h1>ภาพรวม Plasma</h1><p class="muted">FFP · Factor VIII QC</p></div><div class="actions"><button class="btn" data-go-route="#/plasma/guide">คู่มือ FFP</button>${staffWriteUi()?'<button class="btn" id="plasmaBatchBtn">+ สร้างใบนำส่ง</button><button class="btn primary" id="plasmaNewBtn">+ บันทึก FFP</button>':''}</div></div>
       <div class="grid cards">${metric('เดือนนี้',month.length,'รายการ FFP')}${metric('รอจัดชุด',noBatch,'ยังไม่ทำใบนำส่ง')}${metric('รอผล Factor VIII',waiting,'ส่ง Outlab แล้ว')}${metric('รอตรวจทวน',review,'Submitted')}${metric('LOCK',locked,'แพทย์ทบทวนแล้ว')}</div>
       <div class="panel"><h2>รายการล่าสุด</h2>${plasmaRecordsTable(rec.slice(0,12))}</div>
       <div class="panel"><h2>ชุดนำส่งล่าสุด</h2>${plasmaBatchesTable(state.plasmaBatches.slice(0,8))}</div>`;
     if($('#plasmaNewBtn'))$('#plasmaNewBtn').onclick=()=>{state.currentPlasmaRecordId=null;location.hash=ROUTES.plasma.record;};
     if($('#plasmaBatchBtn'))$('#plasmaBatchBtn').onclick=openPlasmaBatchBuilder;
-    bindPlasmaRecordLinks($('#view-module'));bindPlasmaBatchPdf($('#view-module'));
+    bindRouteButtons($('#view-module'));bindPlasmaRecordLinks($('#view-module'));bindPlasmaBatchPdf($('#view-module'));
   }
   function plasmaBatchesTable(rows){
     if(!rows.length)return '<div class="empty">ยังไม่มีชุดนำส่ง</div>';
@@ -1076,7 +1077,7 @@
 
   function renderPlasmaRecordsList(){
     const del=adminUi()?`<label class="inline-check"><input type="checkbox" id="pfDeleted" ${state.showDeletedPlasma?'checked':''}> แสดงรายการที่ลบแล้ว</label>`:'';
-    $('#view-module').innerHTML=`<div class="page-head"><div><h1>รายการ FFP</h1><p class="muted">Plasma · Factor VIII QC</p></div><div class="actions"><button class="btn" id="plasmaCsv">Export CSV</button>${staffWriteUi()?'<button class="btn" id="plasmaBatchBtn">+ สร้างใบนำส่ง</button><button class="btn primary" id="plasmaNewBtn">+ บันทึก FFP</button>':''}</div></div><div class="panel"><div class="filters"><input id="pfSearch" placeholder="ค้นหา Product No."><select id="pfProduct"><option value="">ทุกชนิด FFP</option>${activePlasmaProducts().map(x=>`<option>${esc(x.product_type)}</option>`).join('')}</select><select id="pfOutlab"><option value="">ทุกสถานะ Outlab</option><option value="no_batch">รอจัดชุดนำส่ง</option><option value="waiting">รอผล Factor VIII</option><option value="result">ได้รับผลแล้ว</option></select><select id="pfQc"><option value="">ทุกผล QC</option><option value="pass">ผ่าน</option><option value="review">ต้องตรวจสอบ</option><option value="incomplete">ข้อมูลไม่ครบ</option></select><select id="pfStatus"><option value="">ทุกสถานะ</option><option value="draft">Draft</option><option value="submitted">รอตรวจทวน</option><option value="locked">LOCK</option></select><button class="btn" id="pfClear">ล้าง</button></div>${del}<div id="plasmaTableHost" style="margin-top:12px"></div></div>`;
+    $('#view-module').innerHTML=`<div class="page-head"><div><h1>รายการ FFP</h1><p class="muted">Plasma · Factor VIII QC</p></div><div class="actions"><button class="btn" id="plasmaCsv">Export CSV</button><button class="btn" data-go-route="#/plasma/guide">คู่มือ FFP</button>${staffWriteUi()?'<button class="btn" id="plasmaBatchBtn">+ สร้างใบนำส่ง</button><button class="btn primary" id="plasmaNewBtn">+ บันทึก FFP</button>':''}</div></div><div class="panel"><div class="filters"><input id="pfSearch" placeholder="ค้นหา Product No."><select id="pfProduct"><option value="">ทุกชนิด FFP</option>${activePlasmaProducts().map(x=>`<option>${esc(x.product_type)}</option>`).join('')}</select><select id="pfOutlab"><option value="">ทุกสถานะ Outlab</option><option value="no_batch">รอจัดชุดนำส่ง</option><option value="waiting">รอผล Factor VIII</option><option value="result">ได้รับผลแล้ว</option></select><select id="pfQc"><option value="">ทุกผล QC</option><option value="pass">ผ่าน</option><option value="review">ต้องตรวจสอบ</option><option value="incomplete">ข้อมูลไม่ครบ</option></select><select id="pfStatus"><option value="">ทุกสถานะ</option><option value="draft">Draft</option><option value="submitted">รอตรวจทวน</option><option value="locked">LOCK</option></select><button class="btn" id="pfClear">ล้าง</button></div>${del}<div id="plasmaTableHost" style="margin-top:12px"></div></div>`;
     const apply=()=>{ const q=$('#pfSearch').value.trim().toLowerCase(),prod=$('#pfProduct').value,out=$('#pfOutlab').value,qc=$('#pfQc').value,st=$('#pfStatus').value; if($('#pfDeleted'))state.showDeletedPlasma=$('#pfDeleted').checked; const rows=state.plasmaRecords.filter(r=>(state.showDeletedPlasma||!r.deleted_at)&&(!q||`${r.product_no} ${r.product_type}`.toLowerCase().includes(q))&&(!prod||r.product_type===prod)&&(!qc||r.qc_status===qc)&&(!st||r.status===st)&&(!out||(out==='no_batch'&&!r.outlab_batch_id)||(out==='waiting'&&r.outlab_batch_id&&r.factor_viii_percent==null)||(out==='result'&&r.factor_viii_percent!=null))); $('#plasmaTableHost').innerHTML=plasmaRecordsTable(rows);bindPlasmaRecordLinks($('#plasmaTableHost'));return rows; };
     ['#pfSearch','#pfProduct','#pfOutlab','#pfQc','#pfStatus'].forEach(x=>$(x).addEventListener('input',apply)); if($('#pfDeleted'))$('#pfDeleted').addEventListener('change',apply);
     $('#pfClear').onclick=()=>{['#pfSearch','#pfProduct','#pfOutlab','#pfQc','#pfStatus'].forEach(x=>$(x).value='');if($('#pfDeleted')){$('#pfDeleted').checked=false;state.showDeletedPlasma=false;}apply();};
@@ -1106,7 +1107,7 @@
     let r=null;state.currentPlasmaEvidence=[];
     if(state.currentPlasmaRecordId){const {data,error}=await state.sb.from('plasma_records').select('*').eq('id',state.currentPlasmaRecordId).single();if(error){showToast(errText(error),'error');return;}r=data;const {data:ev}=await state.sb.from('plasma_evidence_files').select('*').eq('record_id',r.id).order('created_at');state.currentPlasmaEvidence=ev||[];}
     const locked=r?.status==='locked',submitted=r?.status==='submitted',deleted=!!r?.deleted_at;const editable=!deleted&&(adminUi()||(!locked&&!submitted&&staffWriteUi()));const batch=r?.outlab_batch_id?plasmaBatchById(r.outlab_batch_id):null;
-    $('#view-module').innerHTML=`<div class="page-head"><div><h1>${r?'FFP · '+esc(r.product_no):'บันทึก FFP'}</h1><p class="muted">Plasma · Factor VIII QC</p></div><div class="page-head-tools">${r?`<div class="status-line">${plasmaQcBadge(r.qc_status)} ${statusBadge(r.status)}</div>`:''}</div></div>
+    $('#view-module').innerHTML=`<div class="page-head"><div><h1>${r?'FFP · '+esc(r.product_no):'บันทึก FFP'}</h1><p class="muted">Plasma · Factor VIII QC</p></div><div class="page-head-tools"><button type="button" class="btn small-btn" data-go-route="#/plasma/guide">คู่มือ FFP</button>${r?`<div class="status-line">${plasmaQcBadge(r.qc_status)} ${statusBadge(r.status)}</div>`:''}</div></div>
       ${deleted?`<div class="notice bad"><strong>รายการนี้ถูกลบแล้ว</strong><br>${esc(r.delete_reason||'–')}</div>`:''}${locked&&!adminUi()?'<div class="notice good"><strong>LOCK แล้ว</strong> หากพบข้อมูลผิดให้แจ้ง Admin พร้อมหลักฐาน</div>':''}${r?.status==='draft'&&r?.returned_at&&r?.review_note?`<div class="notice warning"><strong>แพทย์ส่งกลับแก้ไข</strong><br>${esc(r.review_note)}</div>`:''}
       <form id="plasmaRecordForm">
       ${r&&adminUi()&&!deleted?`<div class="panel admin-correction-panel"><h2>การแก้ไขโดย Admin</h2><div class="field"><label>เหตุผลการแก้ไข</label><textarea id="plasma_admin_reason" placeholder="เช่น เจ้าหน้าที่แจ้งผลผิด ตรวจหลักฐานใหม่แล้วแก้ไข"></textarea></div></div>`:''}
@@ -1117,7 +1118,7 @@
       <div class="panel"><h2>5. หมายเหตุ</h2><textarea id="plasma_notes" placeholder="บันทึกข้อมูลเพิ่มเติม">${esc(r?.notes||'')}</textarea></div>
       <div class="sticky-actions"><div class="left"><button type="button" class="btn" id="plasmaBack">กลับรายการทั้งหมด</button></div><div class="right">${!r&&editable?'<button type="button" class="btn clear-form-btn" id="plasmaClear">ล้างฟอร์ม</button>':''}${editable?'<button type="button" class="btn" id="plasmaSave">บันทึก</button>':''}${r&&r.status==='draft'&&editable?'<button type="button" class="btn primary" id="plasmaSubmit">ส่งตรวจทวน</button>':''}${r&&r.status==='locked'&&adminUi()&&!deleted?'<button type="button" class="btn danger" id="plasmaUnlock">ปลดล็อกเป็น Draft</button>':''}</div></div></form>`;
     if(!editable)$$('#plasmaRecordForm input,#plasmaRecordForm select,#plasmaRecordForm textarea').forEach(el=>{if(!el.readOnly)el.disabled=true;});
-    updatePlasmaPreview();renderPlasmaEvidence(editable,locked);
+    updatePlasmaPreview();renderPlasmaEvidence(editable,locked);bindRouteButtons($('#view-module'));
     ['plasma_product_type','plasma_gross_weight_g','plasma_factor_viii_percent','plasma_manufactured_on'].forEach(id=>$('#'+id)?.addEventListener('input',updatePlasmaPreview));
     $('#plasmaBack').onclick=()=>location.hash=ROUTES.plasma.records;if($('#plasmaClear'))$('#plasmaClear').onclick=()=>{if(confirm('ล้างฟอร์มทั้งหมด?'))renderPlasmaRecordForm();};if($('#plasmaSave'))$('#plasmaSave').onclick=()=>savePlasmaRecord(false);if($('#plasmaSubmit'))$('#plasmaSubmit').onclick=submitPlasmaRecord;if($('#plasmaUnlock'))$('#plasmaUnlock').onclick=unlockPlasmaRecord;if($('#plasmaOpenBatch'))$('#plasmaOpenBatch').onclick=openPlasmaBatchBuilder;if($('#plasmaPrintBatch'))$('#plasmaPrintBatch').onclick=()=>printPlasmaOutlabBatch(batch.id);
   }
@@ -1178,7 +1179,7 @@
     if(!b){showToast('ไม่พบชุดนำส่ง','error');return;}
     const rows=state.plasmaRecords.filter(r=>r.outlab_batch_id===batchId&&!r.deleted_at).sort((a,b)=>String(a.product_type).localeCompare(String(b.product_type),'th')||String(a.product_no).localeCompare(String(b.product_no)));
     if(!rows.length){showToast('ไม่มีรายการในชุดนำส่ง','error');return;}
-    if(document.fonts&&!(document.fonts.check('16px "TH Sarabun New"')||document.fonts.check('16px "TH SarabunNew"'))){showToast('เครื่องนี้ไม่พบ TH Sarabun New — PDF อาจใช้ฟอนต์สำรอง','warn');}
+    if(document.fonts&&!(document.fonts.check('16px "TH Sarabun New"')||document.fonts.check('16px "TH SarabunNew"'))){showToast('เครื่องนี้ไม่พบ TH Sarabun New - PDF อาจใช้ฟอนต์สำรอง','warn');}
     const w=window.open('','_blank');
     if(!w){showToast('Browser บล็อกหน้าต่าง PDF กรุณาอนุญาต Pop-up','error');return;}
     const sentDate=dateTHLong(b.sent_at);
@@ -1186,18 +1187,53 @@
     const resultEmail=b.result_email||state.plasmaSettings.result_email||'transfusionbb_cnmi@mahidol.ac.th';
     const effectiveText=b.form_effective_text||state.plasmaSettings.outlab_form_effective_text||'วันบังคับใช้ 15 มกราคม 2565';
     const logoUrl=new URL('assets/ramathibodi-mark.png',location.href.split('#')[0]).href;
+    const maxRowsPerPage=12;
+    const pages=[];
+    for(let i=0;i<rows.length;i+=maxRowsPerPage) pages.push(rows.slice(i,i+maxRowsPerPage));
+    const pageHtml=(pageRows,pageIndex)=>`<section class="page">
+      <table class="form-head-table"><tr><td class="form-logo" rowspan="3"><img src="${logoUrl}" alt="ตราโรงพยาบาล"></td><td class="head-row"><span class="label">ชื่อแบบฟอร์ม :</span> บันทึกส่งสิ่งส่งตรวจต่อโรงพยาบาลรามาธิบดี ผ่าน ศูนย์บริการพยาธิวิทยา</td></tr><tr><td class="head-row"><span class="label">ฝ่าย/งาน/หน่วย :</span> หน่วยเวชศาสตร์บริการโลหิต</td></tr><tr><td class="head-row hospital">โรงพยาบาลรามาธิบดีจักรีนฤบดินทร์ คณะแพทยศาสตร์โรงพยาบาลรามาธิบดี มหาวิทยาลัยมหิดล</td></tr></table>
+      <table class="sample-table" style="margin-top:3mm"><thead><tr><th>ตัวอย่างส่งตรวจ</th><th>รหัสบริการ</th><th>ชื่อการทดสอบ</th></tr></thead><tbody>${pageRows.map(r=>`<tr><td>${esc(r.product_no)}</td><td>${esc(b.service_code)}</td><td>${esc(b.test_name)}</td></tr>`).join('')}</tbody></table>
+      <div class="send-block">
+        <div class="destination"><span>สำหรับ</span><strong>${esc(b.destination)}</strong></div>
+        <div class="send-grid">
+          <div class="send-line"><span class="send-label">ผู้เตรียมสิ่งส่งตรวจ</span><span class="value">${esc(profileName(b.prepared_by))}</span></div>
+          <div class="send-line"><span class="send-label">เจ้าหน้าที่ RFS ที่นำส่ง</span><span class="value">${esc(b.rfs_staff_name||'')}</span></div>
+          <div class="send-line"><span class="send-label">วันที่นำส่ง</span><span class="value">${esc(sentDate)}</span></div>
+          <div class="send-line"><span class="send-label">เวลาที่นำส่ง</span><span class="value">${esc(sentTime)} น.</span></div>
+        </div>
+        <div class="note"><b>* หมายเหตุ:</b> ส่งผลกลับไปที่ E-mail: <b>${esc(resultEmail)}</b></div>
+      </div>
+      <div class="page-footer"><span>หน้า ${pageIndex+1} ของ ${pages.length} หน้า</span><span>${esc(b.form_code)} Rev.00&nbsp;&nbsp;${esc(effectiveText)}</span></div>
+    </section>`;
     w.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>${esc(b.batch_no)}</title><style>
-      @page{size:A4;margin:9mm 10mm 7mm}*{box-sizing:border-box}html,body{margin:0;padding:0;color:#000;background:#fff}body{font-family:"TH Sarabun New","TH SarabunNew","Sarabun",Tahoma,sans-serif;font-size:16pt;line-height:1.05}.page{min-height:279mm;display:flex;flex-direction:column}.form-head{display:grid;grid-template-columns:26mm 1fr;border:1px solid #000}.form-logo{grid-row:1/4;display:flex;align-items:center;justify-content:center;border-right:1px solid #000}.form-logo img{width:21mm;height:21mm;object-fit:contain}.head-row{padding:2.2mm 3mm;border-bottom:1px solid #000}.head-row:last-child{border-bottom:0}.label{font-weight:700}.sample-table{width:100%;border-collapse:collapse;margin-top:3mm}.sample-table th,.sample-table td{border:1px solid #000;padding:1.5mm 2.4mm;vertical-align:middle}.sample-table th{text-align:center;font-weight:700}.sample-table td:nth-child(1),.sample-table td:nth-child(2){text-align:center}.sample-table th:nth-child(1){width:34mm}.sample-table th:nth-child(2){width:26mm}.spacer{flex:1;min-height:18mm}.path{text-align:center;font-size:23pt;font-weight:700;margin:4mm 0 7mm}.path .dest{border-bottom:1px dotted #000;padding:0 5mm}.send-grid{display:grid;grid-template-columns:1fr 1fr;gap:7mm 13mm;margin:0 7mm}.send-line{display:flex;align-items:flex-end;gap:2mm}.send-line .value{flex:1;border-bottom:1px dotted #000;min-height:7mm;padding:0 2mm;text-align:center}.note{margin:8mm 7mm 0;font-weight:700}.page-footer{margin-top:auto;text-align:right;font-size:10.5pt;padding-top:8mm}.print-help{position:fixed;right:12px;top:12px;padding:8px 14px}@media print{.print-help{display:none}}
-      </style></head><body><button class="print-help" onclick="window.print()">พิมพ์ / Save PDF</button><div class="page">
-      <div class="form-head"><div class="form-logo"><img src="${logoUrl}" alt=""></div><div class="head-row"><span class="label">ชื่อแบบฟอร์ม :</span> บันทึกส่งสิ่งส่งตรวจต่อโรงพยาบาลรามาธิบดี ผ่าน ศูนย์บริการพยาธิวิทยา</div><div class="head-row"><span class="label">ฝ่าย/งาน/หน่วย :</span> หน่วยเวชศาสตร์บริการโลหิต</div><div class="head-row">โรงพยาบาลรามาธิบดีจักรีนฤบดินทร์ คณะแพทยศาสตร์โรงพยาบาลรามาธิบดี มหาวิทยาลัยมหิดล</div></div>
-      <table class="sample-table"><thead><tr><th>ตัวอย่างส่งตรวจ</th><th>รหัสบริการ</th><th>ชื่อการทดสอบ</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.product_no)}</td><td>${esc(b.service_code)}</td><td>${esc(b.test_name)}</td></tr>`).join('')}</tbody></table>
-      <div class="spacer"></div><div class="path">สำหรับ <span class="dest">${esc(b.destination)}</span></div>
-      <div class="send-grid"><div class="send-line"><span>ผู้เตรียมสิ่งส่งตรวจ</span><span class="value">${esc(profileName(b.prepared_by))}</span></div><div class="send-line"><span>เจ้าหน้าที่ RFS ที่นำส่ง</span><span class="value">${esc(b.rfs_staff_name||'')}</span></div><div class="send-line"><span>วันที่นำส่ง</span><span class="value">${esc(sentDate)}</span></div><div class="send-line"><span>เวลาที่นำส่ง</span><span class="value">${esc(sentTime)} น.</span></div></div>
-      <div class="note">* หมายเหตุ: ส่งผลกลับไปที่ E-mail: ${esc(resultEmail)}</div>
-      <div class="page-footer">หน้า 1 ของ 1 หน้า&nbsp;&nbsp;${esc(b.form_code)} ${esc(effectiveText)}</div></div>
-      <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),500));<\/script></body></html>`);
+      @page{size:A4;margin:9mm 10mm 8mm}
+      *{box-sizing:border-box}html,body{margin:0;padding:0;color:#111;background:#fff}
+      body{font-family:"TH Sarabun New","TH SarabunNew","Sarabun",Tahoma,sans-serif;font-size:16pt;line-height:1.12}
+      .page{min-height:279mm;position:relative;display:flex;flex-direction:column;page-break-after:always}.page:last-child{page-break-after:auto}
+      .form-head-table{width:100%;border-collapse:collapse;table-layout:fixed}
+      .form-head-table td{border:1.2px solid #111}
+      .form-logo{width:27mm;text-align:center;vertical-align:middle;padding:1.5mm}
+      .form-logo img{width:21mm;height:21mm;object-fit:contain;display:block;margin:auto}
+      .head-row{height:10.2mm;padding:1.5mm 3.2mm;font-size:15.5pt;vertical-align:middle}
+      .head-row.hospital{font-size:15pt}.label{font-weight:700;margin-right:1mm}
+      .sample-table{width:100%;border-collapse:collapse;table-layout:fixed}
+      .sample-table th,.sample-table td{border:1.15px solid #111;padding:1.1mm 2.5mm;height:8mm;vertical-align:middle}
+      .sample-table th{font-weight:700;text-align:center;background:#fafafa}
+      .sample-table td:nth-child(1),.sample-table td:nth-child(2){text-align:center}
+      .sample-table th:nth-child(1){width:38mm}.sample-table th:nth-child(2){width:28mm}
+      .send-block{margin-top:10mm;padding:0 4mm}
+      .destination{display:flex;align-items:flex-end;justify-content:center;gap:5mm;margin-bottom:7mm;font-size:20pt}
+      .destination span{font-weight:700}.destination strong{min-width:105mm;text-align:center;border-bottom:1.3px dotted #111;padding:0 5mm 1.2mm;font-weight:700}
+      .send-grid{display:grid;grid-template-columns:1fr 1fr;column-gap:14mm;row-gap:6mm}
+      .send-line{display:grid;grid-template-columns:auto 1fr;align-items:end;gap:3mm;min-width:0}
+      .send-label{white-space:nowrap}.send-line .value{border-bottom:1.2px dotted #111;min-height:6.5mm;padding:0 2mm 1mm;text-align:center;overflow:hidden}
+      .note{margin-top:8mm;padding:3mm 3.5mm;border:1px solid #bbb;border-radius:2px;font-size:14.5pt}
+      .page-footer{margin-top:auto;display:flex;justify-content:space-between;gap:8mm;padding-top:6mm;font-size:10.5pt;color:#333}
+      .print-help{position:fixed;right:12px;top:12px;z-index:20;padding:8px 14px;border:1px solid #bbb;border-radius:8px;background:#fff;font:14px sans-serif;box-shadow:0 2px 8px #0002}
+      @media print{.print-help{display:none}.sample-table th{background:#fff}}
+    </style></head><body><button class="print-help" onclick="window.print()">พิมพ์ / Save PDF</button>${pages.map(pageHtml).join('')}<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),600));<\/script></body></html>`);
     w.document.close();
-    logActivity('export_pdf','plasma_outlab_batch',batchId,{module:'plasma',batch_no:b.batch_no,records:rows.length}).catch(()=>{});
+    logActivity('export_pdf','plasma_outlab_batch',batchId,{module:'plasma',batch_no:b.batch_no,records:rows.length,pages:pages.length}).catch(()=>{});
   }
   async function openPlasmaDetail(id){
     try{const {data:r,error}=await state.sb.from('plasma_records').select('*').eq('id',id).single();if(error)throw error;const [{data:ev},{data:audit}]=await Promise.all([state.sb.from('plasma_evidence_files').select('*').eq('record_id',id).order('created_at'),adminUi()?state.sb.from('audit_logs').select('*').eq('module','plasma').eq('entity_id',id).order('created_at',{ascending:false}).limit(100):Promise.resolve({data:[]})]);const b=r.outlab_batch_id?plasmaBatchById(r.outlab_batch_id):null;state.currentPlasmaEvidence=ev||[];$('#detailTitle').textContent=r.product_no;$('#detailSubtitle').textContent=`${r.product_type} · Revision ${r.revision}`;const canEdit=!r.deleted_at&&(adminUi()||(r.status==='draft'&&staffWriteUi())),canReview=!r.deleted_at&&r.status==='submitted'&&reviewerUi();const evHtml=ev?.length?ev.map(x=>`<div class="evidence-item"><span class="name evidence-name"><strong>${esc(x.original_name)}</strong><small>ผู้แนบหลักฐาน ${esc(profileName(x.uploaded_by))} · ${esc(dateTH(x.created_at))}</small></span><button class="btn small-btn plasma-detail-ev" data-id="${x.id}">ดู</button></div>`).join(''):'<div class="muted small">ยังไม่มีหลักฐาน</div>';
@@ -1220,6 +1256,29 @@
   async function returnPlasmaForCorrection(id,note=''){if(!reviewerUi())return;note=note.trim();if(!note){showToast('กรุณาระบุเหตุผลที่ส่งกลับแก้ไข','error');return;}try{const {error}=await state.sb.from('plasma_records').update({status:'draft',review_note:note}).eq('id',id);if(error)throw error;await reloadPlasmaRecords();$('#detailDialog').close();showToast('ส่งกลับให้แก้ไขแล้ว','good');renderReviewQueue();}catch(e){showToast(errText(e),'error');}}
   async function adminDeletePlasma(id){if(!adminUi())return;const reason=prompt('ระบุเหตุผลที่ลบรายการ (จำเป็น):');if(!reason?.trim())return;try{const {error}=await state.sb.from('plasma_records').update({deleted_at:new Date().toISOString(),delete_reason:reason.trim()}).eq('id',id);if(error)throw error;await reloadPlasmaRecords();$('#detailDialog').close();showToast('ลบรายการแล้วและเก็บ Audit ไว้','good');renderPlasmaPage('records');}catch(e){showToast(errText(e),'error');}}
   async function adminRestorePlasma(id){if(!adminUi())return;const reason=prompt('ระบุเหตุผลที่กู้คืนรายการ:');if(!reason?.trim())return;try{const {error}=await state.sb.from('plasma_records').update({deleted_at:null,deleted_by:null,delete_reason:null,last_admin_edit_reason:reason.trim(),last_admin_edit_id:crypto.randomUUID()}).eq('id',id);if(error)throw error;await reloadPlasmaRecords();$('#detailDialog').close();showToast('กู้คืนรายการแล้ว','good');renderPlasmaPage('records');}catch(e){showToast(errText(e),'error');}}
+  function renderPlasmaGuide(){
+    const s=state.plasmaSettings;
+    $('#view-module').innerHTML=`
+      <div class="page-head"><div><h1>คู่มือ FFP</h1><p class="muted">ขั้นตอนทำงานตั้งแต่เลือกถุงจนแพทย์ LOCK</p></div><div class="actions">${staffWriteUi()?'<button class="btn" id="guidePlasmaBatch">+ สร้างใบนำส่ง</button><button class="btn primary" id="guidePlasmaNew">+ บันทึก FFP</button>':''}</div></div>
+      <div class="notice info"><strong>จำง่าย:</strong> 1 Product No. = 1 รายการ FFP QC · 1 เที่ยวส่ง = 1 ใบนำส่ง · เที่ยวเดียวรวม FFP ต่างชนิดกันได้</div>
+      <div class="guide-grid ffp-guide-grid">
+        <section class="guide-card"><div class="guide-no">1</div><div><h2>เลือกถุงที่จะทำ QC แล้วสร้างรายการ</h2><p>เมื่อหน่วยเลือก FFP สำหรับ QC ให้เข้า <strong>Plasma → บันทึก FFP</strong> และสร้าง Product No. ไว้ทันที ไม่จำเป็นต้องรอผล Factor VIII</p><p>กรอกชนิด FFP, Group, วันที่ผลิต, เครื่องปั่น และเวลาที่เตรียมตามข้อมูลจริงของถุง</p><div class="guide-callout">สร้างไว้ก่อนช่วยให้ติดตามได้ว่าถุงใดกำลังรอชั่งน้ำหนัก รอใบนำส่ง หรือรอผล Outlab</div></div></section>
+        <section class="guide-card"><div class="guide-no">2</div><div><h2>ชั่งน้ำหนักถุง</h2><p>ชั่งผลิตภัณฑ์ทั้งถุง แล้วกรอกเฉพาะ <strong>น้ำหนักที่ชั่งได้ (g)</strong> ระบบจะใส่น้ำหนักถุงเปล่าและ Density ตามชนิดถุงให้เอง</p><div class="guide-rule-row"><span class="guide-rule good">Top&Bottom 27.7 g</span><span class="guide-rule good">NLR-Reveos 28.2 g</span><span class="guide-rule good">LR-Reveos 28.2 g</span><span class="guide-rule warn">Density 1.025</span></div><div class="guide-callout">Volume = (น้ำหนักที่ชั่งได้ - น้ำหนักถุงเปล่า) ÷ Density ระบบคำนวณให้อัตโนมัติ และเก็บชื่อผู้กรอกน้ำหนักพร้อมวันเวลา</div></div></section>
+        <section class="guide-card"><div class="guide-no">3</div><div><h2>เตรียม Segment สำหรับ Factor VIII</h2><p>เตรียม Segment ของ Product No. ที่จะส่งตรวจตามวิธีปฏิบัติงานของหน่วย: <strong>แช่แข็ง → พัน Parafilm → เก็บแช่แข็ง</strong> จนถึงเวลานำส่ง</p><p>ตรวจ Product No. บน Segment ให้ตรงกับรายการในระบบก่อนจัดชุดนำส่ง</p></div></section>
+        <section class="guide-card"><div class="guide-no">4</div><div><h2>สร้างใบนำส่ง</h2><p>กด <strong>+ สร้างใบนำส่ง</strong> แล้วเลือกเฉพาะ Product No. ที่จะออกไปในเที่ยวเดียวกัน สามารถรวม Top&Bottom, NLR-Reveos และ LR-Reveos ในใบเดียวได้</p><div class="guide-callout"><strong>ถ้าวันนี้ส่ง 12 ถุง:</strong> เลือกทั้ง 12 ถุงแล้วสร้าง 1 ใบ<br><strong>ถ้าอีกวันส่งเพิ่ม 1–2 ถุง:</strong> สร้างใบนำส่งใหม่อีก 1 ใบ เลือกเฉพาะถุงที่ส่งวันนั้น ไม่แก้ใบเดิม</div><p>ระบบเก็บแต่ละชุดแยกกัน จึง Export PDF ใบเก่าย้อนหลังได้เสมอ</p></div></section>
+        <section class="guide-card"><div class="guide-no">5</div><div><h2>ตรวจใบนำส่งก่อนพิมพ์</h2><p>ตรวจ Product No., รหัสบริการ <strong>${esc(s.outlab_service_code||'250089')}</strong>, ชื่อการทดสอบ <strong>${esc(s.outlab_test_name||'Factor VIII assay')}</strong>, ผู้เตรียมสิ่งส่งตรวจ, วัน-เวลา และชื่อ RFS ถ้ามี</p><p>PDF ใช้รูปแบบ A4 และรองรับหลายถุง ถ้ารายการเกิน 12 ถุง ระบบจะแบ่งหน้าต่อให้อัตโนมัติ โดยยังเป็นชุดนำส่งเดียวกัน</p></div></section>
+        <section class="guide-card"><div class="guide-no">6</div><div><h2>นำส่ง Outlab และรอผล</h2><p>นำ Segment แช่แข็งไปตามกระบวนการของหน่วย พร้อมใบนำส่งที่ Export จากระบบ หลังส่งแล้วรายการจะอยู่สถานะ <strong>รอผล Factor VIII</strong></p><p>ผลส่งกลับที่ <strong>${esc(s.result_email||'transfusionbb_cnmi@mahidol.ac.th')}</strong> ตามค่าที่ Admin กำหนด</p></div></section>
+        <section class="guide-card"><div class="guide-no">7</div><div><h2>เมื่อได้รับใบรายงานผล</h2><p>เปิด Product No. ที่ตรงกับใบรายงาน แล้วกรอก <strong>Factor VIII (%)</strong> และวันที่ทดสอบตามใบผล จากนั้นถ่ายรูปหรือแนบ Scan/PDF ของใบรายงานไว้ในหัวข้อเดียวกัน</p><div class="guide-callout">ชื่อ <strong>ผู้กรอกผล</strong> และ <strong>ผู้แนบหลักฐาน</strong> ถูกเก็บแยกตามบัญชีที่ทำจริง เพื่อทวนสอบย้อนหลังได้</div></div></section>
+        <section class="guide-card"><div class="guide-no">8</div><div><h2>ระบบคำนวณและประเมิน QC</h2><p>ระบบคำนวณ Factor VIII เป็น IU/mL และ IU/bag ให้อัตโนมัติ แล้วเทียบกับเกณฑ์ที่หน่วยกำหนด</p><div class="guide-rule-row"><span class="guide-rule good">Volume ≥ ${fmt(s.volume_min_ml,0)} mL</span><span class="guide-rule good">Factor VIII ≥ ${fmt(s.factor_viii_min_iu_ml,2)} IU/mL</span></div><p>ถ้าข้อมูลยังไม่ครบจะขึ้น “ข้อมูลยังไม่ครบ” ถ้าค่าใดไม่เข้าเกณฑ์จะขึ้น “ต้องตรวจสอบ” ไม่ควรแก้ตัวเลขเพื่อให้ผ่าน</p></div></section>
+        <section class="guide-card"><div class="guide-no">9</div><div><h2>ส่งแพทย์ทบทวน</h2><p>เมื่อข้อมูลและหลักฐานครบ กด <strong>ส่งตรวจทวน</strong> แพทย์ Reviewer จะตรวจข้อมูลและหลักฐาน</p><p>แพทย์เลือก <strong>อนุมัติและ LOCK</strong> หรือ <strong>ส่งกลับแก้ไข</strong> พร้อมเหตุผล หากส่งกลับ Staff แก้ข้อมูลแล้วส่งตรวจทวนใหม่ได้</p></div></section>
+        <section class="guide-card"><div class="guide-no">10</div><div><h2>ถ้ากรอกผิดหรือมีหลักฐานใหม่</h2><p>ก่อน LOCK สามารถแก้ Draft ได้ตามสิทธิ์ หาก LOCK แล้วให้แจ้ง Admin พร้อมหลักฐานที่ถูกต้อง</p><div class="guide-callout">Admin ต้องระบุเหตุผลการแก้ไข ระบบเก็บค่าก่อน-หลัง ผู้แก้ วันเวลา และ Revision ใน Audit Log และควรคงหลักฐานเดิมไว้ พร้อมแนบหลักฐานใหม่เพิ่ม</div></div></section>
+      </div>
+      <div class="panel guide-terms"><h2>สถานะที่ควรรู้</h2><div class="term-grid"><div><strong>รอจัดชุด</strong><span>สร้าง FFP แล้ว แต่ยังไม่มีใบนำส่ง</span></div><div><strong>รอผล Factor VIII</strong><span>อยู่ในชุดนำส่งแล้ว ยังไม่ได้กรอกผล</span></div><div><strong>Draft</strong><span>เจ้าหน้าที่ยังกรอก/แก้ข้อมูลได้</span></div><div><strong>Submitted</strong><span>ส่งให้แพทย์ทบทวนแล้ว</span></div><div><strong>LOCK</strong><span>แพทย์ทบทวนเสร็จ</span></div><div><strong>Revision</strong><span>ครั้งที่แก้ไขหลัง LOCK</span></div></div></div>`;
+    if($('#guidePlasmaNew'))$('#guidePlasmaNew').onclick=()=>{state.currentPlasmaRecordId=null;location.hash=ROUTES.plasma.record;};
+    if($('#guidePlasmaBatch'))$('#guidePlasmaBatch').onclick=openPlasmaBatchBuilder;
+    bindRouteButtons($('#view-module'));
+  }
+
   function renderPlasmaSettings(){
     if(!adminUi()){location.hash=ROUTES.plasma.dashboard;return;}const s=state.plasmaSettings;$('#view-module').innerHTML=`<div class="page-head"><div><h1>ตั้งค่า Plasma QC</h1><p class="muted">FFP · Factor VIII</p></div></div><div class="panel"><h2>เกณฑ์ QC FFP</h2><div class="form-grid">${plasmaField('Volume ขั้นต่ำ (mL)','ps_volume_min',s.volume_min_ml,'number',false,false,'0.01')}${plasmaField('Factor VIII ขั้นต่ำ (IU/mL)','ps_factor_min',s.factor_viii_min_iu_ml,'number',false,false,'0.01')}${plasmaField('อายุผลิตภัณฑ์ (วัน)','ps_expiry_days',s.expiry_days,'number')}<div class="field"><label>&nbsp;</label><label class="inline-check"><input id="ps_require_ev" type="checkbox" ${s.require_factor_evidence?'checked':''}> บังคับหลักฐาน Factor VIII ก่อนส่งตรวจทวน</label></div></div></div><div class="panel"><h2>Outlab</h2><div class="form-grid">${plasmaField('รหัสบริการ','ps_service_code',s.outlab_service_code)}${plasmaField('ชื่อการทดสอบ','ps_test_name',s.outlab_test_name)}${plasmaField('รหัสแบบฟอร์ม','ps_form_code',s.outlab_form_code)}${plasmaField('เวลานำส่งเริ่มต้น','ps_send_time',plasmaTimeInput(s.default_send_time),'time')}<div class="field span2"><label>ข้อความวันบังคับใช้</label><input id="ps_form_effective" value="${esc(s.outlab_form_effective_text||'วันบังคับใช้ 15 มกราคม 2565')}"></div><div class="field span2"><label>E-mail รับผล</label><input id="ps_result_email" type="email" value="${esc(s.result_email||'transfusionbb_cnmi@mahidol.ac.th')}"></div><div class="field span4"><label>ปลายทาง</label><input id="ps_destination" value="${esc(s.outlab_destination)}"></div></div></div><div class="panel"><h2>น้ำหนักถุง / Density</h2><div class="table-wrap"><table class="data-table plasma-product-settings"><thead><tr><th>ชนิด FFP</th><th>น้ำหนักถุงเปล่า (g)</th><th>Density</th><th></th></tr></thead><tbody>${state.plasmaProductSettings.map(x=>`<tr data-type="${esc(x.product_type)}"><td><strong>${esc(x.product_type)}</strong></td><td><input class="pptare" type="number" step="0.01" value="${esc(x.tare_weight_g)}"></td><td><input class="ppdensity" type="number" step="0.001" value="${esc(x.density)}"></td><td><button class="btn small-btn ppsave">บันทึก</button></td></tr>`).join('')}</tbody></table></div></div><div class="actions"><button class="btn primary" id="savePlasmaSettings">บันทึกเกณฑ์/Outlab</button></div>`;$('#savePlasmaSettings').onclick=savePlasmaSettings;$$('.ppsave').forEach(b=>b.onclick=()=>savePlasmaProductSetting(b.closest('tr').dataset.type));
   }
