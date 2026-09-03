@@ -334,3 +334,21 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 @media(max-width:1180px){.rbc-progress-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:1000px){.rbc-filters{grid-template-columns:1fr 1fr}.rbc-filters .btn{width:100%}}
 @media(max-width:650px){.rbc-progress-grid{grid-template-columns:1fr}.rbc-filters{grid-template-columns:1fr}}
+
+/* v5.3.8 — monthly QC tracking + mandatory evidence */
+.month-input{min-width:145px;max-width:170px}
+.qc-tracking-panel{padding-top:18px}
+.tracking-total{font-size:28px;line-height:1;color:#172033}
+.qc-progress-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}
+.qc-progress-card{border:1px solid #e3e7ee;border-radius:14px;padding:14px;background:#fff;min-width:0}
+.qc-progress-card.qc{border-color:#b8e7ce;background:#f6fffa}
+.qc-progress-card.no_pool{border-color:#f1d3a3;background:#fffaf1}
+.qc-progress-card.pending{background:#fafbfc}
+.qc-progress-head{display:flex;gap:8px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.qc-progress-sub{font-size:13px;color:#6c7586;margin-top:10px;line-height:1.45}
+.tracking-bar{height:10px;border-radius:999px;background:#edf0f4;overflow:hidden;margin-top:14px}
+.tracking-bar>span{display:block;height:100%;min-width:0;background:#9e1d2d;border-radius:999px;transition:width .2s ease}
+.section-badge.required-evidence{background:#fff1f2;color:#9e1d2d;border:1px solid #efc4ca;font-weight:700}
+.no-pool-dialog-panel{margin:0;box-shadow:none}
+@media(max-width:900px){.qc-progress-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.month-input{max-width:none;min-width:0}}
+@media(max-width:560px){.qc-progress-grid{grid-template-columns:1fr}.page-head .actions .month-input{width:100%}}
