@@ -81,7 +81,7 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 :root{--sidebar-w:250px;--topbar-h:70px}
 #appShell{min-height:100vh}
 .topbar{height:var(--topbar-h);padding:0 22px;justify-content:flex-start;gap:12px}
-.topbar .brand{min-width:0}.topbar-mode{margin-left:auto}.mode-badge{display:inline-flex;align-items:center;border-radius:999px;padding:6px 10px;background:#eef8f1;color:#177245;font-size:12px;font-weight:800;border:1px solid #ccebd8}.mode-badge.admin{background:#fff0f2;color:var(--primary);border-color:#f3c5cc}
+.topbar .brand{min-width:0}.topbar-mode{margin-left:auto}.mode-badge{display:inline-flex;align-items:center;border-radius:999px;padding:6px 10px;background:#eef8f1;color:#177245;font-size:12px;font-weight:800;border:1px solid #ccebd8}.mode-badge.admin{background:#fff0f2;color:var(--primary);border-color:#f3c5cc}.mode-badge.reviewer{background:#eef4ff;color:#2759a5;border-color:#cbdcff}
 .mobile-menu-btn{display:none;border:1px solid var(--line);background:#fff;border-radius:11px;width:42px;height:42px;font-size:20px;cursor:pointer;flex:none}
 .app-layout{display:flex;min-height:calc(100vh - var(--topbar-h))}
 .sidebar{width:var(--sidebar-w);flex:none;position:sticky;top:var(--topbar-h);height:calc(100vh - var(--topbar-h));background:#fff;border-right:1px solid var(--line);padding:16px 12px 14px;display:flex;flex-direction:column;z-index:35;overflow-y:auto}
@@ -93,7 +93,7 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 .sidebar-action,.sidebar-logout{width:100%;border-radius:11px;padding:10px 12px;background:#fff;font-weight:750;cursor:pointer}
 .sidebar-action{border:1px solid var(--line);color:#475467;margin-bottom:10px}.sidebar-logout{border:1px solid #fecdca;color:var(--bad);margin-top:10px}
 .admin-mode-panel{position:relative;margin-top:4px}.user-mode-card,.regular-user-card{width:100%;border:1px solid var(--line);border-radius:14px;background:#fff;padding:11px 12px;text-align:left}
-.user-mode-card{cursor:pointer}.user-mode-name strong,.regular-user-card strong{display:block;font-size:14px}.user-mode-name span,.regular-user-card span{display:block;color:var(--muted);font-size:11px;margin-top:2px}.user-mode-current{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:12px;font-weight:800}.mode-dot{width:9px;height:9px;border-radius:50%;background:#35b56f;box-shadow:0 0 0 4px #ebf9f1}.mode-dot.admin{background:#e3485b;box-shadow:0 0 0 4px #fff0f2}.mode-chevron{margin-left:auto;color:var(--muted)}
+.user-mode-card{cursor:pointer}.user-mode-name strong,.regular-user-card strong{display:block;font-size:14px}.user-mode-name span,.regular-user-card span{display:block;color:var(--muted);font-size:11px;margin-top:2px}.user-mode-current{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:12px;font-weight:800}.mode-dot{width:9px;height:9px;border-radius:50%;background:#35b56f;box-shadow:0 0 0 4px #ebf9f1}.mode-dot.admin{background:#e3485b;box-shadow:0 0 0 4px #fff0f2}.mode-dot.reviewer{background:#3b73c8;box-shadow:0 0 0 4px #edf4ff}.mode-chevron{margin-left:auto;color:var(--muted)}
 .mode-menu{position:absolute;left:0;right:0;bottom:calc(100% + 8px);background:#fff;border:1px solid var(--line);border-radius:14px;padding:7px;box-shadow:0 14px 40px rgba(16,24,40,.18);z-index:70}.mode-menu button{width:100%;text-align:left;border:0;background:#fff;padding:10px;border-radius:10px;cursor:pointer}.mode-menu button:hover{background:#f8f9fb}.mode-menu strong{display:block;font-size:12px}.mode-menu span{display:block;font-size:10px;color:var(--muted);margin-top:2px;line-height:1.35}
 .regular-user-card{margin-top:4px}
 .content-shell{flex:1;min-width:0;display:flex;flex-direction:column}.content-shell .container{width:100%;max-width:none;margin:0;padding:24px 22px 60px}.content-shell .footer{margin-top:auto}
@@ -309,3 +309,5 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 .batch-pager strong{font-size:.92rem;color:var(--text,#1f2937);}
 .batch-pager .btn:disabled{opacity:.45;cursor:not-allowed;}
 @media (max-width:640px){.batch-pager{gap:8px}.batch-pager .btn{padding:8px 10px;}}
+
+.review-test-banner{display:flex;gap:10px;align-items:flex-start;margin:0 0 14px;padding:12px 14px;border:1px solid #bfd5ff;background:#f3f7ff;border-radius:14px;color:#244d88}.review-test-banner strong{white-space:nowrap}.review-test-banner span{font-size:12px;line-height:1.5}

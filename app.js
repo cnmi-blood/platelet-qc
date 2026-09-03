@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.4 - Plasma recent outlab pagination */
+/* CNMI Blood Component QC v5.3.5 - Admin physician-view test mode */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -86,10 +86,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.3.4 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.3.5 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.4 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.5 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -110,7 +110,7 @@
   function cfgReady(){ return C.SUPABASE_URL && C.SUPABASE_KEY && !C.SUPABASE_URL.includes('PASTE_') && !C.SUPABASE_KEY.includes('PASTE_'); }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'5.3.0',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.3.5',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -133,9 +133,15 @@
     if(a?.startsWith('status:locked→draft')) return 'ปลดล็อก / Revision ใหม่';
     return a||'-';
   }
+  function doctorTestAvailable(){ return state.profile?.role==='admin' && state.profile?.can_review===true; }
+  function doctorTestMode(){ return doctorTestAvailable() && state.uiMode==='reviewer'; }
   function effectiveRole(){
     if(!state.profile) return 'staff';
-    if(state.profile.role==='admin' && state.uiMode==='staff') return 'staff';
+    if(state.profile.role==='admin'){
+      if(state.uiMode==='staff') return 'staff';
+      if(state.uiMode==='reviewer' && doctorTestAvailable()) return 'reviewer';
+      return 'admin';
+    }
     return state.profile.role;
   }
   function reviewerUi(){ return effectiveRole()==='reviewer'; }
@@ -191,12 +197,14 @@
     $('#adminNavLabel')?.classList.toggle('hidden',!adminUi());
     $('#adminModePanel')?.classList.toggle('hidden',!isAdmin);
     $('#regularUserCard')?.classList.toggle('hidden',isAdmin);
-    const label=adminUi()?'Admin mode':'Staff mode';
-    const badge=$('#currentModeBadge'); if(badge){ badge.textContent=isAdmin?label:roleTH(state.profile.role); badge.classList.toggle('admin',adminUi()); }
+    $('#doctorModeOption')?.classList.toggle('hidden',!doctorTestAvailable());
+    const label=adminUi()?'Admin mode':doctorTestMode()?'แพทย์ mode · ทดสอบ':'Staff mode';
+    const badge=$('#currentModeBadge'); if(badge){ badge.textContent=isAdmin?label:roleTH(state.profile.role); badge.classList.toggle('admin',adminUi()); badge.classList.toggle('reviewer',doctorTestMode()); }
     const btnLabel=$('#modeButtonLabel'); if(btnLabel) btnLabel.textContent=label;
     $('#modeDot')?.classList.toggle('admin',adminUi());
+    $('#modeDot')?.classList.toggle('reviewer',doctorTestMode());
     if($('#headerUser')) $('#headerUser').textContent=state.profile.display_name || state.profile.email.split('@')[0];
-    if($('#headerRole')) $('#headerRole').textContent=roleTH(state.profile.role);
+    if($('#headerRole')) $('#headerRole').textContent=doctorTestMode()?'Reviewer (แพทย์) · โหมดทดสอบ':roleTH(state.profile.role);
     if($('#regularUserName')) $('#regularUserName').textContent=state.profile.display_name || state.profile.email.split('@')[0];
     if($('#regularUserRole')) $('#regularUserRole').textContent=roleTH(state.profile.role);
     if(!adminUi() && ['settings','users','audit'].includes(activeView())){ const r=parseRoute(); location.hash=r.module?ROUTES[r.module].dashboard:ROUTES.home; return; }
@@ -208,10 +216,12 @@
   }
   function setUiMode(mode){
     if(state.profile?.role!=='admin') return;
-    state.uiMode=mode==='admin'?'admin':'staff';
+    if(mode==='reviewer' && !doctorTestAvailable()) return;
+    state.uiMode=mode==='admin'?'admin':mode==='reviewer'?'reviewer':'staff';
     localStorage.setItem('bloodqc_ui_mode',state.uiMode);
     $('#modeMenu')?.classList.add('hidden'); $('#modeMenuBtn')?.setAttribute('aria-expanded','false');
-    applyUiMode(true); logActivity('ui_mode_change','session',null,{mode:state.uiMode}).catch(()=>{}); showToast(state.uiMode==='admin'?'เปิดโหมดผู้ดูแลระบบแล้ว':'กลับสู่โหมดผู้ใช้งานทั่วไปแล้ว','good');
+    applyUiMode(true); logActivity('ui_mode_change','session',null,{mode:state.uiMode}).catch(()=>{});
+    showToast(state.uiMode==='admin'?'เปิดโหมดผู้ดูแลระบบแล้ว':state.uiMode==='reviewer'?'เปิดโหมดแพทย์ทดสอบแล้ว':'กลับสู่โหมดผู้ใช้งานทั่วไปแล้ว','good');
   }
 
   let enterAppPromise=null;
@@ -324,7 +334,8 @@
     $('#appShell').classList.remove('hidden');
     applySidebarCollapsed();
     const p=state.profile;
-    state.uiMode=p.role==='admin' ? ((localStorage.getItem('bloodqc_ui_mode')||localStorage.getItem('platelet_ui_mode'))==='admin'?'admin':'staff') : p.role;
+    const savedMode=localStorage.getItem('bloodqc_ui_mode')||localStorage.getItem('platelet_ui_mode')||'staff';
+    state.uiMode=p.role==='admin' ? (savedMode==='reviewer'&&p.can_review===true?'reviewer':savedMode==='admin'?'admin':'staff') : p.role;
     await loadSettings(); await loadProductSettings(); await loadProfiles(); await loadRecords(); await loadPlasmaModuleData(); await loadRbcModuleData();
     applyUiMode(false);
     const loginKey=`bloodqc_login_${state.user.id}_${String(state.session?.access_token||'').slice(-16)}`;
@@ -566,6 +577,7 @@
     const rows=pendingReviewRecords();
     $('#view-review').innerHTML=`
       <div class="page-head"><div><h1>งานรอตรวจทวน</h1><p class="muted">Platelet · Plasma · RBC</p></div><div class="actions"><span class="badge submitted">${rows.length} รายการ</span></div></div>
+      ${doctorTestMode()?`<div class="review-test-banner"><strong>โหมดแพทย์ทดสอบ</strong><span>มุมมองและปุ่มเหมือน Reviewer จริง หากกด “อนุมัติและ LOCK” หรือ “ส่งกลับแก้ไข” ระบบจะบันทึกการกระทำจริงเป็นบัญชีของคุณ</span></div>`:''}
       <div class="panel review-queue-panel">
         ${rows.length?`<div class="table-wrap"><table class="data-table review-table"><thead><tr><th>Module</th><th>Product No.</th><th>ผลิตภัณฑ์</th><th>ส่งโดย</th><th>เวลาที่ส่ง</th><th>ผล QC</th><th></th></tr></thead><tbody>${rows.map(x=>{const r=x.record;return `<tr><td><span class="badge">${x.module==='plasma'?'Plasma':x.module==='rbc'?'RBC':'Platelet'}</span></td><td><strong>${esc(r.product_no)}</strong></td><td>${esc(r.product_type)}</td><td>${esc(profileName(r.submitted_by))}</td><td class="nowrap">${esc(dateTH(r.submitted_at))}</td><td>${x.module==='plasma'?plasmaQcBadge(r.qc_status):x.module==='rbc'?rbcQcBadge(r.qc_status):(r.record_purpose==='qc'?qcBadge(r.qc_status):'<span class="muted">–</span>')}</td><td><button class="btn small-btn primary review-open" data-module="${x.module}" data-id="${r.id}">ทบทวน</button></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty"><strong>ไม่มีรายการรอตรวจทวน</strong></div>'}
       </div>`;
