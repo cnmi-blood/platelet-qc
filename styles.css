@@ -311,3 +311,7 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 @media (max-width:640px){.batch-pager{gap:8px}.batch-pager .btn{padding:8px 10px;}}
 
 .review-test-banner{display:flex;gap:10px;align-items:flex-start;margin:0 0 14px;padding:12px 14px;border:1px solid #bfd5ff;background:#f3f7ff;border-radius:14px;color:#244d88}.review-test-banner strong{white-space:nowrap}.review-test-banner span{font-size:12px;line-height:1.5}
+
+/* v5.3.6 Plasma outlab batch correction actions */
+.batch-actions{display:flex;align-items:center;gap:6px;white-space:nowrap}
+@media(max-width:640px){.batch-actions{flex-direction:column;align-items:stretch}.batch-actions .btn{width:100%}}
