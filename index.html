@@ -2,616 +2,272 @@
 <html lang="th">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#f5f7fa" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#8b1e2d" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="LAB OT" />
-  <link rel="manifest" href="manifest.webmanifest?v=20260903-18" />
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <title>LAB OT — LAB / Molec / Bacteria</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260903-v234" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
-  <style>
-    /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
-    [hidden] { display: none !important; }
-  </style>
+  <meta name="apple-mobile-web-app-title" content="Blood QC" />
+  <meta name="application-name" content="Blood QC" />
+  <meta name="format-detection" content="telephone=no" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Blood QC</title>
+  <link rel="icon" href="assets/platelet.svg" />
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=5.3.2" />
+  <link rel="manifest" href="manifest.webmanifest?v=5.3.2" />
+  <link rel="stylesheet" href="styles.css?v=5.3.2" />
 </head>
 <body>
-  <div id="toast" class="toast" hidden></div>
+  <div id="toast" class="toast" aria-live="polite"></div>
 
-  <main id="setupView" class="center-shell" hidden>
-    <section class="auth-card">
-      <div class="brand-mark">OT</div>
-      <h1>LAB OT</h1>
-      <p>ระบบยังไม่ได้ตั้งค่า Supabase กรุณาแจ้ง Admin</p>
-      <button id="offlineDemoBtn" class="secondary-btn">ทดลองอ่าน Excel แบบไม่บันทึก</button>
-    </section>
-  </main>
+  <section id="setupScreen" class="center-screen hidden">
+    <div class="auth-card wide-card">
+      <img src="assets/platelet.svg" class="app-logo" alt="" />
+      <h1>ยังไม่ได้เชื่อม Supabase</h1>
+      <p class="muted">เปิดไฟล์ <code>config.js</code> แล้วใส่ Supabase Project URL และ Publishable key ก่อนใช้งาน</p>
+      <div class="notice warning">
+        <strong>ห้ามใส่ Service Role key ในเว็บไซต์</strong><br>
+        หน้าเว็บใช้ Publishable key หรือ legacy anon key เท่านั้น
+      </div>
+      <ol class="setup-mini">
+        <li>สร้าง Supabase Project</li>
+        <li>รัน <code>supabase/schema.sql</code></li>
+        <li>สร้าง Storage bucket ชื่อ <code>platelet-evidence</code> แบบ Private</li>
+        <li>ตั้ง Password Auth และปิดการสมัครเอง</li>
+        <li>แก้ <code>config.js</code></li>
+        <li>อัปโหลดไฟล์ขึ้น GitHub Pages</li>
+      </ol>
+      <p class="muted small">ดูคู่มือละเอียดที่ <code>INSTALL_STEP_BY_STEP_TH.md</code></p>
+    </div>
+  </section>
 
-  <main id="authView" class="center-shell" hidden>
-    <section class="auth-card">
-      <div class="brand-mark">OT</div>
-      <h1>LAB OT</h1>
-      <p class="subtle">รวม OT ของ LAB, Molec และ Bacteria รอบ 16–15</p>
+  <section id="resumeScreen" class="center-screen hidden">
+    <div class="auth-card">
+      <img src="assets/platelet.svg" class="app-logo" alt="" />
+      <h1>Blood QC</h1>
+      <p id="resumeMessage" class="muted">กำลังตรวจสอบการเข้าสู่ระบบ...</p>
+      <div id="resumeActions" class="stack hidden">
+        <button class="btn primary" type="button" id="retrySessionBtn">ลองเชื่อมต่ออีกครั้ง</button>
+        <button class="btn ghost" type="button" id="resumeLogoutBtn">ออกจากระบบ</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="loginScreen" class="center-screen hidden">
+    <div class="auth-card">
+      <img src="assets/platelet.svg" class="app-logo" alt="" />
+      <h1>CNMI Blood Component QC</h1>
+      <p class="muted">ระบบบันทึกและควบคุมคุณภาพส่วนประกอบโลหิต · ใช้ Mahidol ID</p>
+      <button class="btn install-app-btn auth-install-btn hidden" type="button">เพิ่ม Blood QC เป็นแอป</button>
       <form id="loginForm" class="stack">
-        <label>Mahidol ID / Email
-          <span class="email-suffix-field">
-            <input id="emailInput" type="text" autocomplete="username" inputmode="email" placeholder="username.sur" autocapitalize="none" spellcheck="false" required />
-            <span class="email-suffix">@mahidol.ac.th</span>
-          </span>
-        </label>
-        <label>รหัสผ่าน
-          <input id="passwordInput" type="password" autocomplete="current-password" required />
-        </label>
-        <button class="primary-btn" type="submit">เข้าสู่ระบบ</button>
-        <button id="installAppBtn" class="text-btn install-app-btn" type="button" hidden>ติดตั้ง LAB OT เป็นแอป</button>
+        <label for="loginEmail">Mahidol ID / Email</label>
+        <div class="email-field">
+          <input id="loginEmail" autocomplete="username" placeholder="เช่น username.sur" required />
+          <span>@mahidol.ac.th</span>
+        </div>
+        <label for="loginPassword">รหัสผ่าน</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" minlength="8" placeholder="อย่างน้อย 8 ตัวอักษร" required />
+        <button class="btn primary" type="submit">เข้าสู่ระบบ</button>
+        <button class="btn ghost" type="button" id="forgotPasswordBtn">ลืมรหัสผ่าน / ติดต่อ Admin</button>
       </form>
-      <p id="loginError" class="error-text" hidden></p>
-    </section>
-  </main>
+      <p id="loginMessage" class="muted small"></p>
+      <div class="notice info small"><strong>ครั้งแรก:</strong> ใช้รหัสผ่านตั้งต้นที่ Admin ให้ แล้วระบบจะบังคับให้เปลี่ยนรหัสผ่านใหม่ก่อนเข้าใช้งาน</div>
+    </div>
+  </section>
 
-  <div id="appView" hidden>
+  <section id="forcePasswordScreen" class="center-screen hidden">
+    <div class="auth-card">
+      <img src="assets/platelet.svg" class="app-logo" alt="" />
+      <h1 id="forcePasswordTitle">ตั้งรหัสผ่านใหม่</h1>
+      <p class="muted" id="forcePasswordText">เพื่อความปลอดภัย กรุณาเปลี่ยนรหัสผ่านตั้งต้นก่อนเข้าใช้งาน</p>
+      <form id="forcePasswordForm" class="stack">
+        <label for="forceNewPassword">รหัสผ่านใหม่</label>
+        <input id="forceNewPassword" type="password" autocomplete="new-password" minlength="8" placeholder="อย่างน้อย 8 ตัวอักษร" required />
+        <label for="forceConfirmPassword">ยืนยันรหัสผ่านใหม่</label>
+        <input id="forceConfirmPassword" type="password" autocomplete="new-password" minlength="8" placeholder="พิมพ์ซ้ำอีกครั้ง" required />
+        <button class="btn primary" type="submit">บันทึกรหัสผ่านใหม่</button>
+        <button class="btn ghost" type="button" id="forceLogoutBtn">ออกจากระบบ</button>
+      </form>
+      <p id="forcePasswordMessage" class="muted small"></p>
+    </div>
+  </section>
+
+  <div id="appShell" class="hidden">
     <header class="topbar">
-      <div>
-        <div class="eyebrow">LAB OT · LAB / MOLEC / BACTERIA</div>
-        <h1>สรุป OT รอบ 16–15</h1>
+      <button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="เปิดเมนู">☰</button>
+      <div class="brand">
+        <img src="assets/platelet.svg" alt="" />
+        <div><strong>CNMI Blood Component QC</strong><span id="brandSubtitle">Blood Component Preparation & QC · CNMI Blood Bank</span></div>
       </div>
-      <div class="topbar-actions">
-        <span id="loginBadge" class="user-badge"></span>
-        <label id="adminRoleSwitchWrap" class="role-switch">
-          <span class="sr-only">Role</span>
-          <select id="adminRoleSwitch" aria-label="Role">
-            <option value="admin">Admin</option>
-            <option value="staff">Staff</option>
-          </select>
-        </label>
-        <button id="changePasswordBtn" class="ghost-btn">เปลี่ยนรหัสผ่าน</button>
-        <button id="logoutBtn" class="ghost-btn">ออกจากระบบ</button>
-      </div>
+      <div class="topbar-mode"><span id="currentModeBadge" class="mode-badge">Staff mode</span></div>
     </header>
 
-    <nav class="tabs" aria-label="เมนูหลัก">
-      <button class="tab active" data-tab="work">ทำ OT รอบนี้</button>
-      <button class="tab" data-tab="history">รอบที่บันทึกไว้</button>
-      <button class="tab" data-tab="myack">OT ของฉัน</button>
-      <button class="tab" data-tab="users" data-admin-only>ผู้ใช้งาน</button>
-      <button class="tab" data-tab="log">Log ล่าสุดของแอพ</button>
-      <button class="tab" data-tab="guide">วิธีใช้</button>
-    </nav>
-    <main class="page-shell">
-      <section id="tab-work" class="tab-panel active">
-        <section class="cycle-card">
-          <div>
-            <div class="section-kicker">รอบ OT</div>
-            <h2 id="cycleTitle">-</h2>
-            <p>เช่น รอบ ก.ย. = 16 ส.ค. – 15 ก.ย.</p>
-          </div>
-          <div class="cycle-controls">
-            <label>รอบเดือน
-              <select id="cycleMonth"></select>
-            </label>
-            <label>ปี พ.ศ.
-              <input id="cycleYear" type="number" min="2560" max="2600" step="1" />
-            </label>
-            <button id="currentCycleBtn" class="secondary-btn compact">รอบปัจจุบัน</button>
-          </div>
-        </section>
-        <section id="roundHolidayCard" class="card round-holiday-card">
-          <div class="section-head">
-            <div>
-              <div class="section-kicker">ขั้นตอนที่ 1</div>
-              <h2>วันหยุดรอบนี้</h2>
+    <div class="app-layout">
+      <aside id="sideNav" class="sidebar" aria-label="เมนูหลัก">
+        <div class="sidebar-title-row">
+          <div class="sidebar-title">Blood Component QC</div>
+          <button id="sidebarCollapseBtn" class="sidebar-collapse-btn" type="button" aria-label="ยุบแถบเมนู" title="ยุบแถบเมนู">‹</button>
+        </div>
+        <nav class="tabs side-tabs" id="mainTabs">
+          <button data-route="#/" id="homeTab" class="active nav-home">ภาพรวมระบบ</button>
+
+          <div class="nav-module-group" data-nav-group="platelet">
+            <button data-route="#/platelet" data-nav-head="platelet" id="plateletDashboardTab" class="nav-group-head" aria-expanded="false">
+              <span>ภาพรวม Platelet</span><span class="nav-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div class="nav-submenu" data-nav-submenu="platelet">
+              <button data-route="#/platelet/new" id="plateletNewTab">บันทึก Platelet</button>
+              <button data-route="#/platelet/records" id="plateletRecordsTab">รายการ Platelet</button>
+              <button data-route="#/platelet/guide" id="plateletGuideTab">คู่มือ Platelet</button>
+              <button data-route="#/platelet/qc_settings" id="settingsTab" class="hidden">ตั้งค่า Platelet QC</button>
             </div>
           </div>
-          <div class="round-holiday-grid">
-            <div class="holiday-auto-box">
-              <b>เสาร์–อาทิตย์</b>
-              <div id="weekendDateList" class="date-chip-list"></div>
-            </div>
-            <div class="holiday-manual-box">
-              <b>วันหยุดนักขัตฤกษ์</b>
-              <div class="special-rate-controls">
-                <label>วันที่
-                  <input id="manualHolidayDatePicker" type="date" />
-                </label>
-                <button id="addManualHolidayDateBtn" class="secondary-btn compact" type="button">เพิ่ม</button>
-                <button id="saveManualHolidayDatesBtn" class="primary-btn compact" type="button">บันทึกวันหยุด</button>
-              </div>
-              <div id="manualHolidayDateList" class="date-chip-list"></div>
+
+          <div class="nav-module-group" data-nav-group="plasma">
+            <button data-route="#/plasma" data-nav-head="plasma" id="plasmaTab" class="nav-group-head" aria-expanded="false">
+              <span>ภาพรวม Plasma</span><span class="nav-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div class="nav-submenu" data-nav-submenu="plasma">
+              <button data-route="#/plasma/new" id="plasmaNewTab">บันทึก FFP</button>
+              <button data-route="#/plasma/records" id="plasmaRecordsTab">รายการ FFP</button>
+              <button data-route="#/plasma/guide" id="plasmaGuideTab">คู่มือ FFP</button>
+              <button data-route="#/plasma/qc_settings" id="plasmaSettingsTab" class="hidden">ตั้งค่า Plasma QC</button>
             </div>
           </div>
-        </section>
 
-        <section class="card">
-          <div class="section-head">
-            <div><div class="section-kicker">ขั้นตอนที่ 2</div><h2>เลือกไฟล์เวร 3 หน่วย</h2></div>
-            <span id="unitReadyBadge" class="pill">0 / 3 หน่วย</span>
-          </div>
-          <div class="unit-upload-grid">
-            <article class="unit-upload">
-              <div class="unit-head"><span class="unit-dot lab"></span><b>LAB</b></div>
-              <p>เวร A–D</p>
-              <input id="labFile" type="file" accept=".xlsx,.xls" />
-              <div id="labStatus" class="file-status">ยังไม่ได้เลือกไฟล์</div>
-            </article>
-            <article class="unit-upload">
-              <div class="unit-head"><span class="unit-dot molec"></span><b>Molec</b></div>
-              <p>เวรแบบ LAB</p>
-              <input id="molecFile" type="file" accept=".xlsx,.xls" />
-              <div id="molecStatus" class="file-status">ยังไม่ได้เลือกไฟล์</div>
-            </article>
-            <article class="unit-upload">
-              <div class="unit-head"><span class="unit-dot bact"></span><b>Bacteria</b></div>
-              <p>H1/H2/H3 · Extra · บ่าย · ดึก</p>
-              <input id="bacteriaFile" type="file" accept=".xlsx,.xls" />
-              <div id="bacteriaStatus" class="file-status">ยังไม่ได้เลือกไฟล์</div>
-            </article>
-          </div>
-        </section>
-
-        <section id="special328Card" class="card special328-card compact-special-card">
-          <div class="section-head">
-            <div>
-              <div class="section-kicker">ขั้นตอนที่ 3</div>
-              <h2>วันที่สิทธิ์ 00000328</h2>
-              
+          <div class="nav-module-group" data-nav-group="rbc">
+            <button data-route="#/rbc" data-nav-head="rbc" id="rbcTab" class="nav-group-head" aria-expanded="false">
+              <span>ภาพรวม RBC</span><span class="nav-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div class="nav-submenu" data-nav-submenu="rbc">
+              <button data-route="#/rbc/new" id="rbcNewTab">บันทึก RBC</button>
+              <button data-route="#/rbc/records" id="rbcRecordsTab">รายการ RBC</button>
+              <button data-route="#/rbc/guide" id="rbcGuideTab">คู่มือ RBC</button>
+              <button data-route="#/rbc/qc_settings" id="rbcSettingsTab" class="hidden">ตั้งค่า RBC QC</button>
             </div>
           </div>
-          <div class="special-rate-controls">
-            <label>วันที่ตามประกาศ HR
-              <input id="special328DatePicker" type="date" />
-            </label>
-            <button id="addSpecial328DateBtn" class="secondary-btn compact" type="button">เพิ่ม</button>
-            <button id="saveSpecial328DatesBtn" class="primary-btn compact" type="button">บันทึกวันที่</button>
-          </div>
-          <div id="special328DateList" class="date-chip-list"></div>
-          <p class="subtle compact-status"><span id="special328Status">ยังไม่ได้เพิ่มวันที่</span></p>
-        </section>
 
-        <section class="card sync-card">
-          <div class="step-no">4</div>
-          <div class="sync-copy">
-            <h2>ดึงวันลา</h2>
-            <p>กดเพื่อใช้วันลาล่าสุดตรวจเทียบกับตารางเวร</p>
-            <div id="calendarStatus" class="file-status">อัปตารางเวรให้ครบ 3 หน่วยก่อน</div>
-            <div id="calendarSyncMeta" class="sync-meta" hidden></div>
-          </div>
-          <button id="syncCalendarBtn" class="secondary-btn" disabled>ดึงวันลาล่าสุด</button>
-        </section>
-
-        <section id="resultArea" hidden>
-          <section class="card result-shell-card">
-            <div class="result-shell-head">
-              <div>
-                <div class="section-kicker">ผลรอบนี้</div>
-                <h2>สรุปและตรวจสอบ OT</h2>
-              </div>
-              <div class="actions result-main-actions">
-                <button id="exportBtn" class="secondary-btn" disabled>Export HR Excel</button>
-                <button id="saveBtn" class="primary-btn" disabled>ยืนยันและบันทึกรอบนี้</button>
-              </div>
-            </div>
-
-            <div class="summary-grid five compact-result-metrics">
-              <div class="metric"><span>รอบ OT</span><b id="cycleMetric">-</b></div>
-              <div class="metric"><span>จำนวนคน</span><b id="staffMetric">0</b></div>
-              <div class="metric"><span>รายการเวร</span><b id="assignmentMetric">0</b></div>
-              <div class="metric"><span>OT รวม</span><b id="hoursMetric">0 ชม.</b></div>
-              <div class="metric warn"><span>เตือนวันลา</span><b id="conflictMetric">0</b></div>
-            </div>
-
-            <nav class="result-tabs" aria-label="ผลรอบนี้">
-              <button class="result-tab active" type="button" data-result-tab="summary">สรุป OT</button>
-              <button class="result-tab" type="button" data-result-tab="ack">รับทราบ OT <span id="resultAckBadge" class="mini-badge">0/0</span></button>
-              <button class="result-tab" type="button" data-result-tab="leave">วันลา <span id="resultLeaveBadge" class="mini-badge">0</span></button>
-              <button class="result-tab" type="button" data-result-tab="validation">ตรวจไฟล์</button>
-            </nav>
-
-            <div id="result-panel-summary" class="result-panel active">
-              <section class="result-subsection">
-                <div class="section-head compact-section-head">
-                  <div><h2>สรุป OT รายคน</h2></div>
-                  <div class="result-search">
-                    <input id="summarySearchInput" type="search" placeholder="ค้นหาชื่อเจ้าหน้าที่">
-                    <button id="clearSummarySearchBtn" class="secondary-btn compact" type="button">ล้าง</button>
-                  </div>
-                </div>
-                <div id="summaryResultMeta" class="result-list-meta"></div>
-                <div class="table-wrap"><table id="summaryTable"></table></div>
-                <div id="summaryPager" class="compact-pager"></div>
-              </section>
-
-              <section class="result-subsection">
-                <div class="section-head compact-section-head"><div><h2>สรุปตามหน่วย</h2></div></div>
-                <div class="table-wrap"><table id="unitSummaryTable"></table></div>
-              </section>
-
-              <section id="special328EligibilityCard" class="result-subsection special328-eligibility" hidden>
-                <div class="section-head compact-section-head">
-                  <div><h2>ตรวจสิทธิ์ 00000328</h2></div>
-                </div>
-                <div id="special328EligibilityEmpty" class="empty-state">ยังไม่มีข้อมูล</div>
-                <div class="table-wrap"><table id="special328EligibilityTable"></table></div>
-              </section>
-            </div>
-
-            <div id="result-panel-ack" class="result-panel">
-              <section id="ackManagerCard" class="result-subsection ack-manager-card" hidden>
-                <div class="section-head">
-                  <div>
-                    <h2>รับทราบ OT <span id="ackProgressBadge" class="pill">0 / 0 คน</span></h2>
-                  </div>
-                  <div class="actions">
-                    <button id="refreshAckBtn" class="secondary-btn" type="button">รีเฟรช</button>
-                    <button id="exportAckEvidenceBtn" class="secondary-btn" type="button" disabled>Export หลักฐาน</button>
-                    <button id="saveAckEmailsBtn" class="primary-btn" type="button">บันทึก Mahidol ID</button>
-                  </div>
-                </div>
-                <div class="result-search result-search-left">
-                  <input id="ackSearchInput" type="search" placeholder="ค้นหาชื่อเจ้าหน้าที่">
-                  <button id="clearAckSearchBtn" class="secondary-btn compact" type="button">ล้าง</button>
-                </div>
-                <p id="ackManagerNote" class="notice-inline" hidden></p>
-                <div id="ackResultMeta" class="result-list-meta"></div>
-                <div class="table-wrap"><table id="ackManagerTable"></table></div>
-                <div id="ackPager" class="compact-pager"></div>
-              </section>
-            </div>
-
-            <div id="result-panel-leave" class="result-panel">
-              <section class="result-subsection">
-                <div class="section-head compact-section-head">
-                  <div>
-                    <h2>เวรที่ตรงกับวันลา</h2>
-                  </div>
-                </div>
-                <div id="conflictEmpty" class="empty-state">ยังไม่ได้ดึงวันลา</div>
-                <div class="table-wrap"><table id="conflictTable"></table></div>
-                <div id="conflictPager" class="compact-pager"></div>
-              </section>
-
-              <section class="result-subsection all-leave-card">
-                <div class="section-head compact-section-head">
-                  <div>
-                    <h2>วันลาทั้งหมด <span class="count-badge"><span id="leaveCountBadge">0</span> รายการ</span></h2>
-                    <p id="leaveSourceSummary" class="leave-source-summary"></p>
-                  </div>
-                </div>
-                <div id="allLeaveEmpty" class="empty-state">ยังไม่ได้ดึงวันลา</div>
-                <div class="table-wrap"><table id="allLeaveTable"></table></div>
-                <div id="leavePager" class="compact-pager"></div>
-              </section>
-            </div>
-
-            <div id="result-panel-validation" class="result-panel">
-              <section class="result-subsection">
-                <div class="section-head compact-section-head"><div><h2>ตรวจไฟล์</h2></div></div>
-                <div id="validationQuick" class="validation-quick"></div>
-                <details class="validation-details">
-                  <summary>ดูรายละเอียดการตรวจไฟล์</summary>
-                  <div id="validationList" class="validation-list"></div>
-                </details>
-              </section>
-            </div>
-          </section>
-        </section>
-      </section>
-
-      <section id="tab-history" class="tab-panel">
-        <section class="card">
-          <div class="section-head"><div><h2>รอบที่บันทึกไว้</h2></div><button id="refreshHistoryBtn" class="secondary-btn">รีเฟรช</button></div>
-          <div id="historyList" class="history-list"></div>
-        </section>
-      </section>
-
-
-      <section id="tab-myack" class="tab-panel">
-        <section class="card">
-          <div class="section-head">
-            <div>
-              <h2>OT ของฉัน</h2>
-              <p>ตรวจรายละเอียดแล้วกดยืนยันรับทราบได้เหมือนเจ้าหน้าที่ทุกคน</p>
-            </div>
-            <div class="admin-ack-search-row">
-              <label class="ack-round-filter">
-                <span>รอบเดือน</span>
-                <select id="adminAckCycleFilter"><option value="">กำลังโหลด…</option></select>
-              </label>
-              <label class="ack-round-filter admin-staff-filter">
-                <span>เจ้าหน้าที่</span>
-                <select id="adminAckStaffFilter">
-                  <option value="">เลือกเจ้าหน้าที่</option>
-                </select>
-              </label>
-              <button id="searchAdminAckStaffBtn" class="primary-btn compact admin-filter-btn" type="button">ค้นหา</button>
-              <button id="clearAdminAckStaffBtn" class="secondary-btn compact admin-filter-btn" type="button">ล้างค่า</button>
-            </div>
-          </div>
-          <div id="myAckEmpty" class="empty-state">กำลังโหลดรายการ…</div>
-          <div id="managerAckList" class="ack-list"></div>
-        </section>
-
-        <section id="ownerStaffPreviewCard" class="card owner-preview-card" hidden>
-          <div class="section-head">
-            <div>
-              <h2>OT ของเจ้าหน้าที่ทุกคน</h2>
-            </div>
-            <button id="refreshOwnerPreviewBtn" class="secondary-btn" type="button">รีเฟรช</button>
+          <div id="reviewNavLabel" class="nav-utility-group hidden">
+            <button data-route="#/review" id="reviewTab" class="hidden">งานรอตรวจทวน <span id="reviewCount" class="nav-count"></span></button>
           </div>
 
-          <div id="ownerStaffPreviewDetail" class="owner-preview-detail owner-preview-detail-top">
-            <h3 id="ownerStaffPreviewTitle">เลือกเจ้าหน้าที่เพื่อดู OT</h3>
-            <div id="ownerStaffPreviewDetailEmpty" class="empty-state">เลือกเจ้าหน้าที่ด้านล่างเพื่อดู OT</div>
-            <div id="ownerStaffPreviewList" class="ack-list owner-preview-list"></div>
-          </div>
-
-          <div id="ownerStaffPreviewEmpty" class="empty-state">เลือกเจ้าหน้าที่ด้านบน แล้วกดค้นหา</div>
-        </section>
-      </section>
-
-      <section id="tab-users" class="tab-panel" data-admin-only>
-        <section class="card user-admin-card">
-          <div class="section-head">
-            <div>
-              <h2>เพิ่มผู้ใช้งาน</h2>
-              <p>เพิ่มและจัดการบัญชีเจ้าหน้าที่ในหน่วย</p>
+          <div id="adminNavLabel" class="nav-module-group admin-nav-group hidden" data-nav-group="admin">
+            <button type="button" data-nav-head="admin" id="adminGroupBtn" class="nav-group-head nav-admin-head" aria-expanded="false">
+              <span>ADMIN</span><span class="nav-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div class="nav-submenu" data-nav-submenu="admin">
+              <button data-route="#/admin/users" id="usersTab" class="hidden">ผู้ใช้งานระบบ</button>
+              <button data-route="#/admin/audit" id="auditTab" class="hidden">ประวัติการใช้งาน</button>
             </div>
           </div>
-          <form id="newUserForm" class="new-user-grid">
-            <label>ชื่อ-สกุล
-              <input id="newUserDisplayName" type="text" placeholder="พิมพ์ชื่อ นามสกุล" autocomplete="off" required>
-            </label>
-            <label>รหัสพนักงาน
-              <input id="newUserEmployeeCode" type="text" placeholder="เช่น 0021415" inputmode="numeric" maxlength="7" autocomplete="off" required>
-            </label>
-            <label>Mahidol ID
-              <span class="email-suffix-field">
-                <input id="newUserUsername" type="text" placeholder="username.sur" autocapitalize="none" spellcheck="false" required>
-                <span class="email-suffix">@mahidol.ac.th</span>
-              </span>
-            </label>
-            <label>ตำแหน่ง
-              <input id="newUserPosition" type="text" placeholder="เช่น นักเทคนิคการแพทย์">
-            </label>
-            <label>Role
-              <select id="newUserRole">
-                <option value="staff" selected>Staff</option>
-                <option value="admin">Admin</option>
-              </select>
-            </label>
-            <label>รหัสผ่านชั่วคราว
-              <input id="newUserPassword" type="password" minlength="8" placeholder="อย่างน้อย 8 ตัวอักษร" required>
-            </label>
-            <label class="create-active-label">Active
-              <span class="active-toggle create-active-toggle">
-                <input id="newUserActive" type="checkbox" checked>
-                <span>Active</span>
-              </span>
-            </label>
-            <button id="createUserBtn" class="primary-btn" type="submit">สร้างบัญชี</button>
-          </form>
-          <p id="newUserError" class="error-text" hidden></p>
-        </section>
+        </nav>
 
-        <section class="card">
-          <div class="section-head">
-            <div><h2>รายชื่อผู้ใช้งาน</h2></div>
-            <button class="secondary-btn" type="button" onclick="void 0" id="reloadManagedUsersBtn">รีเฟรช</button>
+        <div class="sidebar-spacer"></div>
+
+        <button class="sidebar-action install-app-btn hidden" type="button">ติดตั้ง Blood QC</button>
+        <button id="changePasswordBtn" class="sidebar-action hidden" type="button" aria-hidden="true" tabindex="-1">เปลี่ยนรหัสผ่าน</button>
+
+        <div id="adminModePanel" class="admin-mode-panel hidden">
+          <div id="modeMenu" class="mode-menu hidden">
+            <button type="button" data-ui-mode="staff"><strong>โหมดผู้ใช้งานทั่วไป</strong><span>ซ่อนเมนูและสิทธิ์จัดการของ Admin</span></button>
+            <button type="button" data-ui-mode="admin"><strong>โหมดผู้ดูแลระบบ</strong><span>เปิดเมนูตั้งค่าและจัดการระบบ</span></button>
           </div>
-          <div id="managedUsersEmpty" class="empty-state">กำลังโหลดรายชื่อ…</div>
-          <div class="table-wrap"><table id="managedUsersTable"></table></div>
-        </section>
-      </section>
+          <button id="modeMenuBtn" class="user-mode-card" type="button" aria-expanded="false">
+            <div class="user-mode-name"><strong id="headerUser">-</strong><span id="headerRole">-</span></div>
+            <div class="user-mode-current"><span id="modeDot" class="mode-dot"></span><span id="modeButtonLabel">Staff mode</span><span class="mode-chevron">⌄</span></div>
+          </button>
+        </div>
 
-      <section id="tab-log" class="tab-panel">
-        <section class="card">
-          <div class="section-head">
-            <div>
-              <h2>Log ล่าสุดของแอพ</h2>
-            </div>
-            <button id="refreshAdminLogBtn" class="secondary-btn" type="button">รีเฟรช</button>
-          </div>
-          <div id="adminLogEmpty" class="empty-state">กำลังโหลด…</div>
-          <div class="table-wrap"><table id="adminLogTable"></table></div>
-        </section>
-      </section>
+        <div id="regularUserCard" class="regular-user-card">
+          <strong id="regularUserName">-</strong>
+          <span id="regularUserRole">-</span>
+        </div>
 
-      <section id="tab-guide" class="tab-panel">
-        <section class="guide-card simple-guide">
-          <h2>วิธีใช้</h2>
+        <button id="logoutBtn" class="sidebar-logout" type="button">ออกจากระบบ</button>
+      </aside>
+      <button id="sidebarBackdrop" class="sidebar-backdrop hidden" type="button" aria-label="ปิดเมนู"></button>
 
-          <h3>สำหรับผู้ทำรอบ OT</h3>
-          <ol class="guide-steps">
-            <li><b>เลือกรอบเดือน</b><span>เช่น รอบเดือนกันยายน คือวันที่ 16 สิงหาคม ถึง 15 กันยายน</span></li>
-            <li><b>ตรวจวันหยุดรอบนี้</b><span>เสาร์–อาทิตย์ระบบแสดงให้อัตโนมัติ ถ้ามีวันหยุดนักขัตฤกษ์ให้เพิ่มวันที่ก่อนอ่านตาราง</span></li>
-            <li><b>เลือกไฟล์เวรให้ครบ 3 หน่วย</b><span>เลือก LAB, Molec และ Bacteria ของรอบนั้น</span></li>
-            <li><b>ใส่วันที่ 00000328 ถ้ามี</b><span>ใส่เฉพาะวันที่ HR แจ้งช่วงปีใหม่หรือสงกรานต์ ถ้าเดือนไหนไม่มีให้ข้าม</span></li>
-            <li><b>ดึงวันลา</b><span>ตรวจจำนวนวันลาที่ดึงมา และดูว่ามีรายการใดตรงกับเวรหรือไม่</span></li>
-            <li><b>ตรวจสรุป OT</b><span>เช็กชื่อ ชั่วโมง และรายการเตือนให้เรียบร้อย</span></li>
-            <li><b>บันทึกรอบ</b><span>เมื่อข้อมูลถูกต้องแล้ว กด “ยืนยันและบันทึกรอบนี้”</span></li>
-            <li><b>ติดตามการรับทราบ</b><span>ดูหัวข้อ “รับทราบ OT” ว่าใครรับทราบแล้วและใครยังค้างอยู่</span></li>
-            <li><b>ดู Log ล่าสุดของแอพ</b><span>ใช้ตรวจการเข้าใช้ การรับทราบ และการทำรายการของผู้ใช้งานในระบบ</span></li>
-            <li><b>Export</b><span>Export HR Excel และ Export หลักฐานการรับทราบเมื่อพร้อมส่งงาน</span></li>
-          </ol>
-
-          <h3>เพิ่มบัญชีเจ้าหน้าที่ครั้งแรก</h3>
-          <ol class="guide-steps">
-            <li><b>เปิดเมนู “ผู้ใช้งาน”</b><span>เลือกชื่อเจ้าหน้าที่ ใส่ Mahidol ID และรหัสผ่านชั่วคราว</span></li>
-            <li><b>กด “สร้างบัญชี”</b><span>แจ้ง Mahidol ID และรหัสชั่วคราวให้เจ้าหน้าที่คนนั้น</span></li>
-            <li><b>ครั้งแรกที่เข้าใช้</b><span>ระบบจะให้เจ้าหน้าที่ตั้งรหัสผ่านใหม่ของตนเองก่อนใช้งาน</span></li>
-            <li><b>ลืมรหัสผ่าน</b><span>กด “Reset password” ที่รายชื่อผู้ใช้งาน แล้วตั้งรหัสชั่วคราวใหม่ให้เจ้าหน้าที่</span></li>
-          </ol>
-
-          <h3>สำหรับเจ้าหน้าที่รับทราบ OT</h3>
-          <ol class="guide-steps">
-            <li><b>เข้าสู่ระบบ</b><span>กรอกเฉพาะ Mahidol ID เช่น username.sur และรหัสผ่าน</span></li>
-            <li><b>เปิดรอบ OT</b><span>ดูยอด OT และเปิดรายละเอียดเวรของตนเอง</span></li>
-            <li><b>ตรวจข้อมูล</b><span>ถ้าข้อมูลถูกต้อง ให้ติ๊กข้อความรับทราบ</span></li>
-            <li><b>กด “ยืนยันรับทราบ”</b><span>เมื่อบันทึกแล้วจะแสดงวันและเวลาที่รับทราบ</span></li>
-            <li><b>ถ้ารายการถูกแก้ภายหลัง</b><span>ระบบจะให้รับทราบใหม่เฉพาะรอบที่ข้อมูลของคุณเปลี่ยน</span></li>
-          </ol>
-
-          <h3>ติดตั้งบนมือถือ</h3>
-          <div class="mobile-guide-grid">
-            <div><b>Android</b><span>เปิด LAB OT ด้วย Chrome → เลือก “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”</span></div>
-            <div><b>iPhone / iPad</b><span>เปิด LAB OT ด้วย Safari → กด Share → “เพิ่มไปยังหน้าจอโฮม” → เพิ่ม</span></div>
-          </div>
-        </section>
-      </section>
-    </main>
+      <div class="content-shell">
+        <main class="container">
+          <section id="view-home" class="view"></section>
+          <section id="view-dashboard" class="view hidden"></section>
+          <section id="view-record" class="view hidden"></section>
+          <section id="view-records" class="view hidden"></section>
+          <section id="view-guide" class="view hidden"></section>
+          <section id="view-settings" class="view hidden"></section>
+          <section id="view-module" class="view hidden"></section>
+          <section id="view-review" class="view hidden"></section>
+          <section id="view-users" class="view hidden"></section>
+          <section id="view-audit" class="view hidden"></section>
+        </main>
+        <footer id="appFooter" class="footer">CNMI Blood Component QC · v5.3.2 · bloodqc.cnmiblood.com</footer>
+      </div>
+    </div>
   </div>
 
+  <dialog id="detailDialog" class="dialog">
+    <div class="dialog-head">
+      <div><h2 id="detailTitle">รายละเอียด</h2><p id="detailSubtitle" class="muted"></p></div>
+      <button class="icon-btn" id="closeDetailBtn" aria-label="ปิด">×</button>
+    </div>
+    <div id="detailBody"></div>
+  </dialog>
 
+  <dialog id="passwordDialog" class="dialog password-dialog">
+    <div class="dialog-head">
+      <div><h2>เปลี่ยนรหัสผ่าน</h2><p class="muted">อย่างน้อย 8 ตัวอักษร</p></div>
+      <button class="icon-btn" id="closePasswordDialogBtn" aria-label="ปิด">×</button>
+    </div>
+    <form id="passwordDialogForm" class="password-dialog-body">
+      <div class="field"><label for="currentPassword">รหัสผ่านปัจจุบัน</label><input id="currentPassword" type="password" autocomplete="current-password" minlength="8" required></div>
+      <div class="field"><label for="newPassword">รหัสผ่านใหม่</label><input id="newPassword" type="password" autocomplete="new-password" minlength="8" required></div>
+      <div class="field"><label for="confirmPassword">ยืนยันรหัสผ่านใหม่</label><input id="confirmPassword" type="password" autocomplete="new-password" minlength="8" required></div>
+      <p id="passwordDialogMessage" class="muted small"></p>
+      <div class="actions"><button class="btn" type="button" id="cancelPasswordBtn">ยกเลิก</button><button class="btn primary" type="submit">เปลี่ยนรหัสผ่าน</button></div>
+    </form>
+  </dialog>
 
-  <main id="ackView" class="ack-view" hidden>
-    <header class="topbar ack-topbar">
-      <div>
-        <div class="eyebrow">LAB OT</div>
-        <h1>OT ของฉัน</h1>
+  <dialog id="adminResetPasswordDialog" class="dialog password-dialog">
+    <div class="dialog-head">
+      <div><h2>Reset Password</h2><p id="adminResetTarget" class="muted">-</p></div>
+      <button class="icon-btn" id="closeAdminResetPasswordBtn" aria-label="ปิด">×</button>
+    </div>
+    <form id="adminResetPasswordForm" class="password-dialog-body">
+      <div class="notice info small">Admin กำหนดรหัสผ่านชั่วคราวใหม่ แล้วผู้ใช้จะถูกบังคับให้เปลี่ยนรหัสผ่านเองเมื่อเข้าสู่ระบบครั้งถัดไป</div>
+      <div class="field"><label for="adminTempPassword">รหัสผ่านชั่วคราวใหม่</label><input id="adminTempPassword" type="password" minlength="8" autocomplete="new-password" placeholder="อย่างน้อย 8 ตัวอักษร" required></div>
+      <div class="field"><label for="adminTempPasswordConfirm">ยืนยันรหัสผ่าน</label><input id="adminTempPasswordConfirm" type="password" minlength="8" autocomplete="new-password" required></div>
+      <p id="adminResetPasswordMessage" class="muted small"></p>
+      <div class="actions"><button class="btn" type="button" id="cancelAdminResetPasswordBtn">ยกเลิก</button><button class="btn primary" type="submit">Reset password</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="installDialog" class="dialog install-dialog">
+    <div class="dialog-head">
+      <div><h2 id="installDialogTitle">ติดตั้งแอปบนโทรศัพท์</h2><p id="installDialogSubtitle" class="muted">เปิด Blood QC จากหน้าจอโฮมได้เหมือนแอป</p></div>
+      <button class="icon-btn" id="closeInstallDialogBtn" aria-label="ปิด">×</button>
+    </div>
+    <div class="install-dialog-body">
+      <div id="iosInstallGuide" class="install-guide hidden">
+        <div class="install-step"><span>1</span><div><strong>เปิดเว็บนี้ด้วย Safari</strong><p>ถ้าเปิดอยู่ใน Chrome หรือ Browser อื่น ให้เปิดลิงก์นี้ใน Safari ก่อน</p></div></div>
+        <div class="install-step"><span>2</span><div><strong>กดปุ่ม Share</strong><p>ปุ่มรูปสี่เหลี่ยมมีลูกศรชี้ขึ้น ที่แถบเครื่องมือ Safari</p></div></div>
+        <div class="install-step"><span>3</span><div><strong>เลือก “เพิ่มไปยังหน้าจอโฮม”</strong><p>หรือ “Add to Home Screen” แล้วกด “เพิ่ม / Add”</p></div></div>
+        <div class="notice info small"><strong>หลังติดตั้ง:</strong> จะมีไอคอน Blood QC บนหน้าจอโฮม กดเข้าใช้งานได้เหมือนแอปทั่วไป</div>
       </div>
-      <div class="topbar-actions">
-        <span id="ackLoginBadge" class="user-badge"></span>
-        <label id="ackRoleSwitchWrap" class="role-switch" hidden>
-          <span class="sr-only">Role</span>
-          <select id="ackRoleSwitch" aria-label="Role">
-            <option value="admin">Admin</option>
-            <option value="staff" selected>Staff</option>
-          </select>
-        </label>
-        <button id="ackInstallAppBtn" class="ghost-btn" type="button" hidden>ติดตั้งแอป</button>
-        <button id="ackChangePasswordBtn" class="ghost-btn" type="button">เปลี่ยนรหัสผ่าน</button>
-        <button id="ackLogoutBtn" class="ghost-btn" type="button">ออกจากระบบ</button>
+      <div id="androidInstallGuide" class="install-guide hidden">
+        <div class="install-step"><span>1</span><div><strong>ใช้ Chrome บน Android</strong><p>เปิดหน้า Blood QC นี้ใน Chrome</p></div></div>
+        <div class="install-step"><span>2</span><div><strong>กดเมนู ⋮</strong><p>มุมขวาบน แล้วเลือก “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”</p></div></div>
+        <div class="install-step"><span>3</span><div><strong>กดติดตั้ง</strong><p>ระบบจะสร้างไอคอน Blood QC บนหน้าจอหลัก</p></div></div>
       </div>
-    </header>
-
-    <nav class="tabs staff-tabs" aria-label="เมนูเจ้าหน้าที่">
-      <button class="tab staff-tab active" data-staff-tab="myack" aria-selected="true">OT ของฉัน</button>
-      <button class="tab staff-tab" data-staff-tab="guide" aria-selected="false">วิธีใช้</button>
-      <button class="tab staff-tab" data-staff-tab="log" aria-selected="false">Log ล่าสุดของแอพ</button>
-    </nav>
-
-    <main class="ack-page-shell staff-page-shell">
-      <section id="staff-tab-myack" class="staff-tab-panel active">
-        <div class="staff-ack-filter-row">
-          <label class="ack-round-filter">
-            <span>รอบเดือน</span>
-            <select id="staffAckCycleFilter"><option value="">กำลังโหลด…</option></select>
-          </label>
-        </div>
-        <div id="ackEmpty" class="empty-state">กำลังโหลดรายการ…</div>
-        <section id="ackList" class="ack-list"></section>
-      </section>
-
-      <section id="staff-tab-guide" class="staff-tab-panel">
-        <section class="guide-card simple-guide staff-guide">
-          <h2>วิธีใช้</h2>
-          <ol class="guide-steps">
-            <li><b>เปิด “OT ของฉัน”</b><span>เลือกดูรอบ OT และเปิดรายละเอียดเวรของตนเอง</span></li>
-            <li><b>ตรวจเวรจริง</b><span>เช็กวันที่ หน่วย เวร เวลา และจำนวนชั่วโมงของตนเอง</span></li>
-            <li><b>ตรวจตารางเบิก HR</b><span>ดูวันที่ เวลาเข้า-ออก และวันที่ระบบเว้น รวมถึงวันลาที่ระบบใช้หลบ</span></li>
-            <li><b>กดยืนยันรับทราบ</b><span>เมื่อเวรจริง ตารางเบิก HR และวันที่ระบบเว้นถูกต้องแล้ว จึงติ๊กและกด “ยืนยันรับทราบ”</span></li>
-            <li><b>ถ้าข้อมูลถูกแก้ภายหลัง</b><span>ระบบจะให้รับทราบใหม่เฉพาะรอบที่ข้อมูลของคุณเปลี่ยน</span></li>
-            <li><b>เปลี่ยนรหัสผ่าน</b><span>กดปุ่ม “เปลี่ยนรหัสผ่าน” ด้านบนได้ตลอด</span></li>
-          </ol>
-          <h3>ติดตั้งบนมือถือ</h3>
-          <div class="mobile-guide-grid">
-            <div><b>Android</b><span>เปิดด้วย Chrome → เลือก “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”</span></div>
-            <div><b>iPhone / iPad</b><span>เปิดด้วย Safari → กด Share → “เพิ่มไปยังหน้าจอโฮม”</span></div>
-          </div>
-        </section>
-      </section>
-
-      <section id="staff-tab-log" class="staff-tab-panel">
-        <section class="card">
-          <div class="section-head">
-            <div><h2>Log ล่าสุดของแอพ</h2></div>
-            <button id="refreshStaffLogBtn" class="secondary-btn" type="button">รีเฟรช</button>
-          </div>
-          <div id="staffLogEmpty" class="empty-state">กำลังโหลด…</div>
-          <div class="table-wrap"><table id="staffLogTable"></table></div>
-        </section>
-      </section>
-    </main>
-  </main>
-
-  <div id="adminResetPasswordModal" class="modal-backdrop" hidden>
-    <section class="modal-card password-modal" role="dialog" aria-modal="true" aria-labelledby="adminResetPasswordTitle">
-      <div class="modal-head">
-        <div>
-          <h2 id="adminResetPasswordTitle">Reset password</h2>
-          <p id="resetUserEmail"></p>
-        </div>
-        <button id="adminResetPasswordCloseBtn" class="icon-btn" type="button" aria-label="ปิด">×</button>
+      <div id="genericInstallGuide" class="install-guide hidden">
+        <p>อุปกรณ์นี้ยังไม่แสดงหน้าติดตั้งอัตโนมัติ ลองเปิดเมนูของ Browser แล้วหา “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”</p>
       </div>
-      <form id="adminResetPasswordForm" class="stack">
-        <label>รหัสผ่านชั่วคราวใหม่
-          <input id="adminTempPassword" type="password" minlength="8" required>
-        </label>
-        <label>ยืนยันรหัสผ่านชั่วคราว
-          <input id="adminTempPasswordConfirm" type="password" minlength="8" required>
-        </label>
-        <p id="adminResetPasswordError" class="error-text" hidden></p>
-        <div class="modal-actions">
-          <button id="adminResetPasswordCancelBtn" class="ghost-btn" type="button">ยกเลิก</button>
-          <button id="adminResetPasswordSaveBtn" class="primary-btn" type="submit">บันทึกรหัสชั่วคราว</button>
-        </div>
-      </form>
-    </section>
-  </div>
-
-  <div id="passwordModal" class="modal-backdrop" hidden>
-    <section class="modal-card password-modal" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
-      <div class="modal-head">
-        <div>
-          <h2 id="passwordModalTitle">เปลี่ยนรหัสผ่าน</h2>
-          <p id="passwordModalHelper">เปลี่ยนรหัสผ่านของบัญชีนี้</p>
-        </div>
-        <button id="closePasswordModalBtn" class="icon-btn" type="button" aria-label="ปิด">×</button>
-      </div>
-
-      <form id="passwordChangeForm" class="stack">
-        <label>รหัสผ่านเดิม
-          <input id="currentPasswordInput" type="password" autocomplete="current-password" required />
-        </label>
-        <label>รหัสผ่านใหม่
-          <input id="newPasswordInput" type="password" autocomplete="new-password" minlength="8" required />
-        </label>
-        <label>ยืนยันรหัสผ่านใหม่
-          <input id="confirmPasswordInput" type="password" autocomplete="new-password" minlength="8" required />
-        </label>
-        <p id="passwordChangeError" class="error-text" hidden></p>
-        <div class="modal-actions">
-          <button id="cancelPasswordBtn" class="ghost-btn" type="button">ยกเลิก</button>
-          <button id="savePasswordBtn" class="primary-btn" type="submit">บันทึกรหัสใหม่</button>
-        </div>
-      </form>
-    </section>
-  </div>
-
+      <div class="actions"><button class="btn primary" type="button" id="installDialogOkBtn">เข้าใจแล้ว</button></div>
+    </div>
+  </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script>
-    window.LAB_OT_CONFIG = {
-      SUPABASE_URL: 'https://xjbwuyhdpsmfimzaradu.supabase.co',
-      SUPABASE_KEY: 'sb_publishable_yyLkUtatgoov6hR50VeLHQ_P8WGFZ-G',
-      USERS: {
-        'parichat.ink@mahidol.ac.th': { role: 'admin', label: 'Admin' },
-        'paleerat.ran@mahidol.ac.th': { role: 'admin', label: 'Admin' }
-      }
-    };
-    window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
-  </script>
-  <script src="app.js?v=20260903-34"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.warn));
-    }
-  </script>
-
+  <script src="config.js"></script>
+  <script src="pwa.js?v=5.3.2"></script>
+  <script src="app.js?v=5.3.2"></script>
 </body>
 </html>
