@@ -1,4 +1,4 @@
-const VERSION = 'blood-qc-v5.0.5';
+const VERSION = 'blood-qc-v5.0.6';
 self.addEventListener('install', event => self.skipWaiting());
 self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', event => {
