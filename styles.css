@@ -258,3 +258,32 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 .workflow-grid.prepare-workflow{grid-template-columns:minmax(0,1fr)}
 .plasma-detail-status{margin-bottom:2px}
 @media(max-width:760px){.plasma-step-section{padding:12px}.plasma-step-section .detail-section-head{display:flex}.step-title{align-items:flex-start}.step-state{font-size:11px}.compact-review-notice{display:block}.compact-review-notice span{display:block;margin-top:4px}.batch-products{gap:5px}}
+
+
+/* v5.2.3 compact accordion sidebar + desktop collapse */
+.sidebar,.content-shell{transition:width .2s ease,flex-basis .2s ease,opacity .15s ease}
+.sidebar-title-row{display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.sidebar-title-row .sidebar-title{flex:1;min-width:0;padding-bottom:2px}
+.sidebar-collapse-btn{display:inline-grid;place-items:center;width:30px;height:30px;flex:none;border:1px solid var(--line);border-radius:9px;background:#fff;color:#667085;font-size:22px;line-height:1;cursor:pointer}
+.sidebar-collapse-btn:hover{background:#f8f9fb;color:var(--primary)}
+.nav-module-group{display:grid;gap:3px;margin-top:5px}
+.sidebar .tabs .nav-group-head{display:flex;align-items:center;gap:7px;font-weight:800}
+.nav-group-head>span:first-child{min-width:0;flex:1}
+.nav-chevron{margin-left:auto;color:#98a2b3;font-size:13px;transition:transform .18s ease}
+.nav-module-group.expanded>.nav-group-head .nav-chevron{transform:rotate(180deg)}
+.nav-module-group.current-group>.nav-group-head{color:#344054}
+.nav-module-group.current-group>.nav-group-head.active{color:var(--primary)}
+.nav-submenu{display:none;gap:3px;padding:2px 0 4px 12px;margin-left:10px;border-left:2px solid #f0d6da}
+.nav-submenu.nav-submenu-open{display:grid}
+.sidebar .tabs .nav-submenu button{padding:9px 10px;font-size:13px;font-weight:700}
+.nav-utility-group{margin-top:8px}
+.admin-nav-group{margin-top:10px;padding-top:8px;border-top:1px solid #f0f1f3}
+.sidebar .tabs .nav-admin-head{color:#667085;font-size:12px;letter-spacing:.04em}
+#mobileMenuBtn{display:inline-grid;place-items:center}
+#appShell.sidebar-collapsed .sidebar{width:0;padding-left:0;padding-right:0;border-right:0;opacity:0;overflow:hidden;pointer-events:none}
+#appShell.sidebar-collapsed .content-shell{width:100%}
+@media(max-width:900px){
+  #appShell.sidebar-collapsed .sidebar{width:min(290px,86vw);padding:16px 12px 14px;border-right:1px solid var(--line);opacity:1;pointer-events:auto}
+  .sidebar-collapse-btn{display:none}
+  .nav-submenu{padding-left:10px;margin-left:8px}
+}

@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.2.2 - polished FFP Outlab PDF + FFP guide */
+/* CNMI Blood Component QC v5.2.3 - polished FFP Outlab PDF + FFP guide */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -20,7 +20,7 @@
     return `<span class="badge ${cls}">${esc(poolReleaseTH(s))}</span>`;
   };
   const measuredTH = iso => iso ? dateTH(iso) : 'ยังไม่บันทึก';
-  const state = { sb:null, session:null, user:null, profile:null, settings:null, productSettings:[], records:[], plasmaSettings:null, plasmaProductSettings:[], plasmaRecords:[], plasmaBatches:[], plasmaReady:false, profiles:[], currentRecordId:null, currentEvidence:[], currentPool:[], currentPlasmaRecordId:null, currentPlasmaEvidence:[], currentPlasmaBatchId:null, lastLoginPassword:null, uiMode:'staff', auditUserFilter:'', resetTargetId:null, showDeletedRecords:false, showDeletedPlasma:false, currentView:'home', currentModule:null, currentPage:null, sessionRetryTimer:null };
+  const state = { sb:null, session:null, user:null, profile:null, settings:null, productSettings:[], records:[], plasmaSettings:null, plasmaProductSettings:[], plasmaRecords:[], plasmaBatches:[], plasmaReady:false, profiles:[], currentRecordId:null, currentEvidence:[], currentPool:[], currentPlasmaRecordId:null, currentPlasmaEvidence:[], currentPlasmaBatchId:null, lastLoginPassword:null, uiMode:'staff', auditUserFilter:'', resetTargetId:null, showDeletedRecords:false, showDeletedPlasma:false, currentView:'home', currentModule:null, currentPage:null, sessionRetryTimer:null, sidebarCollapsed:localStorage.getItem('bloodqc_sidebar_collapsed')==='1', openNavGroup:null };
   const productSetting = type => state.productSettings.find(x=>x.product_type===type);
   const activeProducts = () => state.productSettings.filter(x=>x.is_active).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||a.product_type.localeCompare(b.product_type));
   const productOptions = selected => activeProducts().map(x=>`<option value="${esc(x.product_type)}" ${selected===x.product_type?'selected':''}>${esc(x.product_type)}</option>`).join('');
@@ -86,16 +86,17 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.2.2 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.2.3 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.2.2 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.2.3 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
     const exact=$(`#mainTabs button[data-route="${route.hash}"]`);
     if(exact) exact.classList.add('active');
     else if(route.module){ $(`#${route.module}Tab`)?.classList.add('active'); }
+    syncNavGroupToRoute(route);
   }
 
   function showToast(msg,type='') { const t=$('#toast'); t.textContent=msg; t.className=`toast show ${type}`; clearTimeout(showToast._t); showToast._t=setTimeout(()=>t.className='toast',3500); }
@@ -109,7 +110,7 @@
   function cfgReady(){ return C.SUPABASE_URL && C.SUPABASE_KEY && !C.SUPABASE_URL.includes('PASTE_') && !C.SUPABASE_KEY.includes('PASTE_'); }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'5.2.2',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.2.3',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -141,18 +142,49 @@
   function staffWriteUi(){ return ['staff','admin'].includes(effectiveRole()); }
   function adminUi(){ return effectiveRole()==='admin'; }
   function activeView(){ return state.currentView || 'home'; }
+  function desktopSidebar(){ return window.matchMedia('(min-width:901px)').matches; }
   function closeSidebar(){ $('#sideNav')?.classList.remove('open'); $('#sidebarBackdrop')?.classList.add('hidden'); $('#mobileMenuBtn')?.setAttribute('aria-expanded','false'); }
   function openSidebar(){ $('#sideNav')?.classList.add('open'); $('#sidebarBackdrop')?.classList.remove('hidden'); $('#mobileMenuBtn')?.setAttribute('aria-expanded','true'); }
+  function applySidebarCollapsed(){
+    const collapsed=desktopSidebar() && state.sidebarCollapsed;
+    $('#appShell')?.classList.toggle('sidebar-collapsed',collapsed);
+    const topBtn=$('#mobileMenuBtn');
+    if(topBtn){ topBtn.setAttribute('aria-label',collapsed?'เปิดแถบเมนู':'ยุบแถบเมนู'); topBtn.title=collapsed?'เปิดแถบเมนู':'ยุบแถบเมนู'; }
+  }
+  function toggleDesktopSidebar(){
+    state.sidebarCollapsed=!state.sidebarCollapsed;
+    localStorage.setItem('bloodqc_sidebar_collapsed',state.sidebarCollapsed?'1':'0');
+    applySidebarCollapsed();
+  }
+  function setOpenNavGroup(group,force=null){
+    const current=state.openNavGroup;
+    state.openNavGroup=force===null ? (current===group?null:group) : (force?group:null);
+    $$('.nav-module-group[data-nav-group]').forEach(el=>{
+      const expanded=el.dataset.navGroup===state.openNavGroup;
+      el.classList.toggle('expanded',expanded);
+      el.querySelector('.nav-submenu')?.classList.toggle('nav-submenu-open',expanded);
+      el.querySelector('.nav-group-head')?.setAttribute('aria-expanded',expanded?'true':'false');
+    });
+  }
+  function syncNavGroupToRoute(route){
+    let group=null;
+    if(route.module) group=route.module;
+    else if(['users','audit'].includes(route.view)) group='admin';
+    if(group!==state.openNavGroup) setOpenNavGroup(group,true);
+    $$('.nav-module-group').forEach(el=>el.classList.toggle('current-group',el.dataset.navGroup===group));
+  }
   function applyUiMode(render=true){
     if(!state.profile) return;
     const isAdmin=state.profile.role==='admin';
     if(!isAdmin) state.uiMode=state.profile.role;
     $('#settingsTab')?.classList.toggle('hidden',!adminUi());
     $('#plasmaSettingsTab')?.classList.toggle('hidden',!adminUi());
+    $('#rbcSettingsTab')?.classList.toggle('hidden',!adminUi());
     $('#reviewTab')?.classList.toggle('hidden',!reviewerUi());
     $('#reviewNavLabel')?.classList.toggle('hidden',!reviewerUi());
     $('#plateletNewTab')?.classList.toggle('hidden',!staffWriteUi());
     $('#plasmaNewTab')?.classList.toggle('hidden',!staffWriteUi());
+    $('#rbcNewTab')?.classList.toggle('hidden',!staffWriteUi());
     const reviewCount=pendingReviewRecords().length; if($('#reviewCount')) $('#reviewCount').textContent=reviewCount?String(reviewCount):'';
     $('#usersTab')?.classList.toggle('hidden',!adminUi());
     $('#auditTab')?.classList.toggle('hidden',!adminUi());
@@ -290,6 +322,7 @@
   async function openAppShell(){
     hideAuthScreens();
     $('#appShell').classList.remove('hidden');
+    applySidebarCollapsed();
     const p=state.profile;
     state.uiMode=p.role==='admin' ? ((localStorage.getItem('bloodqc_ui_mode')||localStorage.getItem('platelet_ui_mode'))==='admin'?'admin':'staff') : p.role;
     await loadSettings(); await loadProductSettings(); await loadProfiles(); await loadRecords(); await loadPlasmaModuleData();
@@ -400,9 +433,30 @@
   $('#forceLogoutBtn').addEventListener('click',()=>state.sb.auth.signOut());
   $('#logoutBtn').addEventListener('click',logoutWithAudit);
   $('#closeDetailBtn').addEventListener('click',()=>$('#detailDialog').close());
-  $('#mainTabs').addEventListener('click',e=>{ const b=e.target.closest('button[data-route]'); if(b){ if(b.dataset.route===ROUTES.platelet.record)state.currentRecordId=null; if(b.dataset.route===ROUTES.plasma.record)state.currentPlasmaRecordId=null; location.hash=b.dataset.route; closeSidebar(); } });
-  $('#mobileMenuBtn').addEventListener('click',()=>$('#sideNav').classList.contains('open')?closeSidebar():openSidebar());
+  $('#mainTabs').addEventListener('click',e=>{
+    const adminHead=e.target.closest('button[data-nav-head="admin"]');
+    if(adminHead){ setOpenNavGroup('admin'); return; }
+    const b=e.target.closest('button[data-route]');
+    if(!b) return;
+    const head=b.dataset.navHead;
+    if(head){
+      const isOpen=state.openNavGroup===head;
+      const currentRoute=parseRoute();
+      if(isOpen && currentRoute.module===head && currentRoute.hash===b.dataset.route){ setOpenNavGroup(head,false); return; }
+      setOpenNavGroup(head,true);
+    }
+    if(b.dataset.route===ROUTES.platelet.record)state.currentRecordId=null;
+    if(b.dataset.route===ROUTES.plasma.record)state.currentPlasmaRecordId=null;
+    location.hash=b.dataset.route;
+    if(!desktopSidebar()) closeSidebar();
+  });
+  $('#mobileMenuBtn').addEventListener('click',()=>{
+    if(desktopSidebar()) toggleDesktopSidebar();
+    else $('#sideNav').classList.contains('open')?closeSidebar():openSidebar();
+  });
+  $('#sidebarCollapseBtn')?.addEventListener('click',toggleDesktopSidebar);
   $('#sidebarBackdrop').addEventListener('click',closeSidebar);
+  window.addEventListener('resize',()=>{ applySidebarCollapsed(); if(desktopSidebar()) closeSidebar(); });
   $('#modeMenuBtn').addEventListener('click',()=>{ const m=$('#modeMenu'); const willOpen=m.classList.contains('hidden'); m.classList.toggle('hidden',!willOpen); $('#modeMenuBtn').setAttribute('aria-expanded',willOpen?'true':'false'); });
   $$('#modeMenu [data-ui-mode]').forEach(b=>b.addEventListener('click',()=>setUiMode(b.dataset.uiMode)));
   document.addEventListener('click',e=>{ if(!e.target.closest('#adminModePanel')){ $('#modeMenu')?.classList.add('hidden'); $('#modeMenuBtn')?.setAttribute('aria-expanded','false'); } });
@@ -1034,7 +1088,7 @@
   }
 
 
-  // ===== Plasma / FFP module v5.2.2 =====
+  // ===== Plasma / FFP module v5.2.3 =====
   function plasmaMonthKey(){ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit'}).format(new Date()).replace('/','-'); }
   function plasmaBatchById(id){ return state.plasmaBatches.find(x=>x.id===id); }
   function plasmaModuleReadyNotice(){

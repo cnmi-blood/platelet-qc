@@ -13,9 +13,9 @@
   <meta name="robots" content="noindex,nofollow" />
   <title>Blood QC</title>
   <link rel="icon" href="assets/platelet.svg" />
-  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=5.2.2" />
-  <link rel="manifest" href="manifest.webmanifest?v=5.2.2" />
-  <link rel="stylesheet" href="styles.css?v=5.2.2" />
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=5.2.3" />
+  <link rel="manifest" href="manifest.webmanifest?v=5.2.3" />
+  <link rel="stylesheet" href="styles.css?v=5.2.3" />
 </head>
 <body>
   <div id="toast" class="toast" aria-live="polite"></div>
@@ -104,33 +104,61 @@
 
     <div class="app-layout">
       <aside id="sideNav" class="sidebar" aria-label="เมนูหลัก">
-        <div class="sidebar-title">Blood Component QC</div>
+        <div class="sidebar-title-row">
+          <div class="sidebar-title">Blood Component QC</div>
+          <button id="sidebarCollapseBtn" class="sidebar-collapse-btn" type="button" aria-label="ยุบแถบเมนู" title="ยุบแถบเมนู">‹</button>
+        </div>
         <nav class="tabs side-tabs" id="mainTabs">
-          <button data-route="#/" id="homeTab" class="active">ภาพรวมระบบ</button>
+          <button data-route="#/" id="homeTab" class="active nav-home">ภาพรวมระบบ</button>
 
-          <div class="sidebar-section-label">Platelet</div>
-          <button data-route="#/platelet" id="plateletDashboardTab">ภาพรวม Platelet</button>
-          <button data-route="#/platelet/new" id="plateletNewTab">บันทึก Platelet</button>
-          <button data-route="#/platelet/records" id="plateletRecordsTab">รายการ Platelet</button>
-          <button data-route="#/platelet/guide" id="plateletGuideTab">คู่มือ Platelet</button>
-          <button data-route="#/platelet/qc_settings" id="settingsTab" class="hidden">ตั้งค่า Platelet QC</button>
+          <div class="nav-module-group" data-nav-group="platelet">
+            <button data-route="#/platelet" data-nav-head="platelet" id="plateletDashboardTab" class="nav-group-head" aria-expanded="false">
+              <span>ภาพรวม Platelet</span><span class="nav-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div class="nav-submenu" data-nav-submenu="platelet">
+              <button data-route="#/platelet/new" id="plateletNewTab">บันทึก Platelet</button>
+              <button data-route="#/platelet/records" id="plateletRecordsTab">รายการ Platelet</button>
+              <button data-route="#/platelet/guide" id="plateletGuideTab">คู่มือ Platelet</button>
+              <button data-route="#/platelet/qc_settings" id="settingsTab" class="hidden">ตั้งค่า Platelet QC</button>
+            </div>
+          </div>
 
-          <div class="sidebar-section-label">Plasma</div>
-          <button data-route="#/plasma" id="plasmaTab">ภาพรวม Plasma</button>
-          <button data-route="#/plasma/new" id="plasmaNewTab">บันทึก FFP</button>
-          <button data-route="#/plasma/records" id="plasmaRecordsTab">รายการ FFP</button>
-          <button data-route="#/plasma/guide" id="plasmaGuideTab">คู่มือ FFP</button>
-          <button data-route="#/plasma/qc_settings" id="plasmaSettingsTab" class="hidden">ตั้งค่า Plasma QC</button>
+          <div class="nav-module-group" data-nav-group="plasma">
+            <button data-route="#/plasma" data-nav-head="plasma" id="plasmaTab" class="nav-group-head" aria-expanded="false">
+              <span>ภาพรวม Plasma</span><span class="nav-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div class="nav-submenu" data-nav-submenu="plasma">
+              <button data-route="#/plasma/new" id="plasmaNewTab">บันทึก FFP</button>
+              <button data-route="#/plasma/records" id="plasmaRecordsTab">รายการ FFP</button>
+              <button data-route="#/plasma/guide" id="plasmaGuideTab">คู่มือ FFP</button>
+              <button data-route="#/plasma/qc_settings" id="plasmaSettingsTab" class="hidden">ตั้งค่า Plasma QC</button>
+            </div>
+          </div>
 
-          <div class="sidebar-section-label">โมดูล</div>
-          <button data-route="#/rbc" id="rbcTab">RBC <span class="nav-coming">เตรียมไว้</span></button>
+          <div class="nav-module-group" data-nav-group="rbc">
+            <button data-route="#/rbc" data-nav-head="rbc" id="rbcTab" class="nav-group-head" aria-expanded="false">
+              <span>ภาพรวม RBC</span><span class="nav-coming">เตรียมไว้</span><span class="nav-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div class="nav-submenu" data-nav-submenu="rbc">
+              <button data-route="#/rbc/new" id="rbcNewTab">บันทึก RBC <span class="nav-coming">เตรียมไว้</span></button>
+              <button data-route="#/rbc/records" id="rbcRecordsTab">รายการ RBC <span class="nav-coming">เตรียมไว้</span></button>
+              <button data-route="#/rbc/qc_settings" id="rbcSettingsTab" class="hidden">ตั้งค่า RBC QC</button>
+            </div>
+          </div>
 
-          <div id="reviewNavLabel" class="sidebar-section-label hidden">Review</div>
-          <button data-route="#/review" id="reviewTab" class="hidden">งานรอตรวจทวน <span id="reviewCount" class="nav-count"></span></button>
+          <div id="reviewNavLabel" class="nav-utility-group hidden">
+            <button data-route="#/review" id="reviewTab" class="hidden">งานรอตรวจทวน <span id="reviewCount" class="nav-count"></span></button>
+          </div>
 
-          <div id="adminNavLabel" class="sidebar-section-label hidden">Admin</div>
-          <button data-route="#/admin/users" id="usersTab" class="hidden">ผู้ใช้งานระบบ</button>
-          <button data-route="#/admin/audit" id="auditTab" class="hidden">ประวัติการใช้งาน</button>
+          <div id="adminNavLabel" class="nav-module-group admin-nav-group hidden" data-nav-group="admin">
+            <button type="button" data-nav-head="admin" id="adminGroupBtn" class="nav-group-head nav-admin-head" aria-expanded="false">
+              <span>ADMIN</span><span class="nav-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div class="nav-submenu" data-nav-submenu="admin">
+              <button data-route="#/admin/users" id="usersTab" class="hidden">ผู้ใช้งานระบบ</button>
+              <button data-route="#/admin/audit" id="auditTab" class="hidden">ประวัติการใช้งาน</button>
+            </div>
+          </div>
         </nav>
 
         <div class="sidebar-spacer"></div>
@@ -171,7 +199,7 @@
           <section id="view-users" class="view hidden"></section>
           <section id="view-audit" class="view hidden"></section>
         </main>
-        <footer id="appFooter" class="footer">CNMI Blood Component QC · v5.2.2 · bloodqc.cnmiblood.com</footer>
+        <footer id="appFooter" class="footer">CNMI Blood Component QC · v5.2.3 · bloodqc.cnmiblood.com</footer>
       </div>
     </div>
   </div>
@@ -238,7 +266,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
-  <script src="pwa.js?v=5.2.2"></script>
-  <script src="app.js?v=5.2.2"></script>
+  <script src="pwa.js?v=5.2.3"></script>
+  <script src="app.js?v=5.2.3"></script>
 </body>
 </html>
