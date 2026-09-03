@@ -238,3 +238,23 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 @media(max-width:760px){.review-queue-panel .table-wrap{overflow:auto}.reviewer-action-panel .actions{display:grid;grid-template-columns:1fr}.reviewer-action-panel .btn{width:100%}}
 
 .outlab-batch-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0 8px;padding:10px 12px;border:1px solid var(--line,#e3e7ee);border-radius:12px;background:#fafbfc}.outlab-batch-toolbar .inline-check{margin:0}.outlab-batch-toolbar .small{text-align:right}@media(max-width:640px){.outlab-batch-toolbar{align-items:flex-start;flex-direction:column}.outlab-batch-toolbar .small{text-align:left}}
+
+/* v5.2.1 — clearer FFP detail workflow */
+.plasma-step-section{padding:16px 18px;border-left:4px solid #e4e7ec}
+.plasma-step-section .detail-section-head{align-items:center;margin-bottom:10px}
+.step-title{display:flex;align-items:center;gap:10px}
+.step-no{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--primary-soft);color:var(--primary);font-weight:800;flex:none}
+.step-state{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:700;white-space:nowrap}
+.step-state.done{background:#ecfdf3;color:#027a48;border:1px solid #abefc6}
+.step-state.pending{background:#f2f4f7;color:#667085;border:1px solid #eaecf0}
+.step-state.review{background:#fff6ed;color:#b54708;border:1px solid #fedf89}
+.plasma-meta-line{justify-content:flex-start;margin:0 0 12px}
+.batch-products{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0 12px}
+.batch-product-chip{font-size:12px;padding:6px 8px;border:1px solid var(--line);border-radius:9px;background:#f9fafb}
+.batch-product-chip.current{border-color:#fda29b;background:#fff1f3;color:#9f1239;font-weight:700}
+.empty-step{padding:14px;border:1px dashed #d0d5dd;border-radius:10px;color:var(--muted);background:#fafafa;margin:8px 0 10px}
+.compact-review-notice{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.compact-review-notice span{font-size:12px;font-weight:500}
+.workflow-grid.prepare-workflow{grid-template-columns:minmax(0,1fr)}
+.plasma-detail-status{margin-bottom:2px}
+@media(max-width:760px){.plasma-step-section{padding:12px}.plasma-step-section .detail-section-head{display:flex}.step-title{align-items:flex-start}.step-state{font-size:11px}.compact-review-notice{display:block}.compact-review-notice span{display:block;margin-top:4px}.batch-products{gap:5px}}
