@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.11 - compact Platelet dashboard with weekly detail popup */
+/* CNMI Blood Component QC v5.3.12 - product overview popups for Platelet, Plasma and RBC */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -86,10 +86,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.11 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.12 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.11 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.12 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -384,7 +384,7 @@
   function plateletDateFromRecord(r){return r?.collection_at?inputFromISO(r.collection_at).slice(0,10):'';}
   function plateletWeekSlot(dateStr){const d=Number(String(dateStr||'').slice(8,10));return !d?null:d<=7?1:d<=14?2:d<=21?3:4;}
   function plateletWeekRange(ym,slot){const last=new Date(Number(ym.slice(0,4)),Number(ym.slice(5,7)),0).getDate();const ranges={1:[1,7],2:[8,14],3:[15,21],4:[22,last]};return ranges[slot]||[1,last];}
-  function plateletWeekLabel(ym,slot){const [a,b]=plateletWeekRange(ym,slot);return `สัปดาห์ ${slot} · ${a}–${b}`;}
+  function plateletWeekLabel(ym,slot){return `สัปดาห์ ${slot}`;}
   function weeklyEventHasEvidence(eventId){return state.plateletWeeklyEvidence.some(x=>x.event_id===eventId);}
   function activePlateletTrackingProducts(){return state.productSettings.filter(x=>x.is_active).sort((a,b)=>(a.sort_order??100)-(b.sort_order??100)||String(a.product_type).localeCompare(String(b.product_type)));}
   function plateletQcInSlot(ym,slot,excludeId=null,productType=''){return state.records.filter(r=>!r.deleted_at&&r.id!==excludeId&&r.record_purpose==='qc'&&(!productType||r.product_type===productType)).filter(r=>{const d=plateletDateFromRecord(r);return monthKeyFromDateString(d)===ym&&plateletWeekSlot(d)===slot;});}
@@ -709,7 +709,7 @@
     const weeks=plateletWeeklySummary(ym,productType),complete=weeks.filter(w=>w.complete).length;
     $('#detailTitle').textContent=`Platelet QC · ${productType}`;
     $('#detailSubtitle').textContent=`${plateletMonthLabel(ym)} · ครบ ${complete}/4 สัปดาห์`;
-    $('#detailBody').innerHTML=`<div class="platelet-week-popup-list">${weeks.map(w=>{const label=plateletWeekLabel(ym,w.slot);if(w.status==='qc')return `<div class="platelet-week-popup-row qc"><div><strong>${esc(label)}</strong><small>เก็บ QC แล้ว ${w.qc.length} รายการ</small></div><span class="badge pass">เก็บแล้ว</span></div>`;if(w.status==='no_pool')return `<div class="platelet-week-popup-row no_pool"><div><strong>${esc(label)}</strong><small>ไม่มี Pool และมีหลักฐานแล้ว</small></div><div class="platelet-week-popup-actions"><span class="badge draft">ไม่มี Pool</span><button type="button" class="btn tiny-btn weekly-evidence-view" data-event-id="${w.noPool[0].id}">ดูหลักฐาน</button></div></div>`;return `<div class="platelet-week-popup-row pending"><div><strong>${esc(label)}</strong><small>ยังไม่มี QC และยังไม่มีหลักฐานไม่มี Pool</small></div><span class="badge incomplete">ยังไม่ได้เก็บ</span></div>`;}).join('')}</div><div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="plateletWeekPopupClose">ปิด</button></div>`;
+    $('#detailBody').innerHTML=`<div class="platelet-week-popup-list">${weeks.map(w=>{const label=plateletWeekLabel(ym,w.slot),owner='ผู้เก็บตามตำแหน่งใน App Staff Planner';if(w.status==='qc')return `<div class="platelet-week-popup-row qc"><div><strong>${esc(label)}</strong><small>${owner} · เก็บ QC แล้ว ${w.qc.length} รายการ</small></div><span class="badge pass">เก็บแล้ว</span></div>`;if(w.status==='no_pool')return `<div class="platelet-week-popup-row no_pool"><div><strong>${esc(label)}</strong><small>${owner} · ไม่มี Pool และมีหลักฐานแล้ว</small></div><div class="platelet-week-popup-actions"><span class="badge draft">ไม่มี Pool</span><button type="button" class="btn tiny-btn weekly-evidence-view" data-event-id="${w.noPool[0].id}">ดูหลักฐาน</button></div></div>`;return `<div class="platelet-week-popup-row pending"><div><strong>${esc(label)}</strong><small>${owner}</small></div><span class="badge incomplete">ยังไม่ได้เก็บ</span></div>`;}).join('')}</div><div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="plateletWeekPopupClose">ปิด</button></div>`;
     $$('.weekly-evidence-view',$('#detailBody')).forEach(b=>b.onclick=()=>viewPlateletWeeklyEvidence(b.dataset.eventId));
     $('#plateletWeekPopupClose').onclick=()=>$('#detailDialog').close();
     dlg.showModal();
@@ -1238,16 +1238,27 @@
     const products=state.plasmaProductSettings.filter(x=>x.is_active).sort((a,b)=>(a.sort_order??100)-(b.sort_order??100)||String(a.product_type).localeCompare(String(b.product_type)));
     const tracking=products.map(ps=>{const done=month.filter(r=>r.product_type===ps.product_type).length;return {product_type:ps.product_type,done,remaining:Math.max(0,target-done),complete:done>=target};});
     const typesComplete=tracking.filter(x=>x.complete).length;
-    const trackingCards=tracking.map(x=>`<div class="type-progress-card"><div class="type-progress-head"><div><strong>${esc(x.product_type)}</strong><small>${x.done}/4 ถุง</small></div><span class="badge ${x.complete?'pass':'incomplete'}">${x.complete?'ครบ':`เหลือ ${x.remaining}`}</span></div><div class="tracking-bar"><span style="width:${Math.min(100,x.done/target*100)}%"></span></div><div class="type-progress-foot"><span>ทำ QC แล้ว <b>${x.done}</b></span><span>เป้าหมาย 4</span></div></div>`).join('');
+    const trackingCards=tracking.map(x=>`<button type="button" class="type-progress-card dashboard-product-card plasma-progress-card ${x.complete?'complete':''}" data-product-type="${esc(x.product_type)}"><div class="type-progress-head"><div><strong>${esc(x.product_type)}</strong><small>${x.done}/4 ถุง</small></div><span class="badge ${x.complete?'pass':'incomplete'}">${x.complete?'ครบ':`เหลือ ${x.remaining}`}</span></div><div class="tracking-bar"><span style="width:${Math.min(100,x.done/target*100)}%"></span></div><div class="type-progress-foot"><span>ทำ QC แล้ว <b>${x.done}</b></span><span>เป้าหมาย 4</span></div></button>`).join('');
     $('#view-module').innerHTML=`<div class="page-head"><div><h1>ภาพรวม Plasma</h1><p class="muted">FFP · Factor VIII QC</p></div><div class="actions"><input id="plasmaDashMonth" class="month-input" type="month" value="${esc(ym)}"><button class="btn" data-go-route="#/plasma/guide">คู่มือ FFP</button>${staffWriteUi()?'<button class="btn" id="plasmaBatchBtn">+ สร้างใบนำส่ง</button><button class="btn primary" id="plasmaNewBtn">+ บันทึก FFP</button>':''}</div></div>
       <div class="grid cards">${metric('เดือนนี้',month.length,'รายการ FFP QC')}${metric('ครบ 4 ถุง',`${typesComplete}/${products.length||0}`,'แยกตามชนิด FFP')}${metric('รอผล Factor VIII',waiting,'ส่ง Outlab แล้ว')}${metric('รอตรวจทวน',review,'Submitted')}${metric('LOCK',locked,'แพทย์ทบทวนแล้ว')}</div>
-      <div class="panel qc-tracking-panel"><div class="section-title-row"><div><h2>ติดตาม FFP QC รายเดือน แยกชนิด</h2><p class="muted small">แต่ละชนิด FFP มีเป้าหมาย 4 ถุงต่อเดือน และยังบันทึกเกิน 4 ถุงได้</p></div></div><div class="type-progress-grid">${trackingCards||'<div class="empty">ยังไม่มีชนิด FFP ที่เปิดใช้งาน</div>'}</div></div>
+      <div class="panel qc-tracking-panel"><div class="section-title-row"><div><h2>ติดตาม FFP QC รายเดือน แยกชนิด</h2><p class="muted small">แต่ละชนิด FFP มีเป้าหมาย 4 ถุงต่อเดือน · คลิกการ์ดเพื่อดูรายละเอียด</p></div></div><div class="type-progress-grid">${trackingCards||'<div class="empty">ยังไม่มีชนิด FFP ที่เปิดใช้งาน</div>'}</div></div>
       <div class="panel"><h2>รายการล่าสุด</h2>${plasmaRecordsTable(rec.slice(0,12))}</div>
       ${plasmaRecentBatchesPanel()}`;
     $('#plasmaDashMonth').onchange=e=>{state.plasmaDashboardMonth=e.target.value||plasmaMonthKey();renderPlasmaDashboard();};
     if($('#plasmaNewBtn'))$('#plasmaNewBtn').onclick=()=>{state.currentPlasmaRecordId=null;location.hash=ROUTES.plasma.record;};
     if($('#plasmaBatchBtn'))$('#plasmaBatchBtn').onclick=openPlasmaBatchBuilder;
+    $$('.plasma-progress-card',$('#view-module')).forEach(b=>b.onclick=()=>openPlasmaProductSummary(b.dataset.productType,ym));
     bindRouteButtons($('#view-module'));bindPlasmaRecordLinks($('#view-module'));bindPlasmaBatchPdf($('#view-module'));bindPlasmaBatchPager();
+  }
+  function openPlasmaProductSummary(productType,ym){
+    const dlg=ensureDetailDialogShell(),rows=state.plasmaRecords.filter(r=>!r.deleted_at&&r.product_type===productType&&String(r.manufactured_on||'').slice(0,7)===ym).sort((a,b)=>String(a.manufactured_on||'').localeCompare(String(b.manufactured_on||''))||String(a.created_at||'').localeCompare(String(b.created_at||'')));
+    const target=4,done=rows.length;
+    $('#detailTitle').textContent=`FFP QC · ${productType}`;
+    $('#detailSubtitle').textContent=`${plateletMonthLabel(ym)} · ทำ QC แล้ว ${done}/${target} ถุง`;
+    const slots=Array.from({length:target},(_,i)=>{const r=rows[i];return r?`<div class="platelet-week-popup-row qc"><div><strong>ถุงที่ ${i+1}</strong><small>${esc(r.product_no)} · วันที่ผลิต ${esc(r.manufactured_on||'–')} · ${esc(plasmaOutlabState(r))}</small></div><button type="button" class="btn tiny-btn plasma-summary-open" data-id="${r.id}">ดูรายการ</button></div>`:`<div class="platelet-week-popup-row pending"><div><strong>ถุงที่ ${i+1}</strong><small>ยังไม่มีรายการ QC ในเดือนนี้</small></div><span class="badge incomplete">ยังไม่ได้เก็บ</span></div>`;}).join('');
+    const extra=rows.slice(target); const extraHtml=extra.length?`<div class="product-popup-extra"><strong>รายการเกินเป้าหมาย ${extra.length} ถุง</strong>${extra.map(r=>`<button type="button" class="btn small-btn plasma-summary-open" data-id="${r.id}">${esc(r.product_no)}</button>`).join('')}</div>`:'';
+    $('#detailBody').innerHTML=`<div class="platelet-week-popup-list">${slots}</div>${extraHtml}<div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="plasmaSummaryClose">ปิด</button></div>`;
+    $$('.plasma-summary-open',$('#detailBody')).forEach(b=>b.onclick=()=>{dlg.close();openPlasmaDetail(b.dataset.id);}); $('#plasmaSummaryClose').onclick=()=>dlg.close(); dlg.showModal();
   }
 
   function sortedPlasmaBatches(){
@@ -1574,7 +1585,7 @@ function printPlasmaOutlabBatch(batchId){
   function rbcTargetCard(p,ym){
     const target=RBC_MONTHLY_TARGET_PER_PRODUCT,done=rbcQcDone(ym,p.product_type),remain=Math.max(0,target-done),complete=done>=target;
     const pct=Math.min(100,Math.round((done/target)*100));
-    return `<article class="rbc-progress-card ${complete?'complete':''}" data-product="${esc(p.product_type)}"><div class="rbc-progress-head"><div><strong>${esc(p.product_type)}</strong><small>${esc(rbcProductClassTH(p.product_class))}</small></div><span class="badge ${complete?'pass':''}">${complete?'ครบแล้ว':done+' / '+target}</span></div><div class="rbc-progress-track"><span style="width:${pct}%"></span></div><div class="rbc-progress-foot"><span>ทำ QC แล้ว <b>${done}</b></span><span>${complete?'ครบเป้าหมาย':`เหลือ ${remain}`}</span></div></article>`;
+    return `<button type="button" class="rbc-progress-card dashboard-product-card ${complete?'complete':''}" data-product="${esc(p.product_type)}"><div class="rbc-progress-head"><div><strong>${esc(p.product_type)}</strong><small>${esc(rbcProductClassTH(p.product_class))}</small></div><span class="badge ${complete?'pass':'incomplete'}">${complete?'ครบแล้ว':done+' / '+target}</span></div><div class="rbc-progress-track"><span style="width:${pct}%"></span></div><div class="rbc-progress-foot"><span>ทำ QC แล้ว <b>${done}</b></span><span>${complete?'ครบเป้าหมาย':`เหลือ ${remain}`}</span></div></button>`;
   }
   function renderRbcDashboard(){
     const ym=state.rbcDashboardMonth||rbcMonthKey(); state.rbcDashboardMonth=ym;
@@ -1585,11 +1596,22 @@ function printPlasmaOutlabBatch(batchId){
     const completedProducts=products.filter(p=>rbcQcDone(ym,p.product_type)>=RBC_MONTHLY_TARGET_PER_PRODUCT).length;
     $('#view-module').innerHTML=`<div class="page-head"><div><h1>ภาพรวม RBC</h1><p class="muted">LPRC / LDPRC QC</p></div><div class="actions"><button class="btn" data-go-route="#/rbc/guide">คู่มือ RBC</button>${staffWriteUi()?'<button class="btn primary" id="rbcNewBtn">+ บันทึก RBC</button>':''}</div></div>
       <div class="grid cards">${metric('เดือนนี้',month.length,'รายการ RBC QC')}${metric('ครบ 4 ถุง',completedProducts,`จาก ${products.length} ชนิด`)}${metric('รอแพทย์ทบทวน',submitted,'Submitted')}${metric('QC ต้องตรวจสอบ',review,'ค่าบางรายการไม่เข้าเกณฑ์')}${metric('LOCK เดือนนี้',locked,'แพทย์ทบทวนแล้ว')}</div>
-      <div class="panel rbc-month-panel compact"><div class="section-title-row"><div><h2>ความครบถ้วน QC รายเดือน</h2><p class="muted">ติดตาม 4 ถุงต่อชนิด</p></div><div class="rbc-month-select"><label>เดือน</label><input id="rbcDashMonth" type="month" value="${esc(ym)}"></div></div><div class="rbc-progress-grid">${products.map(p=>rbcTargetCard(p,ym)).join('')}</div></div>
+      <div class="panel rbc-month-panel compact"><div class="section-title-row"><div><h2>ความครบถ้วน QC รายเดือน</h2><p class="muted">ติดตาม 4 ถุงต่อชนิด · คลิกการ์ดเพื่อดูรายละเอียด</p></div><div class="rbc-month-select"><label>เดือน</label><input id="rbcDashMonth" type="month" value="${esc(ym)}"></div></div><div class="rbc-progress-grid">${products.map(p=>rbcTargetCard(p,ym)).join('')}</div></div>
       <div class="panel"><h2>รายการล่าสุด</h2>${rbcRecordsTable(rec.slice(0,12))}</div>`;
     $('#rbcDashMonth').onchange=e=>{state.rbcDashboardMonth=e.target.value||rbcMonthKey();renderRbcDashboard();};
     if($('#rbcNewBtn'))$('#rbcNewBtn').onclick=()=>{state.currentRbcRecordId=null;location.hash=ROUTES.rbc.record;};
+    $$('.rbc-progress-card',$('#view-module')).forEach(b=>b.onclick=()=>openRbcProductSummary(b.dataset.product,ym));
     bindRouteButtons($('#view-module')); bindRbcRecordLinks($('#view-module'));
+  }
+  function openRbcProductSummary(productType,ym){
+    const dlg=ensureDetailDialogShell(),rows=state.rbcRecords.filter(r=>!r.deleted_at&&r.product_type===productType&&String(r.manufactured_on||'').slice(0,7)===ym).sort((a,b)=>String(a.manufactured_on||'').localeCompare(String(b.manufactured_on||''))||String(a.created_at||'').localeCompare(String(b.created_at||'')));
+    const target=RBC_MONTHLY_TARGET_PER_PRODUCT,done=rows.length;
+    $('#detailTitle').textContent=`RBC QC · ${productType}`;
+    $('#detailSubtitle').textContent=`${plateletMonthLabel(ym)} · ทำ QC แล้ว ${done}/${target} ถุง`;
+    const slots=Array.from({length:target},(_,i)=>{const r=rows[i];return r?`<div class="platelet-week-popup-row qc"><div><strong>ถุงที่ ${i+1}</strong><small>${esc(r.product_no)} · วันที่ผลิต ${esc(r.manufactured_on||'–')} · ${r.qc_status==='pass'?'ผ่านเกณฑ์ QC':r.qc_status==='review'?'ต้องตรวจสอบ QC':'ข้อมูล QC ยังไม่ครบ'}</small></div><button type="button" class="btn tiny-btn rbc-summary-open" data-id="${r.id}">ดูรายการ</button></div>`:`<div class="platelet-week-popup-row pending"><div><strong>ถุงที่ ${i+1}</strong><small>ยังไม่มีรายการ QC ในเดือนนี้</small></div><span class="badge incomplete">ยังไม่ได้เก็บ</span></div>`;}).join('');
+    const extra=rows.slice(target); const extraHtml=extra.length?`<div class="product-popup-extra"><strong>รายการเกินเป้าหมาย ${extra.length} ถุง</strong>${extra.map(r=>`<button type="button" class="btn small-btn rbc-summary-open" data-id="${r.id}">${esc(r.product_no)}</button>`).join('')}</div>`:'';
+    $('#detailBody').innerHTML=`<div class="platelet-week-popup-list">${slots}</div>${extraHtml}<div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="rbcSummaryClose">ปิด</button></div>`;
+    $$('.rbc-summary-open',$('#detailBody')).forEach(b=>b.onclick=()=>{dlg.close();openRbcDetail(b.dataset.id);}); $('#rbcSummaryClose').onclick=()=>dlg.close(); dlg.showModal();
   }
   function rbcRecordsTable(rows){
     if(!rows.length)return '<div class="empty">ยังไม่มีข้อมูล</div>';

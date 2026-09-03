@@ -393,3 +393,11 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 .platelet-week-popup-footer{justify-content:flex-end;margin-top:16px}
 @media(max-width:1180px){.platelet-progress-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.platelet-progress-grid{grid-template-columns:1fr}.platelet-week-popup-row{align-items:flex-start;flex-direction:column}.platelet-week-popup-actions{justify-content:flex-start}}
+
+
+/* v5.3.12 — clickable product overview cards + shared detail popups */
+.dashboard-product-card{width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;appearance:none;-webkit-appearance:none}
+.dashboard-product-card:hover{border-color:#cfd5df;box-shadow:0 3px 10px rgba(16,24,40,.06)}
+.dashboard-product-card:focus-visible{outline:2px solid #9e1d2d;outline-offset:2px}
+.product-popup-extra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.product-popup-extra>strong{font-size:12px;margin-right:4px}
