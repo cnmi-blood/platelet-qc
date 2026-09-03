@@ -236,3 +236,5 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 .reviewer-action-panel textarea{min-height:88px}
 .reviewer-action-panel .actions{justify-content:flex-end;margin-top:10px}
 @media(max-width:760px){.review-queue-panel .table-wrap{overflow:auto}.reviewer-action-panel .actions{display:grid;grid-template-columns:1fr}.reviewer-action-panel .btn{width:100%}}
+
+.outlab-batch-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0 8px;padding:10px 12px;border:1px solid var(--line,#e3e7ee);border-radius:12px;background:#fafbfc}.outlab-batch-toolbar .inline-check{margin:0}.outlab-batch-toolbar .small{text-align:right}@media(max-width:640px){.outlab-batch-toolbar{align-items:flex-start;flex-direction:column}.outlab-batch-toolbar .small{text-align:left}}

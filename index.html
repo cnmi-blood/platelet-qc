@@ -13,9 +13,9 @@
   <meta name="robots" content="noindex,nofollow" />
   <title>Blood QC</title>
   <link rel="icon" href="assets/platelet.svg" />
-  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=5.1.0" />
-  <link rel="manifest" href="manifest.webmanifest?v=5.1.0" />
-  <link rel="stylesheet" href="styles.css?v=5.1.0" />
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=5.2.0" />
+  <link rel="manifest" href="manifest.webmanifest?v=5.2.0" />
+  <link rel="stylesheet" href="styles.css?v=5.2.0" />
 </head>
 <body>
   <div id="toast" class="toast" aria-live="polite"></div>
@@ -115,9 +115,14 @@
           <button data-route="#/platelet/guide" id="plateletGuideTab">คู่มือ Platelet</button>
           <button data-route="#/platelet/qc_settings" id="settingsTab" class="hidden">ตั้งค่า Platelet QC</button>
 
+          <div class="sidebar-section-label">Plasma</div>
+          <button data-route="#/plasma" id="plasmaTab">ภาพรวม Plasma</button>
+          <button data-route="#/plasma/new" id="plasmaNewTab">บันทึก FFP</button>
+          <button data-route="#/plasma/records" id="plasmaRecordsTab">รายการ FFP</button>
+          <button data-route="#/plasma/qc_settings" id="plasmaSettingsTab" class="hidden">ตั้งค่า Plasma QC</button>
+
           <div class="sidebar-section-label">โมดูล</div>
           <button data-route="#/rbc" id="rbcTab">RBC <span class="nav-coming">เตรียมไว้</span></button>
-          <button data-route="#/plasma" id="plasmaTab">Plasma <span class="nav-coming">เตรียมไว้</span></button>
 
           <div id="reviewNavLabel" class="sidebar-section-label hidden">Review</div>
           <button data-route="#/review" id="reviewTab" class="hidden">งานรอตรวจทวน <span id="reviewCount" class="nav-count"></span></button>
@@ -165,7 +170,7 @@
           <section id="view-users" class="view hidden"></section>
           <section id="view-audit" class="view hidden"></section>
         </main>
-        <footer id="appFooter" class="footer">CNMI Blood Component QC · v5.1.0 · bloodqc.cnmiblood.com</footer>
+        <footer id="appFooter" class="footer">CNMI Blood Component QC · v5.2.0 · bloodqc.cnmiblood.com</footer>
       </div>
     </div>
   </div>
@@ -232,7 +237,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
-  <script src="pwa.js?v=5.1.0"></script>
-  <script src="app.js?v=5.1.0"></script>
+  <script src="pwa.js?v=5.2.0"></script>
+  <script src="app.js?v=5.2.0"></script>
 </body>
 </html>
