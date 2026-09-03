@@ -353,7 +353,7 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 @media(max-width:900px){.qc-progress-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.month-input{max-width:none;min-width:0}}
 @media(max-width:560px){.qc-progress-grid{grid-template-columns:1fr}.page-head .actions .month-input{width:100%}}
 
-/* v5.3.9 — QC tracking separated by product type */
+/* v5.3.10 — simplified user guides */
 .product-week-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
 .product-week-card,.type-progress-card{border:1px solid #e3e7ee;border-radius:14px;background:#fff;padding:14px;min-width:0}
 .product-week-head,.type-progress-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
@@ -373,3 +373,23 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 @media(max-width:1100px){.type-progress-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:900px){.product-week-grid{grid-template-columns:1fr}}
 @media(max-width:650px){.type-progress-grid{grid-template-columns:1fr}}
+
+
+/* v5.3.11 — Platelet dashboard aligned with FFP/RBC; weekly status moved to popup */
+.platelet-progress-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}
+.platelet-progress-card{appearance:none;-webkit-appearance:none;width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.03);transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease}
+.platelet-progress-card:hover{border-color:#c7ccd5;box-shadow:0 4px 14px rgba(16,24,40,.07);transform:translateY(-1px)}
+.platelet-progress-card:focus-visible{outline:3px solid rgba(158,29,45,.18);outline-offset:2px}
+.platelet-progress-card.complete{border-color:#b7ebcb;background:#f8fffb}
+.platelet-progress-card.complete .tracking-bar>span{background:#12b76a}
+.platelet-week-popup-list{display:grid;gap:10px}
+.platelet-week-popup-row{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--line);border-radius:12px;padding:13px 14px;background:#fff}
+.platelet-week-popup-row.qc{border-color:#b8e7ce;background:#f6fffa}
+.platelet-week-popup-row.no_pool{border-color:#f1d3a3;background:#fffaf1}
+.platelet-week-popup-row.pending{border-color:#efc4ca;background:#fff7f8}
+.platelet-week-popup-row strong{display:block;font-size:13px}
+.platelet-week-popup-row small{display:block;margin-top:3px;color:var(--muted);font-size:11px;line-height:1.4}
+.platelet-week-popup-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.platelet-week-popup-footer{justify-content:flex-end;margin-top:16px}
+@media(max-width:1180px){.platelet-progress-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.platelet-progress-grid{grid-template-columns:1fr}.platelet-week-popup-row{align-items:flex-start;flex-direction:column}.platelet-week-popup-actions{justify-content:flex-start}}

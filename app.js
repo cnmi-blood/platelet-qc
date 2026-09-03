@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.10 - simplified QC guides and corrected evidence guidance */
+/* CNMI Blood Component QC v5.3.11 - compact Platelet dashboard with weekly detail popup */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -86,10 +86,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.10 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.11 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.10 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.11 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -676,22 +676,43 @@
     const products=activePlateletTrackingProducts();
     const productSummaries=products.map(ps=>{const weeks=plateletWeeklySummary(ym,ps.product_type);const complete=weeks.filter(x=>x.complete).length;return {product_type:ps.product_type,weeks,complete};});
     const typesComplete=productSummaries.filter(x=>x.complete>=4).length;
-    const completeSlots=productSummaries.reduce((n,x)=>n+x.complete,0);
-    const expectedSlots=products.length*4;
     const noPool=productSummaries.reduce((n,x)=>n+x.weeks.filter(w=>w.status==='no_pool').length,0);
-    const productCards=productSummaries.map(p=>`<div class="product-week-card"><div class="product-week-head"><div><strong>${esc(p.product_type)}</strong><small>${p.complete}/4 สัปดาห์</small></div><span class="badge ${p.complete>=4?'pass':'incomplete'}">${p.complete>=4?'ครบ':'กำลังติดตาม'}</span></div><div class="product-week-slots">${p.weeks.map(w=>`<div class="product-week-slot ${w.status}"><div><strong>${esc(plateletWeekLabel(ym,w.slot))}</strong><small>${w.status==='qc'?`${w.qc.length} QC`:w.status==='no_pool'?'ไม่มี Pool · มีหลักฐาน':'รอดำเนินการ'}</small></div>${w.noPool.length?`<button class="btn tiny-btn weekly-evidence-view" data-event-id="${w.noPool[0].id}">หลักฐาน</button>`:''}</div>`).join('')}</div></div>`).join('');
+    const productCards=productSummaries.map(p=>{const remaining=Math.max(0,4-p.complete);return `<button type="button" class="type-progress-card platelet-progress-card ${p.complete>=4?'complete':''}" data-product-type="${esc(p.product_type)}"><div class="type-progress-head"><div><strong>${esc(p.product_type)}</strong><small>${p.complete}/4 สัปดาห์</small></div><span class="badge ${p.complete>=4?'pass':'incomplete'}">${p.complete>=4?'ครบ':`เหลือ ${remaining}`}</span></div><div class="tracking-bar"><span style="width:${Math.min(100,p.complete/4*100)}%"></span></div><div class="type-progress-foot"><span>ครบแล้ว <b>${p.complete}</b></span><span>เป้าหมาย 4 สัปดาห์</span></div></button>`;}).join('');
     $('#view-dashboard').innerHTML=`
       <div class="page-head"><div><h1>ภาพรวม Platelet</h1><p class="muted">Prepare และ QC</p></div><div class="actions"><input id="plateletDashMonth" class="month-input" type="month" value="${esc(ym)}">${staffWriteUi()?'<button class="btn" id="plateletNoPoolBtn">วันนี้ไม่มี Pool</button><button class="btn primary" id="dashNew">+ บันทึก Platelet</button>':''}${reviewerUi()?'<button class="btn" data-go-route="#/review">งานรอตรวจทวน</button>':''}</div></div>
       <div class="grid cards">
         ${metric('เดือนนี้',month.length,'รายการทั้งหมด')}${metric('ครบ 4 สัปดาห์',`${typesComplete}/${products.length||0}`,'แยกตามชนิดผลิตภัณฑ์')}${metric('QC จริง',qc,'รายการที่ใช้เป็น QC')}${metric('ไม่มี Pool',noPool,'สัปดาห์ที่มีหลักฐาน')}${metric('รอแพทย์ทบทวน',submitted,'เฉพาะ Platelet QC')}
       </div>
-      <div class="panel qc-tracking-panel"><div class="section-title-row"><div><h2>ติดตาม Platelet QC รายสัปดาห์ แยกชนิด</h2><p class="muted small">แต่ละชนิดติดตาม 4 ช่วงต่อเดือน: 1–7, 8–14, 15–21 และ 22–สิ้นเดือน</p></div><strong class="tracking-total">${completeSlots}/${expectedSlots}</strong></div><div class="product-week-grid">${productCards||'<div class="empty">ยังไม่มีชนิดผลิตภัณฑ์ที่เปิดใช้งาน</div>'}</div></div>
+      <div class="panel qc-tracking-panel"><div class="section-title-row"><div><h2>ติดตาม Platelet QC รายเดือน แยกชนิด</h2><p class="muted small">แต่ละชนิดติดตาม 4 สัปดาห์ต่อเดือน · คลิกการ์ดเพื่อดูว่าสัปดาห์ไหนยังไม่ได้เก็บ</p></div></div><div class="platelet-progress-grid">${productCards||'<div class="empty">ยังไม่มีชนิดผลิตภัณฑ์ที่เปิดใช้งาน</div>'}</div></div>
       ${wait?`<div class="notice info small"><strong>รอ pH ${wait} รายการ</strong> สามารถกลับมาเติมผลภายหลังได้</div>`:''}
       <div class="panel"><h2>รายการล่าสุด</h2>${recordsTable(rec.slice(0,12))}</div>`;
     $('#plateletDashMonth').onchange=e=>{state.plateletDashboardMonth=e.target.value||plateletMonthKey();renderDashboard();};
     if($('#plateletNoPoolBtn'))$('#plateletNoPoolBtn').onclick=openPlateletNoPoolDialog;
-    $$('.weekly-evidence-view',$('#view-dashboard')).forEach(b=>b.onclick=()=>viewPlateletWeeklyEvidence(b.dataset.eventId));
+    $$('.platelet-progress-card',$('#view-dashboard')).forEach(b=>b.onclick=()=>openPlateletWeekSummary(b.dataset.productType,ym));
     if($('#dashNew')) $('#dashNew').onclick=()=>{state.currentRecordId=null;switchView('record');}; bindRouteButtons($('#view-dashboard')); bindRecordLinks($('#view-dashboard'));
+  }
+
+  function plateletMonthLabel(ym){
+    const [y,m]=String(ym||'').split('-').map(Number);if(!y||!m)return ym||'';
+    return new Intl.DateTimeFormat('th-TH',{timeZone:'Asia/Bangkok',month:'long',year:'numeric'}).format(new Date(Date.UTC(y,m-1,1,12,0,0)));
+  }
+
+  function ensureDetailDialogShell(){
+    const dlg=$('#detailDialog');
+    if(!$('#detailTitle',dlg)||!$('#detailBody',dlg)) dlg.innerHTML=`<div class="dialog-head"><div><h2 id="detailTitle">รายละเอียด</h2><p id="detailSubtitle" class="muted"></p></div><button class="icon-btn" id="closeDetailBtn" aria-label="ปิด">×</button></div><div id="detailBody"></div>`;
+    const close=$('#closeDetailBtn',dlg);if(close)close.onclick=()=>dlg.close();
+    return dlg;
+  }
+
+  function openPlateletWeekSummary(productType,ym){
+    const dlg=ensureDetailDialogShell();
+    const weeks=plateletWeeklySummary(ym,productType),complete=weeks.filter(w=>w.complete).length;
+    $('#detailTitle').textContent=`Platelet QC · ${productType}`;
+    $('#detailSubtitle').textContent=`${plateletMonthLabel(ym)} · ครบ ${complete}/4 สัปดาห์`;
+    $('#detailBody').innerHTML=`<div class="platelet-week-popup-list">${weeks.map(w=>{const label=plateletWeekLabel(ym,w.slot);if(w.status==='qc')return `<div class="platelet-week-popup-row qc"><div><strong>${esc(label)}</strong><small>เก็บ QC แล้ว ${w.qc.length} รายการ</small></div><span class="badge pass">เก็บแล้ว</span></div>`;if(w.status==='no_pool')return `<div class="platelet-week-popup-row no_pool"><div><strong>${esc(label)}</strong><small>ไม่มี Pool และมีหลักฐานแล้ว</small></div><div class="platelet-week-popup-actions"><span class="badge draft">ไม่มี Pool</span><button type="button" class="btn tiny-btn weekly-evidence-view" data-event-id="${w.noPool[0].id}">ดูหลักฐาน</button></div></div>`;return `<div class="platelet-week-popup-row pending"><div><strong>${esc(label)}</strong><small>ยังไม่มี QC และยังไม่มีหลักฐานไม่มี Pool</small></div><span class="badge incomplete">ยังไม่ได้เก็บ</span></div>`;}).join('')}</div><div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="plateletWeekPopupClose">ปิด</button></div>`;
+    $$('.weekly-evidence-view',$('#detailBody')).forEach(b=>b.onclick=()=>viewPlateletWeeklyEvidence(b.dataset.eventId));
+    $('#plateletWeekPopupClose').onclick=()=>$('#detailDialog').close();
+    dlg.showModal();
   }
 
   async function viewPlateletWeeklyEvidence(eventId){
@@ -702,12 +723,15 @@
     if(!staffWriteUi()||!state.plateletWeeklyReady){showToast('กรุณา Run SQL v5.3.9 ก่อนใช้งานบันทึกไม่มี Pool','error');return;}
     let selectedFile=null;
     const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-    $('#detailDialog').innerHTML=`<div class="dialog-head"><div><h2>บันทึกวันนี้ไม่มี Pool</h2><p class="muted">บันทึกแยกตามชนิดผลิตภัณฑ์ พร้อมหลักฐาน</p></div><button class="icon-btn" id="noPoolClose">×</button></div><div class="detail-scroll"><div class="panel no-pool-dialog-panel"><div class="form-grid"><div class="field"><label class="required">วันที่</label><input id="noPoolDate" type="date" value="${esc(today)}"></div><div class="field"><label class="required">ชนิดผลิตภัณฑ์</label><select id="noPoolProduct"><option value="">เลือก</option>${activePlateletTrackingProducts().map(x=>`<option value="${esc(x.product_type)}">${esc(x.product_type)}</option>`).join('')}</select></div><div class="field span2"><label>หมายเหตุ</label><input id="noPoolNote" placeholder="เช่น วันนี้ไม่มีการ Pool / ไม่มีผลิตภัณฑ์ชนิดนี้"></div></div><div class="measurement-evidence"><div class="measurement-evidence-head"><strong>หลักฐานว่าไม่มี Pool</strong><span class="section-badge required-evidence">บังคับ</span></div><input class="hidden-file-input" type="file" id="noPoolCamera" accept="image/*" capture="environment"><input class="hidden-file-input" type="file" id="noPoolFile" accept="image/*,application/pdf"><div class="evidence-pick-actions"><button type="button" class="btn primary small-btn" id="noPoolCameraBtn">ถ่ายรูป</button><button type="button" class="btn small-btn" id="noPoolFileBtn">เลือกไฟล์ / PDF</button></div><div id="noPoolSelected" class="muted small">ยังไม่ได้เลือกหลักฐาน</div></div></div><div class="dialog-actions"><button class="btn" id="noPoolCancel">ยกเลิก</button><button class="btn primary" id="noPoolSave">บันทึกไม่มี Pool</button></div></div>`;
-    const dlg=$('#detailDialog');dlg.showModal();
+    const dlg=ensureDetailDialogShell();
+    $('#detailTitle').textContent='บันทึกวันนี้ไม่มี Pool';
+    $('#detailSubtitle').textContent='บันทึกแยกตามชนิดผลิตภัณฑ์ พร้อมหลักฐาน';
+    $('#detailBody').innerHTML=`<div class="panel no-pool-dialog-panel"><div class="form-grid"><div class="field"><label class="required">วันที่</label><input id="noPoolDate" type="date" value="${esc(today)}"></div><div class="field"><label class="required">ชนิดผลิตภัณฑ์</label><select id="noPoolProduct"><option value="">เลือก</option>${activePlateletTrackingProducts().map(x=>`<option value="${esc(x.product_type)}">${esc(x.product_type)}</option>`).join('')}</select></div><div class="field span2"><label>หมายเหตุ</label><input id="noPoolNote" placeholder="เช่น วันนี้ไม่มีการ Pool / ไม่มีผลิตภัณฑ์ชนิดนี้"></div></div><div class="measurement-evidence"><div class="measurement-evidence-head"><strong>หลักฐานว่าไม่มี Pool</strong><span class="section-badge required-evidence">บังคับ</span></div><input class="hidden-file-input" type="file" id="noPoolCamera" accept="image/*" capture="environment"><input class="hidden-file-input" type="file" id="noPoolFile" accept="image/*,application/pdf"><div class="evidence-pick-actions"><button type="button" class="btn primary small-btn" id="noPoolCameraBtn">ถ่ายรูป</button><button type="button" class="btn small-btn" id="noPoolFileBtn">เลือกไฟล์ / PDF</button></div><div id="noPoolSelected" class="muted small">ยังไม่ได้เลือกหลักฐาน</div></div></div><div class="actions platelet-week-popup-footer"><button class="btn" id="noPoolCancel">ยกเลิก</button><button class="btn primary" id="noPoolSave">บันทึกไม่มี Pool</button></div>`;
+    dlg.showModal();
     const setFile=f=>{selectedFile=f||null;$('#noPoolSelected').textContent=f?`เลือกแล้ว: ${f.name}`:'ยังไม่ได้เลือกหลักฐาน';};
     $('#noPoolCameraBtn').onclick=()=>$('#noPoolCamera').click();$('#noPoolFileBtn').onclick=()=>$('#noPoolFile').click();
     $('#noPoolCamera').onchange=e=>setFile(e.target.files?.[0]);$('#noPoolFile').onchange=e=>setFile(e.target.files?.[0]);
-    $('#noPoolClose').onclick=$('#noPoolCancel').onclick=()=>dlg.close();
+    $('#noPoolCancel').onclick=()=>dlg.close();
     $('#noPoolSave').onclick=async()=>{
       const eventDate=$('#noPoolDate').value,productType=$('#noPoolProduct').value,note=$('#noPoolNote').value.trim()||null;
       if(!eventDate){showToast('กรุณาระบุวันที่','error');return;}if(!productType){showToast('กรุณาเลือกชนิดผลิตภัณฑ์','error');return;}if(!selectedFile){showToast('ต้องแนบรูปหรือ PDF ที่แสดงว่าไม่มี Pool','error');return;}if(selectedFile.size>10*1024*1024){showToast('ไฟล์ต้องไม่เกิน 10 MB','error');return;}
