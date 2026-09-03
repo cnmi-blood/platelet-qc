@@ -303,3 +303,9 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 .platelet-repeat-table input{width:100%;min-width:160px}
 .platelet-detail-repeat-wrap{margin-top:14px}
 @media(max-width:650px){.platelet-repeat-wrap,.platelet-detail-repeat-wrap{max-width:100%}.platelet-repeat-table{min-width:340px}.platelet-repeat-table th:first-child{width:105px}}
+
+/* v5.3.4 Plasma dashboard: recent outlab batches, 5 per page */
+.batch-pager{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:14px;}
+.batch-pager strong{font-size:.92rem;color:var(--text,#1f2937);}
+.batch-pager .btn:disabled{opacity:.45;cursor:not-allowed;}
+@media (max-width:640px){.batch-pager{gap:8px}.batch-pager .btn{padding:8px 10px;}}
