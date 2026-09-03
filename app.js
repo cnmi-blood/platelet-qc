@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.6 - Editable FFP outlab batches + compact high-resolution send form */
+/* CNMI Blood Component QC v5.3.7 - RBC dashboard/list visual alignment with Platelet and Plasma */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -86,10 +86,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.3.6 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} module · v5.3.7 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.6 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.7 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -110,7 +110,7 @@
   function cfgReady(){ return C.SUPABASE_URL && C.SUPABASE_KEY && !C.SUPABASE_URL.includes('PASTE_') && !C.SUPABASE_KEY.includes('PASTE_'); }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'5.3.6',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.3.7',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -1467,16 +1467,19 @@ function printPlasmaOutlabBatch(batchId){
   function rbcQcDone(ym,type){ return state.rbcRecords.filter(r=>!r.deleted_at&&r.product_type===type&&String(r.manufactured_on||'').slice(0,7)===ym).length; }
   function rbcTargetCard(p,ym){
     const target=RBC_MONTHLY_TARGET_PER_PRODUCT,done=rbcQcDone(ym,p.product_type),remain=Math.max(0,target-done),complete=done>=target;
-    return `<article class="rbc-target-card" data-product="${esc(p.product_type)}"><div class="rbc-target-title"><strong>${esc(p.product_type)}</strong><span class="badge ${complete?'pass':''}">${complete?'ครบเดือนนี้':esc(rbcProductClassTH(p.product_class))}</span></div><div class="rbc-target-stats rbc-target-stats-simple"><div><span>เป้าหมาย</span><b>${target}</b></div><div><span>ทำ QC แล้ว</span><b>${done}</b></div><div><span>เหลือ</span><b>${remain}</b></div></div></article>`;
+    const pct=Math.min(100,Math.round((done/target)*100));
+    return `<article class="rbc-progress-card ${complete?'complete':''}" data-product="${esc(p.product_type)}"><div class="rbc-progress-head"><div><strong>${esc(p.product_type)}</strong><small>${esc(rbcProductClassTH(p.product_class))}</small></div><span class="badge ${complete?'pass':''}">${complete?'ครบแล้ว':done+' / '+target}</span></div><div class="rbc-progress-track"><span style="width:${pct}%"></span></div><div class="rbc-progress-foot"><span>ทำ QC แล้ว <b>${done}</b></span><span>${complete?'ครบเป้าหมาย':`เหลือ ${remain}`}</span></div></article>`;
   }
   function renderRbcDashboard(){
     const ym=state.rbcDashboardMonth||rbcMonthKey(); state.rbcDashboardMonth=ym;
     const rec=state.rbcRecords.filter(r=>!r.deleted_at);
     const month=rec.filter(r=>String(r.manufactured_on||'').slice(0,7)===ym);
     const submitted=rec.filter(r=>r.status==='submitted').length, locked=month.filter(r=>r.status==='locked').length, review=month.filter(r=>r.qc_status==='review').length;
+    const products=activeRbcProducts();
+    const completedProducts=products.filter(p=>rbcQcDone(ym,p.product_type)>=RBC_MONTHLY_TARGET_PER_PRODUCT).length;
     $('#view-module').innerHTML=`<div class="page-head"><div><h1>ภาพรวม RBC</h1><p class="muted">LPRC / LDPRC QC</p></div><div class="actions"><button class="btn" data-go-route="#/rbc/guide">คู่มือ RBC</button>${staffWriteUi()?'<button class="btn primary" id="rbcNewBtn">+ บันทึก RBC</button>':''}</div></div>
-      <div class="panel rbc-month-panel"><div class="section-title-row"><div><h2>QC รายเดือน</h2><p class="muted">เป้าหมายเบื้องต้น 4 ถุงต่อชนิด · บันทึกเกิน 4 ได้</p></div><div class="rbc-month-select"><label>เดือน</label><input id="rbcDashMonth" type="month" value="${esc(ym)}"></div></div><div class="rbc-target-grid">${activeRbcProducts().map(p=>rbcTargetCard(p,ym)).join('')}</div></div>
-      <div class="grid cards">${metric('QC เดือนนี้',month.length,'รายการ')}${metric('รอแพทย์ทบทวน',submitted,'Submitted')}${metric('QC ต้องตรวจสอบ',review,'ค่าบางรายการไม่เข้าเกณฑ์')}${metric('LOCK เดือนนี้',locked,'แพทย์ทบทวนแล้ว')}</div>
+      <div class="grid cards">${metric('เดือนนี้',month.length,'รายการ RBC QC')}${metric('ครบ 4 ถุง',completedProducts,`จาก ${products.length} ชนิด`)}${metric('รอแพทย์ทบทวน',submitted,'Submitted')}${metric('QC ต้องตรวจสอบ',review,'ค่าบางรายการไม่เข้าเกณฑ์')}${metric('LOCK เดือนนี้',locked,'แพทย์ทบทวนแล้ว')}</div>
+      <div class="panel rbc-month-panel compact"><div class="section-title-row"><div><h2>ความครบถ้วน QC รายเดือน</h2><p class="muted">ติดตาม 4 ถุงต่อชนิด</p></div><div class="rbc-month-select"><label>เดือน</label><input id="rbcDashMonth" type="month" value="${esc(ym)}"></div></div><div class="rbc-progress-grid">${products.map(p=>rbcTargetCard(p,ym)).join('')}</div></div>
       <div class="panel"><h2>รายการล่าสุด</h2>${rbcRecordsTable(rec.slice(0,12))}</div>`;
     $('#rbcDashMonth').onchange=e=>{state.rbcDashboardMonth=e.target.value||rbcMonthKey();renderRbcDashboard();};
     if($('#rbcNewBtn'))$('#rbcNewBtn').onclick=()=>{state.currentRbcRecordId=null;location.hash=ROUTES.rbc.record;};
@@ -1490,7 +1493,7 @@ function printPlasmaOutlabBatch(batchId){
   function renderRbcRecordsList(){
     const products=activeRbcProducts();
     const del=adminUi()?`<label class="inline-check"><input type="checkbox" id="rbcDeleted" ${state.showDeletedRbc?'checked':''}> แสดงรายการที่ลบแล้ว</label>`:'';
-    $('#view-module').innerHTML=`<div class="page-head"><div><h1>รายการ RBC</h1><p class="muted">QC LPRC / LDPRC</p></div><div class="actions"><button class="btn" id="rbcCsv">Export CSV</button><button class="btn" data-go-route="#/rbc/guide">คู่มือ RBC</button>${staffWriteUi()?'<button class="btn primary" id="rbcNewList">+ บันทึก RBC</button>':''}</div></div><div class="panel"><div class="filter-grid rbc-filter-grid"><input id="rbcSearch" placeholder="ค้นหา Product No."><select id="rbcProductFilter"><option value="">ทุกผลิตภัณฑ์</option>${products.map(p=>`<option value="${esc(p.product_type)}">${esc(p.product_type)}</option>`).join('')}</select><select id="rbcStatusFilter"><option value="">ทุกสถานะ</option><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="locked">LOCK</option></select><select id="rbcQcFilter"><option value="">ทุกผล QC</option><option value="incomplete">ข้อมูลยังไม่ครบ</option><option value="pass">ผ่าน</option><option value="review">ต้องตรวจสอบ</option></select><button class="btn" id="rbcClearFilter">ล้าง</button></div>${del}<div id="rbcRecordsHost"></div></div>`;
+    $('#view-module').innerHTML=`<div class="page-head"><div><h1>รายการ RBC</h1><p class="muted">QC LPRC / LDPRC</p></div><div class="actions"><button class="btn" id="rbcCsv">Export CSV</button><button class="btn" data-go-route="#/rbc/guide">คู่มือ RBC</button>${staffWriteUi()?'<button class="btn primary" id="rbcNewList">+ บันทึก RBC</button>':''}</div></div><div class="panel"><div class="filters rbc-filters"><input id="rbcSearch" placeholder="ค้นหา Product No. / ผลิตภัณฑ์"><select id="rbcProductFilter"><option value="">ทุกผลิตภัณฑ์</option>${products.map(p=>`<option value="${esc(p.product_type)}">${esc(p.product_type)}</option>`).join('')}</select><select id="rbcStatusFilter"><option value="">ทุกสถานะ</option><option value="draft">ร่าง</option><option value="submitted">รอตรวจทวน</option><option value="locked">LOCK</option></select><select id="rbcQcFilter"><option value="">ทุกผล QC</option><option value="incomplete">ข้อมูลยังไม่ครบ</option><option value="pass">ผ่านเกณฑ์ QC</option><option value="review">ต้องตรวจสอบ QC</option></select><button class="btn" id="rbcClearFilter">ล้าง</button></div>${del}<div id="rbcRecordsHost" style="margin-top:12px"></div></div>`;
     const render=()=>{const q=$('#rbcSearch').value.trim().toLowerCase(),pt=$('#rbcProductFilter').value,st=$('#rbcStatusFilter').value,qc=$('#rbcQcFilter').value;let rows=state.rbcRecords.filter(r=>(state.showDeletedRbc||!r.deleted_at)&&(!q||`${r.product_no} ${r.product_type}`.toLowerCase().includes(q))&&(!pt||r.product_type===pt)&&(!st||r.status===st)&&(!qc||r.qc_status===qc));$('#rbcRecordsHost').innerHTML=rbcRecordsTable(rows);bindRbcRecordLinks($('#rbcRecordsHost'));};
     ['rbcSearch','rbcProductFilter','rbcStatusFilter','rbcQcFilter'].forEach(id=>$('#'+id).addEventListener(id==='rbcSearch'?'input':'change',render));
     $('#rbcClearFilter').onclick=()=>{$('#rbcSearch').value='';$('#rbcProductFilter').value='';$('#rbcStatusFilter').value='';$('#rbcQcFilter').value='';render();};

@@ -315,3 +315,22 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 /* v5.3.6 Plasma outlab batch correction actions */
 .batch-actions{display:flex;align-items:center;gap:6px;white-space:nowrap}
 @media(max-width:640px){.batch-actions{flex-direction:column;align-items:stretch}.batch-actions .btn{width:100%}}
+
+/* v5.3.7 — RBC dashboard/list aligned with Platelet & Plasma */
+.rbc-month-panel.compact{margin-top:0;margin-bottom:18px}
+.rbc-progress-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.rbc-progress-card{border:1px solid var(--line);border-radius:14px;background:#fff;padding:13px 14px;box-shadow:0 1px 2px rgba(16,24,40,.03)}
+.rbc-progress-card.complete{border-color:#b7ebcb;background:#f8fffb}
+.rbc-progress-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.rbc-progress-head strong{display:block;font-size:13px;line-height:1.35;color:var(--text)}
+.rbc-progress-head small{display:block;margin-top:3px;color:var(--muted);font-size:10.5px;font-weight:700}
+.rbc-progress-track{height:6px;border-radius:99px;background:#eef1f4;overflow:hidden;margin:12px 0 8px}
+.rbc-progress-track span{display:block;height:100%;border-radius:99px;background:#a21f32}
+.rbc-progress-card.complete .rbc-progress-track span{background:#12b76a}
+.rbc-progress-foot{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:11px}
+.rbc-progress-foot b{color:var(--text)}
+.rbc-filters{grid-template-columns:1.45fr 1.25fr 1fr 1.1fr auto}
+.rbc-records-table th,.rbc-records-table td{vertical-align:middle}
+@media(max-width:1180px){.rbc-progress-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1000px){.rbc-filters{grid-template-columns:1fr 1fr}.rbc-filters .btn{width:100%}}
+@media(max-width:650px){.rbc-progress-grid{grid-template-columns:1fr}.rbc-filters{grid-template-columns:1fr}}
