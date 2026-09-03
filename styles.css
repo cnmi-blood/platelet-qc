@@ -352,3 +352,24 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 .no-pool-dialog-panel{margin:0;box-shadow:none}
 @media(max-width:900px){.qc-progress-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.month-input{max-width:none;min-width:0}}
 @media(max-width:560px){.qc-progress-grid{grid-template-columns:1fr}.page-head .actions .month-input{width:100%}}
+
+/* v5.3.9 — QC tracking separated by product type */
+.product-week-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
+.product-week-card,.type-progress-card{border:1px solid #e3e7ee;border-radius:14px;background:#fff;padding:14px;min-width:0}
+.product-week-head,.type-progress-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
+.product-week-head>div,.type-progress-head>div{min-width:0}
+.product-week-head strong,.type-progress-head strong{display:block;overflow-wrap:anywhere}
+.product-week-head small,.type-progress-head small{display:block;color:var(--muted);margin-top:3px}
+.product-week-slots{display:grid;gap:7px}
+.product-week-slot{border:1px solid #edf0f4;background:#fafbfc;border-radius:10px;padding:9px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.product-week-slot.qc{border-color:#b8e7ce;background:#f6fffa}
+.product-week-slot.no_pool{border-color:#f1d3a3;background:#fffaf1}
+.product-week-slot strong{font-size:12px;display:block}
+.product-week-slot small{font-size:11px;color:var(--muted);display:block;margin-top:2px}
+.tiny-btn{padding:5px 8px;font-size:11px;min-height:auto}
+.type-progress-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}
+.type-progress-foot{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:11px;margin-top:8px}
+.type-progress-foot b{color:var(--text)}
+@media(max-width:1100px){.type-progress-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:900px){.product-week-grid{grid-template-columns:1fr}}
+@media(max-width:650px){.type-progress-grid{grid-template-columns:1fr}}
