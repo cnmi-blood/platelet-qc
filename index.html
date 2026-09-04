@@ -15,7 +15,7 @@
   <link rel="icon" href="assets/platelet.svg" />
   <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=5.3.4" />
   <link rel="manifest" href="manifest.webmanifest?v=5.3.4" />
-  <link rel="stylesheet" href="styles.css?v=5.3.16" />
+  <link rel="stylesheet" href="styles.css?v=5.3.17" />
 </head>
 <body>
   <div id="toast" class="toast" aria-live="polite"></div>
@@ -147,6 +147,10 @@
             </div>
           </div>
 
+          <div class="nav-utility-group">
+            <button data-route="#/nonconformance" id="nonconformanceTab">QC Fail / Corrective Action <span id="ncCount" class="nav-count"></span></button>
+          </div>
+
           <div id="reviewNavLabel" class="nav-utility-group hidden">
             <button data-route="#/review" id="reviewTab" class="hidden">งานรอตรวจทวน <span id="reviewCount" class="nav-count"></span></button>
           </div>
@@ -198,6 +202,7 @@
           <section id="view-settings" class="view hidden"></section>
           <section id="view-module" class="view hidden"></section>
           <section id="view-review" class="view hidden"></section>
+          <section id="view-nonconformance" class="view hidden"></section>
           <section id="view-users" class="view hidden"></section>
           <section id="view-audit" class="view hidden"></section>
         </main>
@@ -269,6 +274,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="pwa.js?v=5.3.4"></script>
-  <script src="app.js?v=5.3.16"></script>
+  <script src="app.js?v=5.3.17"></script>
 </body>
 </html>
