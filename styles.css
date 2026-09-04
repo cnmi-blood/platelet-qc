@@ -104,11 +104,17 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
   body{padding-bottom:0}
   .topbar{height:var(--topbar-h);padding:8px 10px}.mobile-menu-btn{display:inline-grid;place-items:center}.topbar .brand img{width:36px;height:36px}.topbar .brand strong{font-size:14px}.topbar .brand span{font-size:10px;display:block}.topbar-mode{margin-left:auto}.mode-badge{padding:5px 8px;font-size:11px}
   .app-layout{min-height:calc(100vh - var(--topbar-h))}
-  .sidebar{position:fixed;left:0;top:var(--topbar-h);bottom:0;height:auto;width:min(290px,86vw);transform:translateX(-105%);transition:transform .2s ease;box-shadow:12px 0 36px rgba(16,24,40,.16);z-index:95}
+  .sidebar{position:fixed;left:0;top:var(--topbar-h);bottom:0;height:auto;width:min(340px,92vw);transform:translateX(-105%);transition:transform .2s ease;box-shadow:12px 0 36px rgba(16,24,40,.16);z-index:95;padding:18px 14px 16px}
   .sidebar.open{transform:translateX(0)}
   .sidebar-backdrop{display:block;position:fixed;left:0;right:0;top:var(--topbar-h);bottom:0;border:0;background:rgba(16,24,40,.36);z-index:90}.sidebar-backdrop.hidden{display:none!important}
-  .sidebar .tabs{position:static;height:auto;display:grid;grid-template-columns:1fr;padding:0;box-shadow:none;border:0}
-  .sidebar .tabs button{font-size:14px;padding:12px}.sidebar .tabs button.active{border:0;background:var(--primary-soft)}
+  .sidebar .tabs{position:static;height:auto;display:flex;flex-direction:column;gap:8px;padding:0;box-shadow:none;border:0}
+  .nav-module-group,.nav-utility-group,.admin-nav-group{display:flex;flex-direction:column;gap:6px}
+  .sidebar .tabs button{width:100%;font-size:17px;line-height:1.3;padding:14px 14px;border-radius:14px;white-space:normal;word-break:break-word}
+  .sidebar .tabs .nav-group-head{font-size:18px;padding:16px 14px}
+  .sidebar .tabs .nav-submenu button{font-size:16px;padding:12px 12px;font-weight:700}
+  .sidebar .tabs button.active{border:0;background:var(--primary-soft)}
+  .sidebar-title{font-size:14px}
+  .sidebar-section-label{font-size:13px;margin:14px 8px 4px}
   .content-shell .container{padding:16px 10px 90px}.content-shell .footer{display:none}
   .sticky-actions{bottom:10px}
   .toast{bottom:14px}
@@ -183,7 +189,7 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 .core-admin-panel{margin-top:4px}.left-actions{justify-content:flex-start}.breadcrumb{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12px;margin-bottom:7px}.breadcrumb .link-btn{font-size:12px}
 .module-placeholder-panel{max-width:900px}.module-placeholder-panel h2{font-size:24px;margin-top:14px}.route-plan{display:grid;gap:8px;margin-top:18px}.route-plan>div{display:grid;grid-template-columns:180px 1fr;gap:10px;align-items:center;padding:10px 12px;background:#f9fafb;border:1px solid var(--line);border-radius:10px}.route-plan span{font-weight:750;color:#475467}.route-plan code{font-size:12px;word-break:break-all}
 @media(max-width:1000px){.module-grid{grid-template-columns:1fr}.module-card{min-height:0}.route-plan>div{grid-template-columns:1fr}}
-@media(max-width:760px){.module-card{padding:15px;border-radius:15px}.module-card h2{font-size:21px}.module-card-head{gap:8px}.module-actions{display:grid;grid-template-columns:1fr 1fr}.module-actions .btn:first-child:last-child{grid-column:1/-1}.route-plan>div{padding:9px 10px}.breadcrumb{flex-wrap:wrap}}
+@media(max-width:760px){.module-card{padding:15px;border-radius:15px}.module-card h2{font-size:21px}.module-card-head{gap:8px}.module-actions{display:grid;grid-template-columns:1fr 1fr}.module-actions .btn{min-height:54px;font-size:15px}.module-actions .btn:first-child:last-child{grid-column:1/-1}.route-plan>div{padding:9px 10px}.breadcrumb{flex-wrap:wrap}}
 
 /* v5.0.5 cleaner Platelet form + in-app guide */
 .page-head-tools{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}.page-head-tools .status-line{margin:0}
@@ -266,14 +272,14 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 .sidebar-title-row .sidebar-title{flex:1;min-width:0;padding-bottom:2px}
 .sidebar-collapse-btn{display:inline-grid;place-items:center;width:30px;height:30px;flex:none;border:1px solid var(--line);border-radius:9px;background:#fff;color:#667085;font-size:22px;line-height:1;cursor:pointer}
 .sidebar-collapse-btn:hover{background:#f8f9fb;color:var(--primary)}
-.nav-module-group{display:grid;gap:3px;margin-top:5px}
-.sidebar .tabs .nav-group-head{display:flex;align-items:center;gap:7px;font-weight:800}
+.nav-module-group{display:grid;gap:3px;margin-top:5px;width:100%}
+.sidebar .tabs .nav-group-head{display:flex;align-items:center;gap:7px;font-weight:800;width:100%;justify-content:space-between;line-height:1.25}
 .nav-group-head>span:first-child{min-width:0;flex:1}
 .nav-chevron{margin-left:auto;color:#98a2b3;font-size:13px;transition:transform .18s ease}
 .nav-module-group.expanded>.nav-group-head .nav-chevron{transform:rotate(180deg)}
 .nav-module-group.current-group>.nav-group-head{color:#344054}
 .nav-module-group.current-group>.nav-group-head.active{color:var(--primary)}
-.nav-submenu{display:none;gap:3px;padding:2px 0 4px 12px;margin-left:10px;border-left:2px solid #f0d6da}
+.nav-submenu{display:none;gap:3px;padding:2px 0 4px 12px;margin-left:10px;border-left:2px solid #f0d6da;width:100%}
 .nav-submenu.nav-submenu-open{display:grid}
 .sidebar .tabs .nav-submenu button{padding:9px 10px;font-size:13px;font-weight:700}
 .nav-utility-group{margin-top:8px}
@@ -283,9 +289,10 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 #appShell.sidebar-collapsed .sidebar{width:0;padding-left:0;padding-right:0;border-right:0;opacity:0;overflow:hidden;pointer-events:none}
 #appShell.sidebar-collapsed .content-shell{width:100%}
 @media(max-width:900px){
-  #appShell.sidebar-collapsed .sidebar{width:min(290px,86vw);padding:16px 12px 14px;border-right:1px solid var(--line);opacity:1;pointer-events:auto}
+  #appShell.sidebar-collapsed .sidebar{width:min(340px,92vw);padding:18px 14px 16px;border-right:1px solid var(--line);opacity:1;pointer-events:auto}
   .sidebar-collapse-btn{display:none}
-  .nav-submenu{padding-left:10px;margin-left:8px}
+  .nav-submenu{display:none;padding:6px 0 0 12px;margin-left:0;border-left:2px solid #f0d6da;gap:6px}
+  .nav-submenu.nav-submenu-open{display:flex;flex-direction:column}
 }
 
 /* v5.3.1 — RBC QC */

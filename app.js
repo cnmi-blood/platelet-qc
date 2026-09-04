@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.12 - product overview popups for Platelet, Plasma and RBC */
+/* CNMI Blood Component QC v5.3.14 - clearer weekly no-product flow + improved mobile navigation */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -86,10 +86,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.12 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.14 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.12 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.14 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -616,7 +616,7 @@
         <article class="module-card active-module">
           <div class="module-card-head"><div><h2>Platelet</h2><p>Preparation & QC</p></div><span class="module-status live">ใช้งานจริง</span></div>
           <div class="module-stats"><span><strong>${month.length}</strong> รายการเดือนนี้</span><span><strong>${qc}</strong> ใช้เป็น QC</span></div>
-          <div class="module-actions"><button class="btn primary" data-go-route="#/platelet">ภาพรวม</button>${staffWriteUi()?'<button class="btn" data-go-route="#/platelet/new">บันทึกใหม่</button>':''}<button class="btn" data-go-route="#/platelet/records">รายการ</button><button class="btn" data-go-route="#/platelet/guide">คู่มือ</button></div>
+          <div class="module-actions"><button class="btn primary" data-go-route="#/platelet">ภาพรวม</button>${staffWriteUi()?'<button class="btn" data-go-route="#/platelet/new">บันทึก Platelet</button>':''}<button class="btn" data-go-route="#/platelet/records">รายการ</button><button class="btn" data-go-route="#/platelet/guide">คู่มือ</button></div>
         </article>
         ${plasmaModuleCard()}
         ${rbcModuleCard()}
@@ -636,7 +636,7 @@
     const ym=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit'}).format(new Date()).replace('/','-');
     const month=state.plasmaRecords.filter(r=>!r.deleted_at&&String(r.manufactured_on||'').slice(0,7)===ym);
     const waiting=state.plasmaRecords.filter(r=>!r.deleted_at&&r.outlab_batch_id&&r.factor_viii_percent==null).length;
-    return `<article class="module-card active-module"><div class="module-card-head"><div><h2>Plasma</h2><p>FFP · Factor VIII QC</p></div><span class="module-status live">ใช้งานจริง</span></div><div class="module-stats"><span><strong>${month.length}</strong> รายการเดือนนี้</span><span><strong>${waiting}</strong> รอผล Factor VIII</span></div><div class="module-actions"><button class="btn primary" data-go-route="#/plasma">ภาพรวม</button>${staffWriteUi()?'<button class="btn" data-go-route="#/plasma/new">บันทึก FFP</button>':''}<button class="btn" data-go-route="#/plasma/records">รายการ</button></div></article>`;
+    return `<article class="module-card active-module"><div class="module-card-head"><div><h2>Plasma</h2><p>FFP · Factor VIII QC</p></div><span class="module-status live">ใช้งานจริง</span></div><div class="module-stats"><span><strong>${month.length}</strong> รายการเดือนนี้</span><span><strong>${waiting}</strong> รอผล Factor VIII</span></div><div class="module-actions"><button class="btn primary" data-go-route="#/plasma">ภาพรวม</button>${staffWriteUi()?'<button class="btn" data-go-route="#/plasma/new">บันทึก FFP</button>':''}<button class="btn" data-go-route="#/plasma/records">รายการ</button><button class="btn" data-go-route="#/plasma/guide">คู่มือ</button></div></article>`;
   }
 
   function renderPlateletGuide(){
@@ -644,7 +644,7 @@
       <div class="page-head"><div><h1>คู่มือ Platelet</h1><p class="muted">วิธีบันทึกและเก็บ QC ให้ครบ</p></div><div class="actions">${staffWriteUi()?'<button class="btn primary" data-go-route="#/platelet/new">+ บันทึก Platelet</button>':''}</div></div>
       <div class="notice warning"><strong>ทุกผลต้องมีหลักฐาน:</strong> ถ้ากรอกผล CBC, ADAM หรือ pH ต้องแนบรูปหรือ PDF ของผลส่วนนั้นก่อนบันทึก</div>
       <div class="guide-grid">
-        <section class="guide-card"><div class="guide-no">1</div><div><h2>เช็ก QC ของแต่ละสัปดาห์</h2><p>Platelet ติดตามแยกตามชนิดผลิตภัณฑ์ เดือนละ 4 ช่วง: วันที่ 1–7, 8–14, 15–21 และ 22–สิ้นเดือน</p><p>ถ้าถุงแรกของชนิดนั้นในสัปดาห์นั้นยังไม่มี QC ระบบจะเลือก <strong>ใช้เป็น QC</strong> ให้เอง</p><div class="guide-callout">ถ้าวันนั้นไม่มี Pool ให้กด <strong>วันนี้ไม่มี Pool</strong> เลือกชนิดผลิตภัณฑ์ และแนบรูปหรือ PDF ที่ยืนยันว่าไม่มี Pool</div></div></section>
+        <section class="guide-card"><div class="guide-no">1</div><div><h2>เช็ก QC ของแต่ละสัปดาห์</h2><p>Platelet ติดตามแยกตามชนิดผลิตภัณฑ์ เดือนละ 4 สัปดาห์ โดยใช้ สัปดาห์ 1–4 ตามตารางตำแหน่งใน App Staff Planner</p><p>ถ้าถุงแรกของชนิดนั้นในสัปดาห์นั้นยังไม่มี QC ระบบจะเลือก <strong>ใช้เป็น QC</strong> ให้เอง</p><div class="guide-callout">ถ้าสัปดาห์นั้นไม่มีการเตรียมผลิตภัณฑ์ ให้กด <strong>ไม่มีผลิตภัณฑ์สัปดาห์นี้</strong> เลือกชนิดผลิตภัณฑ์ และแนบรูปหรือ PDF ที่ยืนยันเหตุผล เช่น ไม่มีผู้บริจาค SDP หรือไม่มีถุงให้ Pool Platelet</div></div></section>
         <section class="guide-card"><div class="guide-no">2</div><div><h2>กรอกข้อมูลถุง</h2><p>กรอก Product No., ชนิดผลิตภัณฑ์, Group, วัน-เวลาเริ่มเจาะ และน้ำหนักที่ชั่งได้เป็น g</p><div class="guide-callout">ระบบใส่น้ำหนักถุงเปล่าและ Density ให้ แล้วคำนวณ Volume ให้อัตโนมัติ</div></div></section>
         <section class="guide-card"><div class="guide-no">3</div><div><h2>LDPPC: กรอก Pool PYI</h2><p>กรอก Unit No. และ PYI จำนวน 3–6 ถุง ระบบรวม Pool PYI ให้</p><div class="guide-rule-row"><span class="guide-rule good">PYI ≥ ${fmt(state.settings.pool_pyi_standard_min,0)} · ปกติ</span><span class="guide-rule warn">${fmt(state.settings.pool_pyi_conditional_min,0)}–${fmt(state.settings.pool_pyi_standard_min-1,0)} · กรณีจำเป็น</span></div><p>ถ้าอยู่ช่วงกรณีจำเป็น ให้ดู Platelet yield เพิ่ม โดยต้องได้ ≥ ${fmt(state.settings.pool_conditional_yield_min,2)} ×10¹¹ cells/unit</p></div></section>
         <section class="guide-card"><div class="guide-no">4</div><div><h2>กรอกผล CBC, ADAM และ pH</h2><p>แต่ละผลกรอกต่างวันหรือต่างคนได้ ให้ใส่วัน-เวลาที่ตรวจจริงของผลนั้น</p><p>ถ้า pH ไม่ได้วัดในวันหมดอายุ ให้ใส่เหตุผลตามที่ระบบถาม</p></div></section>
@@ -679,11 +679,11 @@
     const noPool=productSummaries.reduce((n,x)=>n+x.weeks.filter(w=>w.status==='no_pool').length,0);
     const productCards=productSummaries.map(p=>{const remaining=Math.max(0,4-p.complete);return `<button type="button" class="type-progress-card platelet-progress-card ${p.complete>=4?'complete':''}" data-product-type="${esc(p.product_type)}"><div class="type-progress-head"><div><strong>${esc(p.product_type)}</strong><small>${p.complete}/4 สัปดาห์</small></div><span class="badge ${p.complete>=4?'pass':'incomplete'}">${p.complete>=4?'ครบ':`เหลือ ${remaining}`}</span></div><div class="tracking-bar"><span style="width:${Math.min(100,p.complete/4*100)}%"></span></div><div class="type-progress-foot"><span>ครบแล้ว <b>${p.complete}</b></span><span>เป้าหมาย 4 สัปดาห์</span></div></button>`;}).join('');
     $('#view-dashboard').innerHTML=`
-      <div class="page-head"><div><h1>ภาพรวม Platelet</h1><p class="muted">Prepare และ QC</p></div><div class="actions"><input id="plateletDashMonth" class="month-input" type="month" value="${esc(ym)}">${staffWriteUi()?'<button class="btn" id="plateletNoPoolBtn">วันนี้ไม่มี Pool</button><button class="btn primary" id="dashNew">+ บันทึก Platelet</button>':''}${reviewerUi()?'<button class="btn" data-go-route="#/review">งานรอตรวจทวน</button>':''}</div></div>
+      <div class="page-head"><div><h1>ภาพรวม Platelet</h1><p class="muted">Prepare และ QC</p></div><div class="actions"><input id="plateletDashMonth" class="month-input" type="month" value="${esc(ym)}"><button class="btn" data-go-route="#/platelet/guide">คู่มือ Platelet</button>${staffWriteUi()?'<button class="btn" id="plateletNoPoolBtn">ไม่มีผลิตภัณฑ์สัปดาห์นี้</button><button class="btn primary" id="dashNew">+ บันทึก Platelet</button>':''}${reviewerUi()?'<button class="btn" data-go-route="#/review">งานรอตรวจทวน</button>':''}</div></div>
       <div class="grid cards">
-        ${metric('เดือนนี้',month.length,'รายการทั้งหมด')}${metric('ครบ 4 สัปดาห์',`${typesComplete}/${products.length||0}`,'แยกตามชนิดผลิตภัณฑ์')}${metric('QC จริง',qc,'รายการที่ใช้เป็น QC')}${metric('ไม่มี Pool',noPool,'สัปดาห์ที่มีหลักฐาน')}${metric('รอแพทย์ทบทวน',submitted,'เฉพาะ Platelet QC')}
+        ${metric('เดือนนี้',month.length,'รายการทั้งหมด')}${metric('ครบ 4 สัปดาห์',`${typesComplete}/${products.length||0}`,'แยกตามชนิดผลิตภัณฑ์')}${metric('QC จริง',qc,'รายการที่ใช้เป็น QC')}${metric('ไม่มีผลิตภัณฑ์',noPool,'สัปดาห์ที่มีหลักฐาน')}${metric('รอแพทย์ทบทวน',submitted,'เฉพาะ Platelet QC')}
       </div>
-      <div class="panel qc-tracking-panel"><div class="section-title-row"><div><h2>ติดตาม Platelet QC รายเดือน แยกชนิด</h2><p class="muted small">แต่ละชนิดติดตาม 4 สัปดาห์ต่อเดือน · คลิกการ์ดเพื่อดูว่าสัปดาห์ไหนยังไม่ได้เก็บ</p></div></div><div class="platelet-progress-grid">${productCards||'<div class="empty">ยังไม่มีชนิดผลิตภัณฑ์ที่เปิดใช้งาน</div>'}</div></div>
+      <div class="panel qc-tracking-panel"><div class="section-title-row"><div><h2>ติดตาม Platelet QC รายเดือน แยกชนิด</h2><p class="muted small">แต่ละชนิดติดตาม 4 สัปดาห์ต่อเดือน · คลิกการ์ดเพื่อดูสถานะแต่ละสัปดาห์</p></div></div><div class="platelet-progress-grid">${productCards||'<div class="empty">ยังไม่มีชนิดผลิตภัณฑ์ที่เปิดใช้งาน</div>'}</div></div>
       ${wait?`<div class="notice info small"><strong>รอ pH ${wait} รายการ</strong> สามารถกลับมาเติมผลภายหลังได้</div>`:''}
       <div class="panel"><h2>รายการล่าสุด</h2>${recordsTable(rec.slice(0,12))}</div>`;
     $('#plateletDashMonth').onchange=e=>{state.plateletDashboardMonth=e.target.value||plateletMonthKey();renderDashboard();};
@@ -709,7 +709,7 @@
     const weeks=plateletWeeklySummary(ym,productType),complete=weeks.filter(w=>w.complete).length;
     $('#detailTitle').textContent=`Platelet QC · ${productType}`;
     $('#detailSubtitle').textContent=`${plateletMonthLabel(ym)} · ครบ ${complete}/4 สัปดาห์`;
-    $('#detailBody').innerHTML=`<div class="platelet-week-popup-list">${weeks.map(w=>{const label=plateletWeekLabel(ym,w.slot),owner='ผู้เก็บตามตำแหน่งใน App Staff Planner';if(w.status==='qc')return `<div class="platelet-week-popup-row qc"><div><strong>${esc(label)}</strong><small>${owner} · เก็บ QC แล้ว ${w.qc.length} รายการ</small></div><span class="badge pass">เก็บแล้ว</span></div>`;if(w.status==='no_pool')return `<div class="platelet-week-popup-row no_pool"><div><strong>${esc(label)}</strong><small>${owner} · ไม่มี Pool และมีหลักฐานแล้ว</small></div><div class="platelet-week-popup-actions"><span class="badge draft">ไม่มี Pool</span><button type="button" class="btn tiny-btn weekly-evidence-view" data-event-id="${w.noPool[0].id}">ดูหลักฐาน</button></div></div>`;return `<div class="platelet-week-popup-row pending"><div><strong>${esc(label)}</strong><small>${owner}</small></div><span class="badge incomplete">ยังไม่ได้เก็บ</span></div>`;}).join('')}</div><div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="plateletWeekPopupClose">ปิด</button></div>`;
+    $('#detailBody').innerHTML=`<div class="platelet-week-popup-list">${weeks.map(w=>{const label=plateletWeekLabel(ym,w.slot),owner='ผู้เก็บตามตำแหน่งใน App Staff Planner';if(w.status==='qc')return `<div class="platelet-week-popup-row qc"><div><strong>${esc(label)}</strong><small>${owner} · เก็บ QC แล้ว ${w.qc.length} รายการ</small></div><span class="badge pass">เก็บแล้ว</span></div>`;if(w.status==='no_pool')return `<div class="platelet-week-popup-row no_pool"><div><strong>${esc(label)}</strong><small>${owner} · สัปดาห์นี้ไม่มีผลิตภัณฑ์ และมีหลักฐานแล้ว</small></div><div class="platelet-week-popup-actions"><span class="badge draft">ไม่มีผลิตภัณฑ์</span><button type="button" class="btn tiny-btn weekly-evidence-view" data-event-id="${w.noPool[0].id}">ดูหลักฐาน</button></div></div>`;return `<div class="platelet-week-popup-row pending"><div><strong>${esc(label)}</strong><small>${owner}</small></div><span class="badge incomplete">ยังไม่ได้เก็บ</span></div>`;}).join('')}</div><div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="plateletWeekPopupClose">ปิด</button></div>`;
     $$('.weekly-evidence-view',$('#detailBody')).forEach(b=>b.onclick=()=>viewPlateletWeeklyEvidence(b.dataset.eventId));
     $('#plateletWeekPopupClose').onclick=()=>$('#detailDialog').close();
     dlg.showModal();
@@ -720,13 +720,13 @@
   }
 
   async function openPlateletNoPoolDialog(){
-    if(!staffWriteUi()||!state.plateletWeeklyReady){showToast('กรุณา Run SQL v5.3.9 ก่อนใช้งานบันทึกไม่มี Pool','error');return;}
+    if(!staffWriteUi()||!state.plateletWeeklyReady){showToast('กรุณา Run SQL v5.3.9 ก่อนใช้งานบันทึกไม่มีผลิตภัณฑ์สัปดาห์นี้','error');return;}
     let selectedFile=null;
     const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
     const dlg=ensureDetailDialogShell();
-    $('#detailTitle').textContent='บันทึกวันนี้ไม่มี Pool';
-    $('#detailSubtitle').textContent='บันทึกแยกตามชนิดผลิตภัณฑ์ พร้อมหลักฐาน';
-    $('#detailBody').innerHTML=`<div class="panel no-pool-dialog-panel"><div class="form-grid"><div class="field"><label class="required">วันที่</label><input id="noPoolDate" type="date" value="${esc(today)}"></div><div class="field"><label class="required">ชนิดผลิตภัณฑ์</label><select id="noPoolProduct"><option value="">เลือก</option>${activePlateletTrackingProducts().map(x=>`<option value="${esc(x.product_type)}">${esc(x.product_type)}</option>`).join('')}</select></div><div class="field span2"><label>หมายเหตุ</label><input id="noPoolNote" placeholder="เช่น วันนี้ไม่มีการ Pool / ไม่มีผลิตภัณฑ์ชนิดนี้"></div></div><div class="measurement-evidence"><div class="measurement-evidence-head"><strong>หลักฐานว่าไม่มี Pool</strong><span class="section-badge required-evidence">บังคับ</span></div><input class="hidden-file-input" type="file" id="noPoolCamera" accept="image/*" capture="environment"><input class="hidden-file-input" type="file" id="noPoolFile" accept="image/*,application/pdf"><div class="evidence-pick-actions"><button type="button" class="btn primary small-btn" id="noPoolCameraBtn">ถ่ายรูป</button><button type="button" class="btn small-btn" id="noPoolFileBtn">เลือกไฟล์ / PDF</button></div><div id="noPoolSelected" class="muted small">ยังไม่ได้เลือกหลักฐาน</div></div></div><div class="actions platelet-week-popup-footer"><button class="btn" id="noPoolCancel">ยกเลิก</button><button class="btn primary" id="noPoolSave">บันทึกไม่มี Pool</button></div>`;
+    $('#detailTitle').textContent='บันทึกไม่มีผลิตภัณฑ์สัปดาห์นี้';
+    $('#detailSubtitle').textContent='ใช้เมื่อสัปดาห์นั้นไม่มีผู้บริจาค SDP / ไม่มีผู้บริจาค Platelet หรือไม่มีถุงให้ Pool Platelet';
+    $('#detailBody').innerHTML=`<div class="panel no-pool-dialog-panel"><div class="form-grid"><div class="field"><label class="required">วันที่อ้างอิงในสัปดาห์</label><input id="noPoolDate" type="date" value="${esc(today)}"></div><div class="field"><label class="required">ชนิดผลิตภัณฑ์</label><select id="noPoolProduct"><option value="">เลือก</option>${activePlateletTrackingProducts().map(x=>`<option value="${esc(x.product_type)}">${esc(x.product_type)}</option>`).join('')}</select></div><div class="field span2"><label>รายละเอียด / เหตุผล</label><input id="noPoolNote" placeholder="เช่น ไม่มีผู้บริจาค / ไม่มีถุงให้ Pool Platelet"></div><div class="field span2"><small class="muted">ระบบจะจัดข้อมูลเข้า สัปดาห์ 1–4 อัตโนมัติตามวันที่อ้างอิงที่เลือก</small></div></div><div class="measurement-evidence"><div class="measurement-evidence-head"><strong>หลักฐานว่าไม่มีผลิตภัณฑ์สัปดาห์นี้</strong><span class="section-badge required-evidence">บังคับ</span></div><div class="muted small">แนบรูปภาพหรือไฟล์ PDF ที่ยืนยันเหตุผล เช่น ไม่มีผู้บริจาค SDP หรือไม่มีถุงให้ Pool Platelet</div><input class="hidden-file-input" type="file" id="noPoolCamera" accept="image/*" capture="environment"><input class="hidden-file-input" type="file" id="noPoolFile" accept="image/*,application/pdf"><div class="evidence-pick-actions"><button type="button" class="btn primary small-btn" id="noPoolCameraBtn">ถ่ายรูป</button><button type="button" class="btn small-btn" id="noPoolFileBtn">เลือกไฟล์ / PDF</button></div><div id="noPoolSelected" class="muted small">ยังไม่ได้เลือกหลักฐาน</div></div></div><div class="actions platelet-week-popup-footer"><button class="btn" id="noPoolCancel">ยกเลิก</button><button class="btn primary" id="noPoolSave">บันทึกสถานะนี้</button></div>`;
     dlg.showModal();
     const setFile=f=>{selectedFile=f||null;$('#noPoolSelected').textContent=f?`เลือกแล้ว: ${f.name}`:'ยังไม่ได้เลือกหลักฐาน';};
     $('#noPoolCameraBtn').onclick=()=>$('#noPoolCamera').click();$('#noPoolFileBtn').onclick=()=>$('#noPoolFile').click();
@@ -734,14 +734,14 @@
     $('#noPoolCancel').onclick=()=>dlg.close();
     $('#noPoolSave').onclick=async()=>{
       const eventDate=$('#noPoolDate').value,productType=$('#noPoolProduct').value,note=$('#noPoolNote').value.trim()||null;
-      if(!eventDate){showToast('กรุณาระบุวันที่','error');return;}if(!productType){showToast('กรุณาเลือกชนิดผลิตภัณฑ์','error');return;}if(!selectedFile){showToast('ต้องแนบรูปหรือ PDF ที่แสดงว่าไม่มี Pool','error');return;}if(selectedFile.size>10*1024*1024){showToast('ไฟล์ต้องไม่เกิน 10 MB','error');return;}
+      if(!eventDate){showToast('กรุณาระบุวันที่อ้างอิงในสัปดาห์','error');return;}if(!productType){showToast('กรุณาเลือกชนิดผลิตภัณฑ์','error');return;}if(!selectedFile){showToast('ต้องแนบรูปหรือ PDF ที่แสดงเหตุผลว่าไม่มีผลิตภัณฑ์ในสัปดาห์นี้','error');return;}if(selectedFile.size>10*1024*1024){showToast('ไฟล์ต้องไม่เกิน 10 MB','error');return;}
       try{
         const {data:event,error:eventErr}=await state.sb.from('platelet_weekly_events').insert({event_date:eventDate,product_type:productType,event_type:'no_pool',note,created_by:state.user.id}).select('*').single();if(eventErr)throw eventErr;
         const clean=selectedFile.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-100),path=`platelet_weekly/${event.id}/evidence/${Date.now()}_${clean}`;
         const {error:u}=await state.sb.storage.from('bloodqc-evidence').upload(path,selectedFile,{upsert:false,contentType:selectedFile.type||undefined});if(u){await state.sb.from('platelet_weekly_events').delete().eq('id',event.id);throw u;}
         const {error:ferr}=await state.sb.from('platelet_weekly_evidence_files').insert({event_id:event.id,storage_path:path,original_name:selectedFile.name,mime_type:selectedFile.type,file_size:selectedFile.size,uploaded_by:state.user.id});
         if(ferr){await state.sb.storage.from('bloodqc-evidence').remove([path]);await state.sb.from('platelet_weekly_events').delete().eq('id',event.id);throw ferr;}
-        await reloadPlateletWeeklyData();dlg.close();showToast('บันทึกไม่มี Pool พร้อมหลักฐานแล้ว','good');renderDashboard();
+        await reloadPlateletWeeklyData();dlg.close();showToast('บันทึกไม่มีผลิตภัณฑ์สัปดาห์นี้พร้อมหลักฐานแล้ว','good');renderDashboard();
       }catch(e){showToast(errText(e),'error');}
     };
   }
@@ -788,7 +788,7 @@
     const purpose=r?.record_purpose||'prepare';
     const adminCorrection=r&&adminUi()&&!deleted;
     $('#view-record').innerHTML=`
-      <div class="page-head"><div><h1>${r?'แก้ไข / ตรวจรายการ Platelet':'บันทึก Platelet'}</h1></div><div class="page-head-tools"><button type="button" class="btn small-btn" id="recordGuideBtn">คู่มือ</button>${r?`<div class="status-line">${deletedBadge(r)}${statusBadge(r.status)}${pHBadge(r)}</div>`:''}</div></div>
+      <div class="page-head"><div><h1>${r?'แก้ไข / ตรวจรายการ Platelet':'บันทึก Platelet'}</h1></div><div class="page-head-tools">${!r&&staffWriteUi()?'<button type="button" class="btn small-btn" id="recordNoPoolBtn">ไม่มีผลิตภัณฑ์สัปดาห์นี้</button>':''}<button type="button" class="btn small-btn" id="recordGuideBtn">คู่มือ</button>${r?`<div class="status-line">${deletedBadge(r)}${statusBadge(r.status)}${pHBadge(r)}</div>`:''}</div></div>
       ${deleted?`<div class="notice bad"><strong>รายการนี้ถูกลบออกจากการใช้งานแล้ว</strong><br>เหตุผล: ${esc(r.delete_reason||'–')} · ${dateTH(r.deleted_at)} · โดย ${esc(profileName(r.deleted_by))}</div>`:''}
       ${locked&&!adminUi()?'<div class="notice good"><strong>รายการนี้ LOCK แล้ว</strong> ข้อมูลถูกป้องกันการแก้ไข หากพบข้อผิดพลาดให้แจ้ง Admin พร้อมหลักฐาน</div>':''}
       ${locked&&adminUi()&&!deleted?'<div class="notice warning"><strong>Admin correction</strong> รายการนี้ LOCK แล้ว แต่ Admin สามารถแก้ไขได้โดยระบุเหตุผล ระบบจะเพิ่ม Revision และบันทึกค่าก่อน/หลังใน Audit Log</div>':''}
@@ -832,7 +832,7 @@
     $$('input[name="record_purpose"]').forEach(el=>el.addEventListener('change',()=>{$$('.purpose-option').forEach(x=>x.classList.toggle('selected',$('input',x)?.checked));updateCalcPreview();}));
     $('#product_type').addEventListener('change',()=>{applyProductWeightConfig(null);togglePool();updateCalcPreview();if(!r)maybeAutoSelectPlateletQc();}); ['collection_at','gross_weight_g','plt_value_1','plt_value_2','plt_use_mode','wbc_adam','ph_value','ph_measured_at','plt_measured_at','wbc_measured_at'].forEach(id=>$('#'+id)?.addEventListener('input',updateCalcPreview));
     $$('.pool-pyi,.pool-unit').forEach(x=>x.addEventListener('input',updatePoolPreview));
-    $('#recordGuideBtn').onclick=()=>switchView('guide'); $('#cancelEdit').onclick=()=>switchView('records'); if($('#clearForm')) $('#clearForm').onclick=clearNewRecordForm; if($('#saveDraft')) $('#saveDraft').onclick=()=>saveRecord(false); if($('#submitReview')) $('#submitReview').onclick=submitRecord; if($('#returnForCorrection')) $('#returnForCorrection').onclick=returnForCorrection; if($('#approveAndLock')) $('#approveAndLock').onclick=approveAndLock; if($('#unlockRecord')) $('#unlockRecord').onclick=unlockRecord;
+    $('#recordGuideBtn').onclick=()=>switchView('guide'); if($('#recordNoPoolBtn')) $('#recordNoPoolBtn').onclick=openPlateletNoPoolDialog; $('#cancelEdit').onclick=()=>switchView('records'); if($('#clearForm')) $('#clearForm').onclick=clearNewRecordForm; if($('#saveDraft')) $('#saveDraft').onclick=()=>saveRecord(false); if($('#submitReview')) $('#submitReview').onclick=submitRecord; if($('#returnForCorrection')) $('#returnForCorrection').onclick=returnForCorrection; if($('#approveAndLock')) $('#approveAndLock').onclick=approveAndLock; if($('#unlockRecord')) $('#unlockRecord').onclick=unlockRecord;
     if(!r&&$('#collection_at')){$('#collection_at').addEventListener('change',()=>maybeAutoSelectPlateletQc());$('#collection_at').addEventListener('blur',()=>maybeAutoSelectPlateletQc());}
   }
 
