@@ -408,3 +408,24 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
 .dashboard-product-card:focus-visible{outline:2px solid #9e1d2d;outline-offset:2px}
 .product-popup-extra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
 .product-popup-extra>strong{font-size:12px;margin-right:4px}
+
+
+/* v5.3.16 mobile list cards + consistent bottom actions */
+@media(max-width:900px){
+  .desktop-table-only{display:none!important}
+  .mobile-data-cards{display:grid!important;gap:10px}
+  .mobile-data-card+.mobile-data-card{margin-top:0}
+  .mobile-data-card{padding:14px 13px;border-radius:14px}
+  .mobile-data-card-head .link-btn,.mobile-data-card-head strong{font-size:18px;line-height:1.3}
+  .mobile-data-pair{grid-template-columns:104px minmax(0,1fr);gap:8px}
+  .mobile-data-label{font-size:12px}
+  .mobile-data-value{font-size:14px}
+  .sticky-actions{align-items:stretch;flex-direction:column;gap:7px}
+  .sticky-actions .left,.sticky-actions .right{display:grid;grid-template-columns:1fr;width:100%;gap:7px}
+  .sticky-actions .right.new-record-actions{grid-template-columns:1fr 1fr}
+  .sticky-actions .btn{width:100%;min-height:48px}
+}
+@media(max-width:420px){
+  .mobile-data-pair{grid-template-columns:96px minmax(0,1fr)}
+  .mobile-data-card{padding:12px}
+}
