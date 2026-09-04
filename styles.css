@@ -447,3 +447,8 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
   .nc-filters{grid-template-columns:1fr}.nc-evidence-uploader{grid-template-columns:1fr}.nc-evidence-uploader .btn{width:100%}.nc-source-meta{display:grid;grid-template-columns:1fr;gap:5px}
   .nc-flow-preview{display:grid;grid-template-columns:1fr}.nc-flow-preview b{display:none}.nc-flow-preview span{text-align:center}
 }
+
+
+/* v5.3.18 NC usability refresh */
+.nc-section-head{display:flex;align-items:flex-start;gap:10px;min-width:0}.nc-step-no{width:30px;height:30px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;background:#fdecef;color:var(--primary);border:1px solid #f3c7cf;font-weight:900;font-size:14px;flex:0 0 30px}.nc-section-head h2{margin:0;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}.nc-section-head h2 small{font-size:12px;color:#7b879c;font-weight:700}.nc-section-head p{margin:2px 0 0}.nc-close-panel{background:linear-gradient(180deg,#fff, #fffafb)}.nc-metrics .card{border-radius:16px}.nc-source-meta span{background:#f8fafc;border:1px solid #eaecf0;border-radius:999px;padding:6px 10px}.nc-evidence-uploader select{min-height:46px}.nc-evidence-list .evidence-item{border-radius:14px}.notice.warning{line-height:1.6}.nc-flow-preview span{font-size:13px}
+@media(max-width:760px){.nc-section-head{align-items:flex-start}.nc-step-no{width:28px;height:28px;font-size:13px}.nc-source-meta span{border-radius:12px}.nc-sticky-actions .right{width:100%}.nc-sticky-actions .right .btn{flex:1 1 auto}}
