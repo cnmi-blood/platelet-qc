@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.19 - step-by-step QC Fail wizard and polished forms */
+/* CNMI Blood Component QC v5.3.20 - repeat-first QC fail branching workflow */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -88,10 +88,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.19 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.20 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.19 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.20 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -112,7 +112,7 @@
   function cfgReady(){ return C.SUPABASE_URL && C.SUPABASE_KEY && !C.SUPABASE_URL.includes('PASTE_') && !C.SUPABASE_KEY.includes('PASTE_'); }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'5.3.17',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.3.20',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -615,13 +615,13 @@
   const ncStatusBadge=s=>`<span class="badge nc-status ${esc(s||'pending_verification')}">${esc(NC_STATUS_TH[s]||s||'รอตรวจสอบ')}</span>`;
   const ncEvidenceCategoryLabel=c=>NC_EVIDENCE_CATEGORY_TH[c]||c||'อื่น ๆ';
   const NC_WIZARD_STEPS=[
-    {n:1,label:'ข้อมูล QC',icon:'alert'},
-    {n:2,label:'ตรวจสอบผล',icon:'search'},
-    {n:3,label:'ผลกระทบ',icon:'shield'},
-    {n:4,label:'หาสาเหตุ',icon:'target'},
-    {n:5,label:'แผนแก้ไข',icon:'wrench'},
-    {n:6,label:'ติดตามผล',icon:'activity'},
-    {n:7,label:'หลักฐาน',icon:'paperclip'},
+    {n:1,label:'หยุดและตรวจสอบ',icon:'alert'},
+    {n:2,label:'ตรวจซ้ำ',icon:'search'},
+    {n:3,label:'สรุปผล',icon:'check'},
+    {n:4,label:'ผลกระทบ',icon:'shield'},
+    {n:5,label:'หาสาเหตุ',icon:'target'},
+    {n:6,label:'แผนแก้ไข',icon:'wrench'},
+    {n:7,label:'ติดตามผล',icon:'activity'},
     {n:8,label:'ปิดเคส',icon:'check'}
   ];
   function ncIcon(name){
@@ -637,14 +637,57 @@
     };
     return `<svg class="nc-line-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]||paths.check}</svg>`;
   }
+  const NC_REPEAT_PREFIX='__NCREP2__';
+  function ncRepeatWorkflow(text){
+    const empty={version:2,initial_checks:[],immediate_note:'',repeat_required:'yes',no_repeat_reason:'',rounds:[],first_fail_cause_known:'',continue_investigation:false,capa_required:'',capa_not_required_reason:'',legacy:''};
+    if(!text)return empty;
+    try{
+      if(String(text).startsWith(NC_REPEAT_PREFIX)){
+        const parsed=JSON.parse(String(text).slice(NC_REPEAT_PREFIX.length));
+        return {...empty,...parsed,rounds:Array.isArray(parsed.rounds)?parsed.rounds:[],initial_checks:Array.isArray(parsed.initial_checks)?parsed.initial_checks:[]};
+      }
+    }catch(e){}
+    return {...empty,legacy:String(text)};
+  }
+  function ncRepeatWorkflowString(w){return NC_REPEAT_PREFIX+JSON.stringify({...w,version:2});}
+  function ncRepeatOutcomeTH(v){return ({pass:'ผ่านเกณฑ์',fail:'ยังไม่ผ่าน',inconclusive:'ยังสรุปไม่ได้'})[v]||'รอผล';}
+  function ncRepeatOutcomeBadge(v){return `<span class="badge nc-repeat-outcome ${esc(v||'pending')}">${esc(ncRepeatOutcomeTH(v))}</span>`;}
+  function ncEvaluateRepeat(param,value){
+    const raw=String(value??'').trim(); if(!raw)return '';
+    const numv=Number(raw.replace(/,/g,'')); if(!Number.isFinite(numv))return '';
+    const c=String(param?.criterion||'').replace(/,/g,'').trim();
+    let m=c.match(/^≥\s*([0-9.]+)/); if(m)return numv>=Number(m[1])?'pass':'fail';
+    m=c.match(/^≤\s*([0-9.]+)/); if(m)return numv<=Number(m[1])?'pass':'fail';
+    m=c.match(/^<\s*([0-9.]+)/); if(m)return numv<Number(m[1])?'pass':'fail';
+    m=c.match(/^>\s*([0-9.]+)/); if(m)return numv>Number(m[1])?'pass':'fail';
+    m=c.match(/([0-9.]+)\s*[–-]\s*([0-9.]+)/); if(m)return numv>=Number(m[1])&&numv<=Number(m[2])?'pass':'fail';
+    return '';
+  }
+  function ncRepeatSummaryHtml(workflow,params){
+    const rounds=workflow.rounds||[];
+    if(!rounds.length)return '<div class="nc-repeat-empty">ยังไม่มีผลตรวจซ้ำ</div>';
+    return `<div class="nc-repeat-summary-list">${rounds.map((x,i)=>{const p=params[Number(x.param_index)||0]||params[0]||{};return `<div class="nc-repeat-summary-row"><div><b>ครั้งที่ ${i+1}</b><span>${esc(p.name||'ผล QC')} · ${esc(x.result_value||'–')}</span></div>${ncRepeatOutcomeBadge(x.assessment)}</div>`}).join('')}</div>`;
+  }
+  function ncEvidenceByCategoryHtml(evidence,category,editable){
+    const rows=evidence.filter(e=>e.category===category);
+    return `<div class="nc-step-evidence-list">${rows.length?rows.map(e=>`<div class="evidence-item"><span class="name evidence-name"><strong>${esc(e.original_name)}</strong><small>${esc(ncEvidenceCategoryLabel(e.category))} · ${esc(profileName(e.uploaded_by))} · ${esc(dateTH(e.created_at))}</small></span><span class="e-actions"><button class="btn small-btn nc-ev-view" data-id="${e.id}">ดู</button>${editable?`<button class="btn small-btn danger nc-ev-delete" data-id="${e.id}">ลบ</button>`:''}</span></div>`).join(''):'<div class="muted small">ยังไม่มีหลักฐานในขั้นตอนนี้</div>'}</div>`;
+  }
+  function ncEvidenceUploaderHtml(category,evidence,editable,label='แนบหลักฐาน'){
+    const safe=String(category).replace(/[^a-z_]/g,'');
+    return `<div class="nc-inline-evidence"><div class="nc-inline-evidence-head"><strong>${esc(label)}</strong><span>${evidence.filter(e=>e.category===category).length} ไฟล์</span></div>${editable?`<div class="nc-inline-evidence-actions"><input class="hidden-file-input" type="file" id="ncEvCam_${safe}" data-nc-upload-input data-category="${safe}" accept="image/*" capture="environment"><input class="hidden-file-input" type="file" id="ncEvFile_${safe}" data-nc-upload-input data-category="${safe}" accept="image/*,application/pdf"><button class="btn small-btn primary" type="button" data-nc-upload-target="ncEvCam_${safe}">ถ่ายรูป</button><button class="btn small-btn" type="button" data-nc-upload-target="ncEvFile_${safe}">เลือกไฟล์ / PDF</button></div>`:''}${ncEvidenceByCategoryHtml(evidence,category,editable)}</div>`;
+  }
   function ncSuggestedStep(n){
     if(!n)return 1;
-    if((n.verification_result||'pending')==='pending')return 2;
-    if(n.verification_result==='technical_error')return n.close_note?8:7;
-    if(!n.product_status||!n.disposition)return 3;
-    if(!n.root_cause_category||!n.root_cause_detail||!n.immediate_correction)return 4;
-    if(!n.corrective_action||!n.responsible_by||!n.due_date)return 5;
-    if(!n.effectiveness_method||!n.effectiveness_due_date||!n.effectiveness_result||n.effectiveness_result==='pending')return 6;
+    const w=ncRepeatWorkflow(n.repeat_result);
+    if((n.verification_result||'pending')==='pending'){
+      if(w.repeat_required==='yes'&&!(w.rounds||[]).length)return 2;
+      return 3;
+    }
+    if(!n.product_status||!n.disposition)return 4;
+    if(!n.root_cause_category||!n.root_cause_detail||!n.immediate_correction)return 5;
+    if(!w.capa_required)return 6;
+    if(w.capa_required==='yes'&&(!n.corrective_action||!n.responsible_by||!n.due_date))return 6;
+    if(w.capa_required==='yes'&&(!n.effectiveness_method||!n.effectiveness_due_date||!n.effectiveness_result||n.effectiveness_result==='pending'))return 7;
     return 8;
   }
   function ncStepTabs(active){
@@ -750,7 +793,7 @@
   }
   function renderNonconformancePage(){
     if(!state.nonconformanceReady){
-      $('#view-nonconformance').innerHTML=`<div class="page-head"><div><h1>QC ไม่ผ่าน / Corrective Action</h1><p class="muted">ใช้ร่วมกันสำหรับ Platelet (เกล็ดเลือด) · Plasma / FFP (พลาสมา) · RBC (เม็ดเลือดแดง)</p></div></div><div class="notice warning"><strong>ยังไม่ได้เปิดฐานข้อมูลสำหรับหน้านี้</strong><br>ให้ Run SQL <code>supabase/upgrade_v5_3_16_to_v5_3_17.sql</code> ก่อน แล้ว Refresh หน้าเว็บอีกครั้ง</div><div class="panel"><div class="nc-section-head"><span class="nc-step-no">1</span><div><h2>ลำดับการทำงาน</h2><p class="muted small">เปิดเคส → ตรวจสอบ → หาสาเหตุ → วางแผนแก้ไข → ติดตามผล → ปิดเคส</p></div></div><div class="nc-flow-preview"><span>QC ต้องตรวจสอบ</span><b>→</b><span>ตรวจสอบผล</span><b>→</b><span>ประเมินผลกระทบ</span><b>→</b><span>หาสาเหตุ</span><b>→</b><span>แก้ไขป้องกันซ้ำ</span><b>→</b><span>ติดตามผล</span><b>→</b><span>ปิดเคส</span></div></div>`;
+      $('#view-nonconformance').innerHTML=`<div class="page-head"><div><h1>QC ไม่ผ่าน / Corrective Action</h1><p class="muted">ใช้ร่วมกันสำหรับ Platelet (เกล็ดเลือด) · Plasma / FFP (พลาสมา) · RBC (เม็ดเลือดแดง)</p></div></div><div class="notice warning"><strong>ยังไม่ได้เปิดฐานข้อมูลสำหรับหน้านี้</strong><br>ให้ Run SQL <code>supabase/upgrade_v5_3_16_to_v5_3_17.sql</code> ก่อน แล้ว Refresh หน้าเว็บอีกครั้ง</div><div class="panel"><div class="nc-section-head"><span class="nc-step-no">1</span><div><h2>ลำดับการทำงาน</h2><p class="muted small">หยุดและตรวจสอบ → Repeat → สรุปผล → ประเมินผลกระทบ → หาสาเหตุ → Corrective Action → Effectiveness → ปิดเคส</p></div></div><div class="nc-flow-preview"><span>QC ต้องตรวจสอบ</span><b>→</b><span>Repeat</span><b>→</b><span>สรุปผล</span><b>→</b><span>ผลกระทบ</span><b>→</b><span>หาสาเหตุ</span><b>→</b><span>Corrective Action</span><b>→</b><span>Effectiveness</span><b>→</b><span>ปิดเคส</span></div></div>`;
       return;
     }
     const current=state.currentNonconformanceId?state.nonconformances.find(n=>n.id===state.currentNonconformanceId):null;
@@ -769,48 +812,130 @@
   function enumOptions(items,selected,placeholder='เลือก'){return `<option value="">${placeholder}</option>`+items.map(([v,t])=>`<option value="${v}" ${selected===v?'selected':''}>${esc(t)}</option>`).join('');}
   function renderNonconformanceDetail(n){
     const r=recordForModule(n.module,n.record_id),closed=n.status==='closed',editable=!closed&&(staffWriteUi()||adminUi()),canClose=!closed&&(adminUi()||reviewerUi()),params=Array.isArray(n.failed_parameters)?n.failed_parameters:[],evidence=state.nonconformanceEvidence.filter(e=>e.nonconformance_id===n.id);
-    const roots=ncRootCauseOptions(n.module,n.product_type);
+    const roots=ncRootCauseOptions(n.module,n.product_type),workflow=ncRepeatWorkflow(n.repeat_result);
     const activeStep=Math.min(8,Math.max(1,Number(state.ncWizardStepById[n.id]||ncSuggestedStep(n)||1)));
     const stepPanel=(step,icon,title,en,sub,body,extra='')=>`<section class="nc-step-panel ${step===activeStep?'active':''}" data-nc-step-panel="${step}"><div class="nc-step-panel-head"><span class="nc-step-hero-icon">${ncIcon(icon)}</span><div><span class="nc-step-kicker">ขั้นตอน ${step} จาก 8</span><h2>${title}${en?` <small>${en}</small>`:''}</h2>${sub?`<p>${sub}</p>`:''}</div>${extra}</div><div class="nc-step-content">${body}</div></section>`;
-    const step1=stepPanel(1,'alert','ข้อมูล QC ที่ไม่ผ่าน','','ตรวจค่าที่ผิดเกณฑ์และข้อมูลผลิตภัณฑ์ก่อนเริ่มดำเนินการ',`${ncParamHtml(params)}<div class="nc-source-meta"><span>เลขผลิตภัณฑ์ <b>${esc(n.product_no)}</b></span><span>ชนิดผลิตภัณฑ์ <b>${esc(n.product_type)}</b></span><span>ผู้เปิดเคส <b>${esc(profileName(n.created_by))}</b></span><span>วันที่เปิดเคส <b>${esc(dateTH(n.created_at))}</b></span></div>`,sourceQcBadge(n.module,r||{}));
-    const step2=stepPanel(2,'search','ตรวจสอบผล','Verification','ตรวจผล ตัวอย่าง เครื่องมือ และหลักฐาน แล้วสรุปว่าเป็นปัญหาทางเทคนิคหรือ QC ไม่ผ่านจริง',`<div class="nc-form-grid"><div class="nc-form-field"><label>สรุปผลการตรวจสอบ</label><select id="ncVerification" ${editable?'':'disabled'}>${enumOptions([['pending',NC_VERIFY_TH.pending],['technical_error',NC_VERIFY_TH.technical_error],['confirmed_failure',NC_VERIFY_TH.confirmed_failure]],n.verification_result,'เลือกผลการตรวจสอบ')}</select></div><div class="nc-form-field nc-wide"><label>รายละเอียดการตรวจสอบ</label><textarea id="ncVerificationNote" ${editable?'':'disabled'} placeholder="เช่น ตรวจตัวอย่าง ตรวจเครื่อง ทบทวนการคำนวณ และดูหลักฐานครบแล้ว">${esc(n.verification_note||'')}</textarea></div><div class="nc-form-field nc-wide"><label>ผลตรวจซ้ำ <small>Repeat</small> <span class="optional">ถ้ามี</span></label><textarea id="ncRepeatResult" ${editable?'':'disabled'} placeholder="ระบุว่าตรวจซ้ำเมื่อไร ได้ผลอย่างไร และสรุปว่าอย่างไร">${esc(n.repeat_result||'')}</textarea></div></div>`);
-    const step3=stepPanel(3,'shield','ประเมินผลกระทบ','','ดูว่าถุงอยู่ที่ไหน ต้องจัดการอย่างไร และมีผลต่อถุงอื่นหรือผู้ป่วยหรือไม่',`<div class="nc-form-grid"><div class="nc-form-field"><label>สถานะถุงเมื่อพบผล</label><select id="ncProductStatus" ${editable?'':'disabled'}>${enumOptions([['in_stock','ยังอยู่ในคลัง'],['issued_not_transfused','จ่ายออกแล้ว แต่ยังไม่ให้ผู้ป่วย'],['transfused','ให้ผู้ป่วยแล้ว'],['destroyed','ทำลายแล้ว'],['unknown','ยังไม่ทราบ']],n.product_status,'เลือกสถานะถุง')}</select></div><div class="nc-form-field"><label>จัดการถุงอย่างไร</label><select id="ncDisposition" ${editable?'':'disabled'}>${enumOptions([['quarantine','กักกัน / งดจ่าย'],['destroy','ทำลาย'],['release_with_approval','ปล่อยใช้ตามการอนุมัติ'],['notify_clinical','แจ้งหน่วยรักษา / ผู้เกี่ยวข้อง'],['no_action','ไม่ต้องดำเนินการกับผลิตภัณฑ์'],['other','อื่น ๆ']],n.disposition,'เลือกการจัดการ')}</select></div><div class="nc-form-field nc-wide"><label>รายละเอียดการจัดการ</label><textarea id="ncDispositionNote" ${editable?'':'disabled'} placeholder="อธิบายว่าทำอะไรกับถุงนี้บ้าง">${esc(n.disposition_note||'')}</textarea></div><div class="nc-form-field nc-wide"><label>ขอบเขตผลกระทบ <small>Scope assessment</small></label><textarea id="ncScope" ${editable?'':'disabled'} placeholder="เช่น กระทบเฉพาะถุงนี้ หรืออาจกระทบ lot / วันผลิต / เครื่อง / filter / ผู้ปฏิบัติงานเดียวกัน">${esc(n.scope_assessment||'')}</textarea></div><div class="nc-form-field"><label>การแจ้งผู้เกี่ยวข้อง</label><select id="ncNotification" ${editable?'':'disabled'}>${enumOptions([['not_required','ไม่จำเป็น'],['required_pending','ต้องแจ้ง / รอดำเนินการ'],['completed','แจ้งแล้ว']],n.notification_status,'เลือกสถานะการแจ้ง')}</select></div><div class="nc-form-field"><label>บันทึกการแจ้ง</label><input id="ncNotificationNote" ${editable?'':'disabled'} value="${esc(n.notification_note||'')}" placeholder="หน่วยหรือบุคคลที่แจ้ง / วันที่แจ้ง"></div></div>`);
-    const step4=stepPanel(4,'target','หาสาเหตุและแก้ไขเบื้องต้น','','สรุปสาเหตุที่แท้จริง และสิ่งที่ทำทันทีเพื่อควบคุมเหตุการณ์',`<div class="nc-form-grid"><div class="nc-form-field"><label>หมวดสาเหตุหลัก</label><select id="ncRootCause" ${editable?'':'disabled'}>${selectOptions(roots,n.root_cause_category,'เลือกหมวดสาเหตุ')}</select></div><div class="nc-form-field nc-wide"><label>รายละเอียดสาเหตุ <small>Root cause</small></label><textarea id="ncRootDetail" ${editable?'':'disabled'} placeholder="สรุปสาเหตุที่แท้จริงจากการสอบสวน">${esc(n.root_cause_detail||'')}</textarea></div><div class="nc-form-field nc-wide"><label>การแก้ไขเบื้องต้น <small>Correction</small></label><textarea id="ncCorrection" ${editable?'':'disabled'} placeholder="เช่น กักกันถุง ตรวจซ้ำ ตรวจเครื่อง เปลี่ยน consumable">${esc(n.immediate_correction||'')}</textarea></div></div>`);
-    const step5=stepPanel(5,'wrench','แผนแก้ไขป้องกันซ้ำ','Corrective Action','ระบุสิ่งที่จะทำ ผู้รับผิดชอบ และวันที่ต้องเสร็จ',`<div class="nc-form-grid"><div class="nc-form-field nc-wide"><label>แผนที่จะทำ</label><textarea id="ncCorrectiveAction" ${editable?'':'disabled'} placeholder="เช่น ปรับ WI, retrain, PM/สอบเทียบ, เปลี่ยน lot, เพิ่ม checkpoint">${esc(n.corrective_action||'')}</textarea></div><div class="nc-form-field"><label>ผู้รับผิดชอบ</label><select id="ncResponsible" ${editable?'':'disabled'}>${profileOptions(n.responsible_by)}</select></div><div class="nc-form-field"><label>กำหนดเสร็จ</label><input id="ncDueDate" type="date" ${editable?'':'disabled'} value="${esc(n.due_date||'')}"></div></div>`);
-    const step6=stepPanel(6,'activity','ติดตามผล','Effectiveness','กำหนดวิธีติดตาม และบันทึกว่าการแก้ไขได้ผลหรือยัง',`<div class="nc-form-grid"><div class="nc-form-field nc-wide"><label>วิธีติดตามผล</label><textarea id="ncEffectMethod" ${editable?'':'disabled'} placeholder="เช่น ติดตาม QC ถัดไป 3 ครั้ง / ติดตาม 1 เดือน / audit การปฏิบัติตาม WI">${esc(n.effectiveness_method||'')}</textarea></div><div class="nc-form-field"><label>กำหนดติดตาม</label><input id="ncEffectDue" type="date" ${editable?'':'disabled'} value="${esc(n.effectiveness_due_date||'')}"></div><div class="nc-form-field"><label>ผลการติดตาม</label><select id="ncEffectResult" ${editable?'':'disabled'}>${enumOptions([['pending',NC_EFFECT_TH.pending],['effective',NC_EFFECT_TH.effective],['not_effective',NC_EFFECT_TH.not_effective]],n.effectiveness_result||'pending','เลือกผลการติดตาม')}</select></div><div class="nc-form-field nc-wide"><label>รายละเอียดผลติดตาม</label><textarea id="ncEffectNote" ${editable?'':'disabled'} placeholder="บันทึกผลที่พบหลังติดตาม">${esc(n.effectiveness_note||'')}</textarea></div>${n.effectiveness_checked_at?`<div class="nc-form-field nc-wide"><div class="readonly-box">ผู้ตรวจติดตามผล: ${esc(profileName(n.effectiveness_checked_by))} · ${esc(dateTH(n.effectiveness_checked_at))}</div></div>`:''}</div>`);
-    const step7=stepPanel(7,'paperclip','หลักฐาน','','เลือกประเภทหลักฐานก่อน แล้วแนบรูปหรือ PDF ที่เกี่ยวข้อง',`${editable?`<div class="nc-evidence-uploader nc-evidence-uploader-polished"><div class="nc-form-field"><label>ประเภทหลักฐาน</label><select id="ncEvidenceCategory">${enumOptions([['verification',NC_EVIDENCE_CATEGORY_TH.verification],['repeat',NC_EVIDENCE_CATEGORY_TH.repeat],['investigation',NC_EVIDENCE_CATEGORY_TH.investigation],['corrective_action',NC_EVIDENCE_CATEGORY_TH.corrective_action],['effectiveness',NC_EVIDENCE_CATEGORY_TH.effectiveness],['other',NC_EVIDENCE_CATEGORY_TH.other]],'verification','เลือกประเภทหลักฐาน')}</select></div><input class="hidden-file-input" type="file" id="ncEvidenceCamera" accept="image/*" capture="environment"><input class="hidden-file-input" type="file" id="ncEvidenceFile" accept="image/*,application/pdf"><button class="btn primary nc-upload-btn" type="button" id="ncEvidenceCameraBtn">${ncIcon('paperclip')}<span>ถ่ายรูป</span></button><button class="btn nc-upload-btn" type="button" id="ncEvidenceFileBtn">${ncIcon('paperclip')}<span>เลือกไฟล์ / PDF</span></button></div>`:''}<div class="nc-evidence-summary"><span><b>${evidence.length}</b> ไฟล์</span><small>${evidence.length?'กดดูหรือลบไฟล์ได้ด้านล่าง':'ยังไม่มีหลักฐาน'}</small></div><div id="ncEvidenceList" class="nc-evidence-list">${evidence.length?evidence.map(e=>`<div class="evidence-item"><span class="name evidence-name"><strong>${esc(e.original_name)}</strong><small>${esc(ncEvidenceCategoryLabel(e.category))} · ${esc(profileName(e.uploaded_by))} · ${esc(dateTH(e.created_at))}</small></span><span class="e-actions"><button class="btn small-btn nc-ev-view" data-id="${e.id}">ดู</button>${editable?`<button class="btn small-btn danger nc-ev-delete" data-id="${e.id}">ลบ</button>`:''}</span></div>`).join(''):''}</div>`);
-    const step8=stepPanel(8,'check','สรุปและปิดเคส','','ทบทวนข้อมูลทั้งหมดก่อนปิดเคส',`<div class="nc-form-grid"><div class="nc-form-field nc-wide"><label>สรุปก่อนปิดเคส</label><textarea id="ncCloseNote" ${closed||canClose?'':'disabled'} ${closed?'disabled':''} placeholder="สรุปสิ่งที่พบ สิ่งที่ทำ และเหตุผลที่ปิดเคสได้">${esc(n.close_note||'')}</textarea></div>${closed?`<div class="nc-form-field nc-wide"><div class="notice good"><strong>ปิดเคสแล้ว</strong><br>${esc(profileName(n.closed_by))} · ${esc(dateTH(n.closed_at))}${n.close_note?`<br>${esc(n.close_note)}`:''}</div></div>`:''}</div>`);
+    const checkItems=[['quarantine','กักกัน / งดใช้ผลิตภัณฑ์ (ถ้ายังอยู่ในคลัง)'],['entry','ตรวจข้อมูลที่กรอกและการคำนวณ'],['sample','ตรวจตัวอย่างที่ใช้ทดสอบ'],['equipment','ตรวจเครื่องมือและ QC เครื่อง'],['method','ทบทวนวิธีทดสอบ / ขั้นตอนปฏิบัติ']];
+    const step1=stepPanel(1,'alert','หยุดและตรวจสอบเบื้องต้น','','ดูค่าที่ผิดเกณฑ์ แล้วทำสิ่งจำเป็นก่อนตรวจซ้ำ',`${ncParamHtml(params)}<div class="nc-action-checklist"><h3>การดำเนินการทันที</h3>${checkItems.map(([v,t])=>`<label class="nc-check-item"><input type="checkbox" class="nc-initial-check" value="${v}" ${workflow.initial_checks.includes(v)?'checked':''} ${editable?'':'disabled'}><span>${t}</span></label>`).join('')}<div class="nc-form-field nc-wide"><label>บันทึกเพิ่มเติม <span class="optional">ถ้ามี</span></label><textarea id="ncImmediateNote" ${editable?'':'disabled'} placeholder="เช่น กักกันถุงแล้ว / ตรวจเครื่องแล้วไม่พบความผิดปกติ">${esc(workflow.immediate_note||'')}</textarea></div></div>${ncEvidenceUploaderHtml('verification',evidence,editable,'หลักฐานการตรวจสอบเบื้องต้น')}<div class="nc-source-meta"><span>เลขผลิตภัณฑ์ <b>${esc(n.product_no)}</b></span><span>ชนิดผลิตภัณฑ์ <b>${esc(n.product_type)}</b></span><span>ผู้เปิดเคส <b>${esc(profileName(n.created_by))}</b></span><span>วันที่เปิดเคส <b>${esc(dateTH(n.created_at))}</b></span></div>`,sourceQcBadge(n.module,r||{}));
+    const paramOpts=params.map((p,i)=>`<option value="${i}">${esc(p.name)} · เกณฑ์ ${esc(p.criterion)}</option>`).join('');
+    const step2=stepPanel(2,'search','ตรวจซ้ำ','Repeat','บันทึกผลตรวจซ้ำเป็นรายครั้ง โดยไม่ทับผลเดิม',`<input type="hidden" id="ncRepeatWorkflow"><div class="nc-repeat-choice"><label class="nc-choice-card"><input type="radio" name="ncRepeatRequired" value="yes" ${workflow.repeat_required!=='no'?'checked':''} ${editable?'':'disabled'}><span><b>ทำการตรวจซ้ำ (Repeat)</b><small>ใช้เมื่อ WI / วิธีปฏิบัติกำหนดให้ตรวจยืนยันผล</small></span></label><label class="nc-choice-card"><input type="radio" name="ncRepeatRequired" value="no" ${workflow.repeat_required==='no'?'checked':''} ${editable?'':'disabled'}><span><b>ไม่ทำ Repeat</b><small>เลือกได้เมื่อมีเหตุผลตาม WI หรือสรุปจากการตรวจสอบได้โดยไม่ต้องตรวจซ้ำ</small></span></label></div><div id="ncNoRepeatReasonWrap" class="nc-form-field nc-wide ${workflow.repeat_required==='no'?'':'hidden'}"><label>เหตุผลที่ไม่ทำ Repeat</label><textarea id="ncNoRepeatReason" ${editable?'':'disabled'} placeholder="ระบุเหตุผลให้ชัดเจน">${esc(workflow.no_repeat_reason||'')}</textarea></div><div id="ncRepeatRoundsWrap" class="${workflow.repeat_required==='no'?'hidden':''}"><div class="nc-repeat-toolbar"><div><h3>ผลตรวจซ้ำ</h3><p>เพิ่มครั้งใหม่ได้ หากยังต้องตรวจยืนยันต่อ</p></div>${editable?'<button type="button" class="btn primary" id="ncAddRepeat">+ เพิ่ม Repeat</button>':''}</div><div id="ncRepeatRounds"></div></div>${ncEvidenceUploaderHtml('repeat',evidence,editable,'หลักฐานผลตรวจซ้ำ')}`);
+    const step3=stepPanel(3,'check','สรุปผลหลังตรวจซ้ำ','','ระบบจะแยกทางไปตามผล Repeat',`<div id="ncDecisionHost"></div><div id="ncRepeatSummaryHost"></div><div id="ncRepeatPassCauseWrap" class="nc-form-field nc-wide hidden"><label>พบสาเหตุของผลแรกชัดเจนหรือไม่?</label><div class="nc-inline-choice"><label><input type="radio" name="ncCauseKnown" value="yes" ${workflow.first_fail_cause_known==='yes'?'checked':''} ${editable?'':'disabled'}> พบสาเหตุชัดเจน</label><label><input type="radio" name="ncCauseKnown" value="no" ${workflow.first_fail_cause_known==='no'?'checked':''} ${editable?'':'disabled'}> ยังไม่ทราบสาเหตุ</label></div></div><div id="ncManualConclusionWrap" class="nc-form-field nc-wide hidden"><label>สรุปผลจากการตรวจสอบ</label><select id="ncManualConclusion" ${editable?'':'disabled'}>${enumOptions([['technical_error',NC_VERIFY_TH.technical_error],['confirmed_failure',NC_VERIFY_TH.confirmed_failure]],n.verification_result==='pending'?'':n.verification_result,'เลือกผล')}</select></div><div class="nc-form-field nc-wide"><label>สรุปการตรวจสอบ <small>Verification</small></label><textarea id="ncVerificationNote" ${editable?'':'disabled'} placeholder="สรุปว่าผลแรกเกิดจากอะไร หรือเหตุใดยังต้องสอบสวนต่อ">${esc(n.verification_note||'')}</textarea></div><input type="hidden" id="ncVerification" value="${esc(n.verification_result||'pending')}">`);
+    const step4=stepPanel(4,'shield','ประเมินผลกระทบ','','ดูว่าถุงอยู่ที่ไหน ต้องจัดการอย่างไร และมีผลต่อถุงอื่นหรือผู้ป่วยหรือไม่',`<div class="nc-form-grid"><div class="nc-form-field"><label>สถานะถุงเมื่อพบผล</label><select id="ncProductStatus" ${editable?'':'disabled'}>${enumOptions([['in_stock','ยังอยู่ในคลัง'],['issued_not_transfused','จ่ายออกแล้ว แต่ยังไม่ให้ผู้ป่วย'],['transfused','ให้ผู้ป่วยแล้ว'],['destroyed','ทำลายแล้ว'],['unknown','ยังไม่ทราบ']],n.product_status,'เลือกสถานะถุง')}</select></div><div class="nc-form-field"><label>จัดการถุงอย่างไร</label><select id="ncDisposition" ${editable?'':'disabled'}>${enumOptions([['quarantine','กักกัน / งดจ่าย'],['destroy','ทำลาย'],['release_with_approval','ปล่อยใช้ตามการอนุมัติ'],['notify_clinical','แจ้งหน่วยรักษา / ผู้เกี่ยวข้อง'],['no_action','ไม่ต้องดำเนินการกับผลิตภัณฑ์'],['other','อื่น ๆ']],n.disposition,'เลือกการจัดการ')}</select></div><div class="nc-form-field nc-wide"><label>รายละเอียดการจัดการ</label><textarea id="ncDispositionNote" ${editable?'':'disabled'} placeholder="อธิบายว่าทำอะไรกับถุงนี้บ้าง">${esc(n.disposition_note||'')}</textarea></div><div class="nc-form-field nc-wide"><label>ขอบเขตผลกระทบ <small>Scope assessment</small></label><textarea id="ncScope" ${editable?'':'disabled'} placeholder="เช่น เฉพาะถุงนี้ / วันผลิตเดียวกัน / lot เดียวกัน / เครื่องเดียวกัน / ผู้ปฏิบัติงานเดียวกัน">${esc(n.scope_assessment||'')}</textarea></div><div class="nc-form-field"><label>การแจ้งผู้เกี่ยวข้อง</label><select id="ncNotification" ${editable?'':'disabled'}>${enumOptions([['not_required','ไม่จำเป็น'],['required_pending','ต้องแจ้ง / รอดำเนินการ'],['completed','แจ้งแล้ว']],n.notification_status,'เลือกสถานะการแจ้ง')}</select></div><div class="nc-form-field"><label>บันทึกการแจ้ง</label><input id="ncNotificationNote" ${editable?'':'disabled'} value="${esc(n.notification_note||'')}" placeholder="หน่วยหรือบุคคลที่แจ้ง / วันที่แจ้ง"></div></div>${ncEvidenceUploaderHtml('other',evidence,editable,'หลักฐานการจัดการผลิตภัณฑ์')}`);
+    const finalConclusionExtra=(n.verification_result||'pending')==='pending'?`<div class="nc-form-field"><label>หลังสอบสวน สรุปเคสเป็น</label><select id="ncInvestigationConclusion" ${editable?'':'disabled'}>${enumOptions([['technical_error',NC_VERIFY_TH.technical_error],['confirmed_failure',NC_VERIFY_TH.confirmed_failure]],'','เลือกผลหลังสอบสวน')}</select></div>`:'';
+    const step5=stepPanel(5,'target','หาสาเหตุและแก้ไขเบื้องต้น','','หาสาเหตุจริง แล้วบันทึกสิ่งที่ทำทันทีเพื่อควบคุมเหตุการณ์',`<div class="nc-form-grid">${finalConclusionExtra}<div class="nc-form-field"><label>หมวดสาเหตุหลัก</label><select id="ncRootCause" ${editable?'':'disabled'}>${selectOptions(roots,n.root_cause_category,'เลือกหมวดสาเหตุ')}</select></div><div class="nc-form-field nc-wide"><label>รายละเอียดสาเหตุ <small>Root cause</small></label><textarea id="ncRootDetail" ${editable?'':'disabled'} placeholder="สรุปสาเหตุที่แท้จริงจากการสอบสวน">${esc(n.root_cause_detail||'')}</textarea></div><div class="nc-form-field nc-wide"><label>การแก้ไขเบื้องต้น <small>Correction</small></label><textarea id="ncCorrection" ${editable?'':'disabled'} placeholder="เช่น กักกันถุง ตรวจซ้ำ ตรวจเครื่อง เปลี่ยน consumable">${esc(n.immediate_correction||'')}</textarea></div></div>${ncEvidenceUploaderHtml('investigation',evidence,editable,'หลักฐานการสอบสวน')}`);
+    const step6=stepPanel(6,'wrench','ต้องทำ Corrective Action เพิ่มหรือไม่?','','เลือกตามสาเหตุ ความรุนแรง และโอกาสเกิดซ้ำ',`<div class="nc-repeat-choice"><label class="nc-choice-card"><input type="radio" name="ncCapaRequired" value="yes" ${workflow.capa_required==='yes'?'checked':''} ${editable?'':'disabled'}><span><b>จำเป็นต้องทำ</b><small>มีความเสี่ยงเกิดซ้ำ / กระทบกระบวนการ / ต้องแก้ระบบ</small></span></label><label class="nc-choice-card"><input type="radio" name="ncCapaRequired" value="no" ${workflow.capa_required==='no'?'checked':''} ${editable?'':'disabled'}><span><b>ไม่จำเป็น</b><small>เหตุการณ์เฉพาะครั้ง ควบคุมได้ และมีเหตุผลรองรับ</small></span></label></div><div id="ncCapaYesWrap" class="nc-form-grid ${workflow.capa_required==='yes'?'':'hidden'}"><div class="nc-form-field nc-wide"><label>แผนแก้ไขป้องกันซ้ำ <small>Corrective Action</small></label><textarea id="ncCorrectiveAction" ${editable?'':'disabled'} placeholder="เช่น ปรับ WI, retrain, PM/สอบเทียบ, เปลี่ยน lot, เพิ่ม checkpoint">${esc(n.corrective_action||'')}</textarea></div><div class="nc-form-field"><label>ผู้รับผิดชอบ</label><select id="ncResponsible" ${editable?'':'disabled'}>${profileOptions(n.responsible_by)}</select></div><div class="nc-form-field"><label>กำหนดเสร็จ</label><input id="ncDueDate" type="date" ${editable?'':'disabled'} value="${esc(n.due_date||'')}"></div></div><div id="ncCapaNoWrap" class="nc-form-field nc-wide ${workflow.capa_required==='no'?'':'hidden'}"><label>เหตุผลที่ไม่เปิด Corrective Action</label><textarea id="ncCapaNoReason" ${editable?'':'disabled'} placeholder="ระบุเหตุผล เช่น เป็น technical error เฉพาะครั้ง แก้ไขแล้ว และไม่พบผลกระทบอื่น">${esc(workflow.capa_not_required_reason||'')}</textarea></div>${ncEvidenceUploaderHtml('corrective_action',evidence,editable,'หลักฐานการแก้ไข')}`);
+    const step7=stepPanel(7,'activity','ติดตามผล','Effectiveness',workflow.capa_required==='yes'?'ติดตามว่าการแก้ไขป้องกันซ้ำได้ผลจริงหรือไม่':'ขั้นนี้จะข้ามได้ เมื่อสรุปว่าไม่จำเป็นต้องทำ Corrective Action',`<div id="ncEffectNeededWrap" class="${workflow.capa_required==='yes'?'':'hidden'}"><div class="nc-form-grid"><div class="nc-form-field nc-wide"><label>วิธีติดตามผล</label><textarea id="ncEffectMethod" ${editable?'':'disabled'} placeholder="เช่น ติดตาม QC ถัดไป 3 ครั้ง / ติดตาม 1 เดือน / audit การปฏิบัติตาม WI">${esc(n.effectiveness_method||'')}</textarea></div><div class="nc-form-field"><label>กำหนดติดตาม</label><input id="ncEffectDue" type="date" ${editable?'':'disabled'} value="${esc(n.effectiveness_due_date||'')}"></div><div class="nc-form-field"><label>ผลการติดตาม</label><select id="ncEffectResult" ${editable?'':'disabled'}>${enumOptions([['pending',NC_EFFECT_TH.pending],['effective',NC_EFFECT_TH.effective],['not_effective',NC_EFFECT_TH.not_effective]],n.effectiveness_result||'pending','เลือกผลการติดตาม')}</select></div><div class="nc-form-field nc-wide"><label>รายละเอียดผลติดตาม</label><textarea id="ncEffectNote" ${editable?'':'disabled'} placeholder="บันทึกผลที่พบหลังติดตาม">${esc(n.effectiveness_note||'')}</textarea></div>${n.effectiveness_checked_at?`<div class="nc-form-field nc-wide"><div class="readonly-box">ผู้ตรวจติดตามผล: ${esc(profileName(n.effectiveness_checked_by))} · ${esc(dateTH(n.effectiveness_checked_at))}</div></div>`:''}</div>${ncEvidenceUploaderHtml('effectiveness',evidence,editable,'หลักฐานการติดตามผล')}</div><div id="ncEffectSkipWrap" class="nc-decision-card neutral ${workflow.capa_required==='yes'?'hidden':''}"><h3>ยังไม่ต้องกรอกขั้นนี้</h3><p>ถ้าขั้นก่อนหน้าเลือก “ไม่จำเป็นต้องทำ Corrective Action” ระบบจะข้ามไปสรุปปิดเคส</p></div>`);
+    const step8=stepPanel(8,'check','สรุปและปิดเคส','','ทบทวนเส้นทางทั้งหมดก่อนส่งให้ผู้มีสิทธิ์ปิดเคส',`<div id="ncCloseSummary"></div><div class="nc-form-grid"><div class="nc-form-field nc-wide"><label>สรุปก่อนปิดเคส</label><textarea id="ncCloseNote" ${closed||canClose?'':'disabled'} ${closed?'disabled':''} placeholder="สรุปสิ่งที่พบ สิ่งที่ทำ และเหตุผลที่ปิดเคสได้">${esc(n.close_note||'')}</textarea></div>${closed?`<div class="nc-form-field nc-wide"><div class="notice good"><strong>ปิดเคสแล้ว</strong><br>${esc(profileName(n.closed_by))} · ${esc(dateTH(n.closed_at))}${n.close_note?`<br>${esc(n.close_note)}`:''}</div></div>`:''}</div>`);
     $('#view-nonconformance').innerHTML=`<div class="page-head nc-case-head"><div><div class="breadcrumb"><button class="link-btn" id="ncBackList">QC ไม่ผ่าน / Corrective Action</button><span>›</span><span>${esc(n.nc_no)}</span></div><h1>${esc(n.nc_no)}</h1><p class="muted">${esc(ncModuleTH(n.module))} · ${esc(n.product_no)} · ${esc(n.product_type)}</p></div><div class="actions">${ncStatusBadge(n.status)}<button class="btn" id="ncOpenSource">ดูรายการ QC ต้นฉบับ</button></div></div>
-      <div class="notice warning nc-principle-note"><strong>หลักการสำคัญ:</strong> ระบบเก็บผล QC เดิมไว้เสมอ การตรวจซ้ำหรือแก้ไขในหน้านี้จะไม่ทับข้อมูลเดิม</div>
+      <div class="notice warning nc-principle-note"><strong>หลักการสำคัญ:</strong> เก็บผล QC เดิมไว้เสมอ ผล Repeat เป็นข้อมูลเพิ่ม ไม่ใช้แทนผลเดิม</div>
       <div class="nc-wizard-progress"><div><span>กำลังทำขั้นตอน</span><strong id="ncWizardProgressText">${activeStep} / 8 · ${esc(NC_WIZARD_STEPS[activeStep-1].label)}</strong></div><div class="nc-progress-track"><span id="ncProgressBar" style="width:${activeStep/8*100}%"></span></div></div>
       ${ncStepTabs(activeStep)}
       <div class="nc-wizard-stage">${step1}${step2}${step3}${step4}${step5}${step6}${step7}${step8}</div>
       <div class="sticky-actions nc-sticky-actions nc-wizard-actions"><div class="left"><button class="btn" id="ncBackBottom">กลับรายการ NC</button></div><div class="right"><button class="btn" id="ncPrevStep">ย้อนกลับ</button>${editable?'<button class="btn primary" id="ncSave">บันทึก</button>':''}<button class="btn primary" id="ncNextStep">ถัดไป</button>${canClose?'<button class="btn good" id="ncClose">ทบทวนและปิดเคส</button>':''}</div></div>`;
+    const wf=ncRepeatWorkflow(n.repeat_result);
+    const syncWorkflow=()=>{
+      wf.initial_checks=$$('.nc-initial-check:checked',$('#view-nonconformance')).map(x=>x.value);
+      wf.immediate_note=$('#ncImmediateNote')?.value.trim()||'';
+      wf.repeat_required=$('input[name="ncRepeatRequired"]:checked')?.value||wf.repeat_required||'yes';
+      wf.no_repeat_reason=$('#ncNoRepeatReason')?.value.trim()||'';
+      wf.first_fail_cause_known=$('input[name="ncCauseKnown"]:checked')?.value||wf.first_fail_cause_known||'';
+      wf.capa_required=$('input[name="ncCapaRequired"]:checked')?.value||wf.capa_required||'';
+      wf.capa_not_required_reason=$('#ncCapaNoReason')?.value.trim()||'';
+      const rounds=[];$$('.nc-repeat-round',$('#view-nonconformance')).forEach(card=>{rounds.push({id:card.dataset.roundId||String(Date.now()),param_index:Number($('.nc-repeat-param',card)?.value||0),sample_source:$('.nc-repeat-sample',card)?.value||'same',reason:$('.nc-repeat-reason',card)?.value.trim()||'',measured_at:$('.nc-repeat-time',card)?.value||'',result_value:$('.nc-repeat-value',card)?.value.trim()||'',assessment:$('.nc-repeat-assessment',card)?.value||'',note:$('.nc-repeat-note',card)?.value.trim()||''});});wf.rounds=rounds;
+      if($('#ncRepeatWorkflow'))$('#ncRepeatWorkflow').value=ncRepeatWorkflowString(wf);
+      return wf;
+    };
+    const renderDecisionStep=()=>{
+      const host=$('#ncDecisionHost'),sum=$('#ncRepeatSummaryHost');if(!host||!sum)return;
+      const rounds=wf.rounds||[],latest=rounds.filter(x=>x.assessment).slice(-1)[0]||null;
+      sum.innerHTML=ncRepeatSummaryHtml(wf,params);
+      $('#ncRepeatPassCauseWrap')?.classList.add('hidden');$('#ncManualConclusionWrap')?.classList.add('hidden');
+      if(wf.repeat_required==='no'){
+        host.innerHTML='<div class="nc-decision-card neutral"><h3>ไม่ได้ทำ Repeat</h3><p>ให้สรุปผลจากการตรวจสอบและหลักฐานที่มี</p></div>';$('#ncManualConclusionWrap')?.classList.remove('hidden');return;
+      }
+      if(!latest){host.innerHTML='<div class="nc-decision-card neutral"><h3>ยังไม่มีผล Repeat</h3><p>กลับไปขั้นที่ 2 เพื่อบันทึกผลตรวจซ้ำก่อน</p></div>';return;}
+      if(latest.assessment==='fail'){host.innerHTML='<div class="nc-decision-card fail"><h3>Repeat ยังไม่ผ่าน</h3><p>ระบบจะแนะนำให้สรุปเป็น <b>ยืนยัน QC ไม่ผ่าน (Confirmed failure)</b></p></div>';return;}
+      if(latest.assessment==='pass'){host.innerHTML='<div class="nc-decision-card pass"><h3>Repeat ผ่านเกณฑ์</h3><p>ตอบต่อว่า รู้สาเหตุของผลแรกที่ผิดเกณฑ์ชัดเจนหรือไม่</p></div>';$('#ncRepeatPassCauseWrap')?.classList.remove('hidden');return;}
+      host.innerHTML='<div class="nc-decision-card warn"><h3>ผล Repeat ยังสรุปไม่ได้</h3><p>เพิ่ม Repeat อีกครั้ง หรือเดินหน้าสอบสวนต่อก่อนสรุปเคส</p></div>';
+    };
+    const updateCloseSummary=()=>{const host=$('#ncCloseSummary');if(!host)return;const v=$('#ncVerification')?.value||n.verification_result||'pending';host.innerHTML=`<div class="nc-case-summary"><div><span>ผลการตรวจสอบ</span><b>${esc(NC_VERIFY_TH[v]||v||'รอสรุป')}</b></div><div><span>Corrective Action</span><b>${wf.capa_required==='yes'?'จำเป็นต้องทำ':wf.capa_required==='no'?'ไม่จำเป็น':'ยังไม่ได้เลือก'}</b></div><div><span>หลักฐาน</span><b>${evidence.length} ไฟล์</b></div></div>`;};
+    const repeatRoundCard=(round,i)=>{const idx=Number(round.param_index)||0,p=params[idx]||params[0]||{};const auto=ncEvaluateRepeat(p,round.result_value),assessment=round.assessment||auto||'';return `<article class="nc-repeat-round" data-round-id="${esc(round.id||String(Date.now()+i))}"><div class="nc-repeat-round-head"><div><b>Repeat ครั้งที่ ${i+1}</b><small>${esc(p.name||'ผล QC')}</small></div>${ncRepeatOutcomeBadge(assessment)}${editable?`<button type="button" class="icon-btn nc-repeat-delete" aria-label="ลบผล Repeat">×</button>`:''}</div><div class="nc-repeat-round-grid"><div class="nc-form-field"><label>Parameter ที่ตรวจซ้ำ</label><select class="nc-repeat-param" ${editable?'':'disabled'}>${paramOpts.replace(`value="${idx}"`,`value="${idx}" selected`)}</select></div><div class="nc-form-field"><label>ตัวอย่าง</label><select class="nc-repeat-sample" ${editable?'':'disabled'}><option value="same" ${round.sample_source!=='new'?'selected':''}>ตัวอย่างเดิม</option><option value="new" ${round.sample_source==='new'?'selected':''}>ตัวอย่างใหม่</option></select></div><div class="nc-form-field"><label>วัน-เวลาที่ตรวจ</label><input class="nc-repeat-time" type="datetime-local" value="${esc(round.measured_at||inputFromISO(new Date().toISOString()))}" ${editable?'':'disabled'}></div><div class="nc-form-field"><label>ผลใหม่</label><input class="nc-repeat-value" value="${esc(round.result_value||'')}" ${editable?'':'disabled'} placeholder="กรอกค่าที่ได้"></div><div class="nc-form-field"><label>สรุปผล</label><select class="nc-repeat-assessment" ${editable?'':'disabled'}>${enumOptions([['pass','ผ่านเกณฑ์'],['fail','ยังไม่ผ่าน'],['inconclusive','ยังสรุปไม่ได้']],assessment,'เลือกผล')}</select></div><div class="nc-form-field nc-wide"><label>เหตุผล / หมายเหตุ</label><input class="nc-repeat-reason" value="${esc(round.reason||'')}" ${editable?'':'disabled'} placeholder="เช่น ตรวจยืนยันผลเดิม"><input class="nc-repeat-note" value="${esc(round.note||'')}" ${editable?'':'disabled'} placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)"></div></div></article>`;};
+    const renderRepeatRounds=()=>{const host=$('#ncRepeatRounds');if(!host)return;const rounds=wf.rounds||[];host.innerHTML=rounds.length?rounds.map(repeatRoundCard).join(''):'<div class="nc-repeat-empty">ยังไม่มีผล Repeat · กด “+ เพิ่ม Repeat” เพื่อเริ่มบันทึก</div>';$$('.nc-repeat-delete',host).forEach((b,i)=>b.onclick=()=>{wf.rounds.splice(i,1);renderRepeatRounds();syncWorkflow();renderDecisionStep();});$$('.nc-repeat-param,.nc-repeat-sample,.nc-repeat-time,.nc-repeat-value,.nc-repeat-assessment,.nc-repeat-reason,.nc-repeat-note',host).forEach(el=>el.onchange=()=>{const card=el.closest('.nc-repeat-round'),p=params[Number($('.nc-repeat-param',card)?.value||0)]||params[0]||{},val=$('.nc-repeat-value',card)?.value||'',auto=ncEvaluateRepeat(p,val);if(auto&&el.classList.contains('nc-repeat-value'))$('.nc-repeat-assessment',card).value=auto;syncWorkflow();renderRepeatRounds();renderDecisionStep();});};
+    renderRepeatRounds();syncWorkflow();renderDecisionStep();updateCloseSummary();
+    if($('#ncAddRepeat'))$('#ncAddRepeat').onclick=()=>{syncWorkflow();wf.rounds.push({id:String(Date.now()),param_index:0,sample_source:'same',reason:'ตรวจยืนยันผลเดิม',measured_at:inputFromISO(new Date().toISOString()),result_value:'',assessment:'',note:''});renderRepeatRounds();syncWorkflow();};
+    $$('input[name="ncRepeatRequired"]',$('#view-nonconformance')).forEach(x=>x.onchange=()=>{syncWorkflow();$('#ncRepeatRoundsWrap')?.classList.toggle('hidden',x.value==='no'&&x.checked);$('#ncNoRepeatReasonWrap')?.classList.toggle('hidden',!(x.value==='no'&&x.checked));renderDecisionStep();});
+    $$('input[name="ncCauseKnown"]',$('#view-nonconformance')).forEach(x=>x.onchange=()=>{syncWorkflow();renderDecisionStep();});$$('input[name="ncCapaRequired"]',$('#view-nonconformance')).forEach(x=>x.onchange=()=>{syncWorkflow();const yes=wf.capa_required==='yes';$('#ncCapaYesWrap')?.classList.toggle('hidden',!yes);$('#ncCapaNoWrap')?.classList.toggle('hidden',yes);$('#ncEffectNeededWrap')?.classList.toggle('hidden',!yes);$('#ncEffectSkipWrap')?.classList.toggle('hidden',yes);updateCloseSummary();});
+    ['ncImmediateNote','ncNoRepeatReason','ncCapaNoReason'].forEach(id=>{if($('#'+id))$('#'+id).oninput=syncWorkflow;});
+    $$('[data-nc-upload-target]',$('#view-nonconformance')).forEach(b=>b.onclick=()=>$('#'+b.dataset.ncUploadTarget)?.click());$$('[data-nc-upload-input]',$('#view-nonconformance')).forEach(inp=>inp.onchange=()=>uploadNcEvidence(n.id,inp.id));
     function setNcWizardStep(step,scroll=true){
-      const s=Math.min(8,Math.max(1,Number(step)||1));state.ncWizardStepById[n.id]=s;
+      syncWorkflow();const s=Math.min(8,Math.max(1,Number(step)||1));state.ncWizardStepById[n.id]=s;
       $$('.nc-step-panel',$('#view-nonconformance')).forEach(el=>el.classList.toggle('active',Number(el.dataset.ncStepPanel)===s));
       $$('.nc-wizard-tab',$('#view-nonconformance')).forEach(el=>{const active=Number(el.dataset.ncStepGo)===s;el.classList.toggle('active',active);el.setAttribute('aria-selected',active?'true':'false');});
       const txt=$('#ncWizardProgressText'),bar=$('#ncProgressBar');if(txt)txt.textContent=`${s} / 8 · ${NC_WIZARD_STEPS[s-1].label}`;if(bar)bar.style.width=`${s/8*100}%`;
-      const prev=$('#ncPrevStep'),next=$('#ncNextStep'),close=$('#ncClose');if(prev)prev.disabled=s===1;if(next){next.classList.toggle('hidden',s===8);next.textContent=s===7?'ไปสรุปปิดเคส':'ถัดไป';}if(close)close.classList.toggle('hidden',s!==8);
+      const prev=$('#ncPrevStep'),next=$('#ncNextStep'),close=$('#ncClose');if(prev)prev.disabled=s===1;if(next){next.classList.toggle('hidden',s===8);const labels={1:'เริ่มตรวจสอบ',2:'สรุปผล Repeat',3:'ประเมินผลกระทบ',4:'หาสาเหตุ',5:'วางแผนแก้ไข',6:wf.capa_required==='no'?'ไปสรุปปิดเคส':'ติดตามผล',7:'ไปสรุปปิดเคส'};next.textContent=labels[s]||'ถัดไป';}if(close)close.classList.toggle('hidden',s!==8);if(s===3)renderDecisionStep();if(s===8)updateCloseSummary();
       if(scroll)$('.nc-wizard-progress')?.scrollIntoView({behavior:'smooth',block:'start'});
     }
     $('#ncBackList').onclick=$('#ncBackBottom').onclick=()=>{state.currentNonconformanceId=null;renderNonconformancePage();};
     $('#ncOpenSource').onclick=()=>{if(n.module==='platelet'){state.currentRecordId=n.record_id;location.hash=ROUTES.platelet.record;}else if(n.module==='plasma'){state.currentPlasmaRecordId=n.record_id;location.hash=ROUTES.plasma.record;}else{state.currentRbcRecordId=n.record_id;location.hash=ROUTES.rbc.record;}};
     $$('.nc-wizard-tab',$('#view-nonconformance')).forEach(b=>b.onclick=()=>setNcWizardStep(b.dataset.ncStepGo));
-    $('#ncPrevStep').onclick=()=>{const cur=state.ncWizardStepById[n.id]||activeStep;const technical=$('#ncVerification')?.value==='technical_error';setNcWizardStep(cur===7&&technical?2:cur-1);};
-    $('#ncNextStep').onclick=()=>{const cur=state.ncWizardStepById[n.id]||activeStep;if(cur===2){const v=$('#ncVerification')?.value||'pending';if(v==='pending'){showToast('กรุณาสรุปผลการตรวจสอบก่อน','error');$('#ncVerification')?.focus();return;}if(v==='technical_error'){setNcWizardStep(7);return;}}setNcWizardStep(cur+1);};
-    if($('#ncSave'))$('#ncSave').onclick=()=>saveNonconformance(n.id,state.ncWizardStepById[n.id]||activeStep);if($('#ncClose'))$('#ncClose').onclick=()=>closeNonconformance(n.id);
-    if($('#ncEvidenceCameraBtn'))$('#ncEvidenceCameraBtn').onclick=()=>$('#ncEvidenceCamera').click();if($('#ncEvidenceFileBtn'))$('#ncEvidenceFileBtn').onclick=()=>$('#ncEvidenceFile').click();
-    if($('#ncEvidenceCamera'))$('#ncEvidenceCamera').onchange=()=>uploadNcEvidence(n.id,'ncEvidenceCamera');if($('#ncEvidenceFile'))$('#ncEvidenceFile').onchange=()=>uploadNcEvidence(n.id,'ncEvidenceFile');
+    $('#ncPrevStep').onclick=()=>{const cur=state.ncWizardStepById[n.id]||activeStep;setNcWizardStep(cur-1);};
+    $('#ncNextStep').onclick=()=>{const cur=state.ncWizardStepById[n.id]||activeStep;syncWorkflow();
+      if(cur===2){
+        if(wf.repeat_required==='yes'){
+          const rounds=wf.rounds||[];if(!rounds.length){showToast('กรุณาบันทึกผล Repeat อย่างน้อย 1 ครั้ง หรือเลือก “ไม่ทำ Repeat” พร้อมเหตุผล','error');return;}
+          const last=rounds[rounds.length-1];if(!last.result_value||!last.assessment){showToast('กรุณากรอกผลและสรุปผล Repeat ครั้งล่าสุดให้ครบ','error');return;}
+        }else if(!wf.no_repeat_reason){showToast('กรุณาระบุเหตุผลที่ไม่ทำ Repeat','error');return;}
+      }
+      if(cur===3){
+        let verification=$('#ncVerification')?.value||n.verification_result||'pending';const rounds=wf.rounds||[],last=rounds[rounds.length-1];
+        if(wf.repeat_required==='no'){
+          verification=$('#ncManualConclusion')?.value||verification;if(!verification||verification==='pending'){showToast('กรุณาสรุปผลจากการตรวจสอบก่อน','error');return;}
+        }else if(last?.assessment==='fail')verification='confirmed_failure';
+        else if(last?.assessment==='pass'){
+          if(wf.first_fail_cause_known==='yes')verification='technical_error';
+          else if(wf.first_fail_cause_known==='no'){verification='pending';wf.continue_investigation=true;}
+          else{showToast('กรุณาระบุว่าพบสาเหตุของผลแรกชัดเจนหรือไม่','error');return;}
+        }else if(last?.assessment==='inconclusive'){verification='pending';wf.continue_investigation=true;}
+        else{showToast('ยังไม่มีผล Repeat ที่สรุปได้','error');return;}
+        if(!$('#ncVerificationNote')?.value.trim()){showToast('กรุณาสรุปการตรวจสอบสั้น ๆ ก่อนดำเนินการต่อ','error');$('#ncVerificationNote')?.focus();return;}
+        if($('#ncVerification'))$('#ncVerification').value=verification;syncWorkflow();
+      }
+      if(cur===4){if(!$('#ncProductStatus')?.value||!$('#ncDisposition')?.value){showToast('กรุณาเลือกสถานะถุงและการจัดการผลิตภัณฑ์ก่อน','error');return;}}
+      if(cur===5){
+        if(($('#ncVerification')?.value||n.verification_result||'pending')==='pending'){
+          const v=$('#ncInvestigationConclusion')?.value||'';if(!v){showToast('กรุณาสรุปผลหลังสอบสวนก่อน','error');return;}$('#ncVerification').value=v;
+        }
+        if(!$('#ncRootCause')?.value||!$('#ncRootDetail')?.value.trim()||!$('#ncCorrection')?.value.trim()){showToast('กรุณาระบุหมวดสาเหตุ รายละเอียดสาเหตุ และการแก้ไขเบื้องต้นให้ครบ','error');return;}
+      }
+      if(cur===6){
+        if(!wf.capa_required){showToast('กรุณาเลือกว่าจำเป็นต้องทำ Corrective Action เพิ่มหรือไม่','error');return;}
+        if(wf.capa_required==='no'){
+          if(!wf.capa_not_required_reason){showToast('กรุณาระบุเหตุผลที่ไม่เปิด Corrective Action','error');return;}setNcWizardStep(8);return;
+        }
+        if(!$('#ncCorrectiveAction')?.value.trim()||!$('#ncResponsible')?.value||!$('#ncDueDate')?.value){showToast('กรุณาระบุแผนแก้ไข ผู้รับผิดชอบ และกำหนดเสร็จให้ครบ','error');return;}
+      }
+      if(cur===7){
+        if(wf.capa_required!=='yes'){setNcWizardStep(8);return;}
+        const method=$('#ncEffectMethod')?.value.trim(),due=$('#ncEffectDue')?.value,result=$('#ncEffectResult')?.value||'pending';
+        if(!method||!due||result==='pending'){showToast('กรุณาระบุวิธีติดตาม กำหนดติดตาม และผลการติดตามให้ครบ','error');return;}
+        if(result==='not_effective'){showToast('Corrective Action ยังไม่ได้ผล กรุณากลับไปทบทวนสาเหตุและแผนแก้ไข','error');setNcWizardStep(5);return;}
+      }
+      setNcWizardStep(cur+1);
+    };
+    if($('#ncSave'))$('#ncSave').onclick=()=>{syncWorkflow();saveNonconformance(n.id,state.ncWizardStepById[n.id]||activeStep);};if($('#ncClose'))$('#ncClose').onclick=()=>{syncWorkflow();closeNonconformance(n.id);};
     $$('.nc-ev-view').forEach(b=>b.onclick=()=>viewNcEvidence(b.dataset.id));$$('.nc-ev-delete').forEach(b=>b.onclick=()=>deleteNcEvidence(b.dataset.id));
     setNcWizardStep(activeStep,false);
   }
   function collectNonconformanceForm(n){
-    const verification=$('#ncVerification')?.value||n.verification_result||'pending',effect=$('#ncEffectResult')?.value||n.effectiveness_result||'pending';
+    const workflowText=$('#ncRepeatWorkflow')?.value||n.repeat_result||null,workflow=ncRepeatWorkflow(workflowText);
+    let verification=$('#ncVerification')?.value||n.verification_result||'pending';
+    if(verification==='pending'&&$('#ncInvestigationConclusion')?.value)verification=$('#ncInvestigationConclusion').value;
+    const effect=$('#ncEffectResult')?.value||n.effectiveness_result||'pending';
     let status='pending_verification';
-    if(verification==='technical_error')status='technical_error';
-    if(verification==='confirmed_failure')status=$('#ncCorrectiveAction')?.value.trim()?(effect==='pending'?'capa_in_progress':'effectiveness_monitoring'):'confirmed_failure';
-    return {verification_result:verification,verification_note:$('#ncVerificationNote')?.value.trim()||null,repeat_result:$('#ncRepeatResult')?.value.trim()||null,product_status:$('#ncProductStatus')?.value||null,disposition:$('#ncDisposition')?.value||null,disposition_note:$('#ncDispositionNote')?.value.trim()||null,scope_assessment:$('#ncScope')?.value.trim()||null,notification_status:$('#ncNotification')?.value||null,notification_note:$('#ncNotificationNote')?.value.trim()||null,root_cause_category:$('#ncRootCause')?.value||null,root_cause_detail:$('#ncRootDetail')?.value.trim()||null,immediate_correction:$('#ncCorrection')?.value.trim()||null,corrective_action:$('#ncCorrectiveAction')?.value.trim()||null,responsible_by:$('#ncResponsible')?.value||null,due_date:$('#ncDueDate')?.value||null,effectiveness_method:$('#ncEffectMethod')?.value.trim()||null,effectiveness_due_date:$('#ncEffectDue')?.value||null,effectiveness_result:effect,effectiveness_note:$('#ncEffectNote')?.value.trim()||null,close_note:$('#ncCloseNote')?.value.trim()||null,status};
+    if(workflow.capa_required==='yes'&&$('#ncCorrectiveAction')?.value.trim())status=effect==='pending'?'capa_in_progress':'effectiveness_monitoring';
+    else if(verification==='technical_error')status='technical_error';
+    else if(verification==='confirmed_failure')status='confirmed_failure';
+    return {verification_result:verification,verification_note:$('#ncVerificationNote')?.value.trim()||n.verification_note||null,repeat_result:workflowText,product_status:$('#ncProductStatus')?.value||n.product_status||null,disposition:$('#ncDisposition')?.value||n.disposition||null,disposition_note:$('#ncDispositionNote')?.value.trim()||n.disposition_note||null,scope_assessment:$('#ncScope')?.value.trim()||n.scope_assessment||null,notification_status:$('#ncNotification')?.value||n.notification_status||null,notification_note:$('#ncNotificationNote')?.value.trim()||n.notification_note||null,root_cause_category:$('#ncRootCause')?.value||n.root_cause_category||null,root_cause_detail:$('#ncRootDetail')?.value.trim()||n.root_cause_detail||null,immediate_correction:$('#ncCorrection')?.value.trim()||n.immediate_correction||null,corrective_action:workflow.capa_required==='yes'?($('#ncCorrectiveAction')?.value.trim()||n.corrective_action||null):null,responsible_by:workflow.capa_required==='yes'?($('#ncResponsible')?.value||n.responsible_by||null):null,due_date:workflow.capa_required==='yes'?($('#ncDueDate')?.value||n.due_date||null):null,effectiveness_method:workflow.capa_required==='yes'?($('#ncEffectMethod')?.value.trim()||n.effectiveness_method||null):null,effectiveness_due_date:workflow.capa_required==='yes'?($('#ncEffectDue')?.value||n.effectiveness_due_date||null):null,effectiveness_result:workflow.capa_required==='yes'?effect:'pending',effectiveness_note:workflow.capa_required==='yes'?($('#ncEffectNote')?.value.trim()||n.effectiveness_note||null):null,close_note:$('#ncCloseNote')?.value.trim()||n.close_note||null,status};
   }
   async function saveNonconformance(id,keepStep=null){
     const n=state.nonconformances.find(x=>x.id===id);if(!n)return;
@@ -819,23 +944,22 @@
   }
   async function closeNonconformance(id){
     const n=state.nonconformances.find(x=>x.id===id);if(!n||!(adminUi()||reviewerUi()))return;
-    const payload=collectNonconformanceForm(n);
-    if(payload.verification_result==='pending'){showToast('ต้องสรุปผลการตรวจสอบ (Verification) ก่อนปิดเคส','error');return;}
-    if(payload.verification_result==='technical_error'){
-      if(!payload.verification_note){showToast('กรณีปัญหาทางเทคนิค (Technical / Test error) ต้องมีรายละเอียดการตรวจสอบก่อนปิดเคส','error');return;}
-    }else{
-      if(!payload.product_status||!payload.disposition){showToast('กรุณาประเมินสถานะและการจัดการผลิตภัณฑ์','error');return;}
-      if(!payload.root_cause_category||!payload.root_cause_detail||!payload.immediate_correction){showToast('กรุณาระบุสาเหตุ (Root cause) และการแก้ไขเบื้องต้น (Correction) ให้ครบ','error');return;}
-      if(!payload.corrective_action||!payload.responsible_by||!payload.due_date){showToast('กรุณาระบุแผนแก้ไขป้องกันซ้ำ (Corrective Action) ผู้รับผิดชอบ และกำหนดเสร็จ','error');return;}
-      if(!payload.effectiveness_method||payload.effectiveness_result!=='effective'){showToast('ปิดเคสได้เมื่อมีวิธีติดตามผล (Effectiveness) และผลการติดตาม = ได้ผล','error');return;}
-    }
-    if(!payload.close_note){showToast('กรุณาระบุหมายเหตุสรุปก่อนปิดเคส','error');$('#ncCloseNote')?.focus();return;}
+    const payload=collectNonconformanceForm(n),workflow=ncRepeatWorkflow(payload.repeat_result);
+    if(payload.verification_result==='pending'){showToast('ยังสรุปผลการตรวจสอบไม่ได้ กรุณาสอบสวนต่อก่อนปิดเคส','error');return;}
+    if(!payload.product_status||!payload.disposition){showToast('กรุณาประเมินสถานะและการจัดการผลิตภัณฑ์ก่อนปิดเคส','error');return;}
+    if(!payload.root_cause_category||!payload.root_cause_detail||!payload.immediate_correction){showToast('กรุณาระบุสาเหตุ (Root cause) และการแก้ไขเบื้องต้น (Correction) ให้ครบ','error');return;}
+    if(!workflow.capa_required){showToast('กรุณาสรุปว่าจำเป็นต้องทำ Corrective Action เพิ่มหรือไม่','error');return;}
+    if(workflow.capa_required==='yes'){
+      if(!payload.corrective_action||!payload.responsible_by||!payload.due_date){showToast('กรุณาระบุ Corrective Action ผู้รับผิดชอบ และกำหนดเสร็จให้ครบ','error');return;}
+      if(!payload.effectiveness_method||payload.effectiveness_result!=='effective'){showToast('ปิดเคสได้เมื่อมีวิธีติดตามผล และผล Effectiveness = ได้ผล','error');return;}
+    }else if(!workflow.capa_not_required_reason){showToast('กรุณาระบุเหตุผลที่ไม่จำเป็นต้องทำ Corrective Action','error');return;}
+    if(!payload.close_note){showToast('กรุณาระบุสรุปก่อนปิดเคส','error');$('#ncCloseNote')?.focus();return;}
     if(!confirm(`ยืนยันปิด ${n.nc_no} ?`))return;
-    try{const {error}=await state.sb.from('qc_nonconformances').update({...payload,status:'closed'}).eq('id',id);if(error)throw error;await logActivity('close','nonconformance',id,{nc_no:n.nc_no,verification_result:payload.verification_result});await reloadNonconformanceData();state.currentNonconformanceId=id;renderNonconformancePage();showToast('ปิดเคส QC ไม่ผ่านแล้ว','good');}catch(e){showToast(errText(e),'error');}
+    try{const {error}=await state.sb.from('qc_nonconformances').update({...payload,status:'closed'}).eq('id',id);if(error)throw error;await logActivity('close','nonconformance',id,{nc_no:n.nc_no,verification_result:payload.verification_result,capa_required:workflow.capa_required});await reloadNonconformanceData();state.currentNonconformanceId=id;renderNonconformancePage();showToast('ปิดเคส QC ไม่ผ่านแล้ว','good');}catch(e){showToast(errText(e),'error');}
   }
   async function uploadNcEvidence(ncId,inputId){
     const input=$('#'+inputId),file=input?.files?.[0];if(!file)return;if(file.size>10*1024*1024){showToast('ไฟล์ต้องไม่เกิน 10 MB','error');input.value='';return;}
-    const category=$('#ncEvidenceCategory')?.value||'other';
+    const category=input?.dataset?.category||$('#ncEvidenceCategory')?.value||'other';
     try{const clean=file.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-100),path=`nonconformance/${ncId}/${category}/${Date.now()}_${clean}`;const {error:u}=await state.sb.storage.from('bloodqc-evidence').upload(path,file,{upsert:false,contentType:file.type||undefined});if(u)throw u;const {data,error}=await state.sb.from('qc_nonconformance_evidence').insert({nonconformance_id:ncId,category,storage_path:path,original_name:file.name,mime_type:file.type,file_size:file.size,uploaded_by:state.user.id}).select('*').single();if(error){await state.sb.storage.from('bloodqc-evidence').remove([path]);throw error;}input.value='';await logActivity('insert','nonconformance_evidence',data.id,{nonconformance_id:ncId,category});await reloadNonconformanceData();state.currentNonconformanceId=ncId;renderNonconformancePage();showToast('แนบหลักฐานแล้ว','good');}catch(e){showToast(errText(e),'error');}
   }
   async function viewNcEvidence(id){const e=state.nonconformanceEvidence.find(x=>x.id===id);if(!e)return;const {data,error}=await state.sb.storage.from('bloodqc-evidence').createSignedUrl(e.storage_path,120);if(error)showToast(errText(error),'error');else window.open(data.signedUrl,'_blank','noopener');}
