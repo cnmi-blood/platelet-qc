@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.20 - repeat-first QC fail branching workflow */
+/* CNMI Blood Component QC v5.3.21 - platelet split dispensing calculator */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -26,7 +26,7 @@
   const productOptions = selected => activeProducts().map(x=>`<option value="${esc(x.product_type)}" ${selected===x.product_type?'selected':''}>${esc(x.product_type)}</option>`).join('');
   const ROUTES = {
     home:'#/',
-    platelet:{dashboard:'#/platelet',record:'#/platelet/new',records:'#/platelet/records',guide:'#/platelet/guide',settings:'#/platelet/qc_settings'},
+    platelet:{dashboard:'#/platelet',record:'#/platelet/new',records:'#/platelet/records',guide:'#/platelet/guide',split:'#/platelet/split',settings:'#/platelet/qc_settings'},
     rbc:{dashboard:'#/rbc',record:'#/rbc/new',records:'#/rbc/records',guide:'#/rbc/guide',settings:'#/rbc/qc_settings'},
     plasma:{dashboard:'#/plasma',record:'#/plasma/new',records:'#/plasma/records',guide:'#/plasma/guide',settings:'#/plasma/qc_settings'},
     review:'#/review',
@@ -68,7 +68,7 @@
       for(const [page,hash] of Object.entries(routes)){
         if(h===hash){
           if(module==='platelet'){
-            const viewMap={dashboard:'dashboard',record:'record',records:'records',guide:'guide',settings:'settings'};
+            const viewMap={dashboard:'dashboard',record:'record',records:'records',guide:'guide',split:'module',settings:'settings'};
             return {view:viewMap[page]||'dashboard',module,page,hash,adminOnly:page==='settings'};
           }
           return {view:'module',module,page,hash,adminOnly:page==='settings'};
@@ -88,10 +88,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.20 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.21 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.20 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.21 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -112,7 +112,7 @@
   function cfgReady(){ return C.SUPABASE_URL && C.SUPABASE_KEY && !C.SUPABASE_URL.includes('PASTE_') && !C.SUPABASE_KEY.includes('PASTE_'); }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'5.3.20',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.3.21',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -1029,12 +1029,75 @@
         <section class="guide-card"><div class="guide-no">4</div><div><h2>กรอกผล CBC, ADAM และ pH</h2><p>แต่ละผลกรอกต่างวันหรือต่างคนได้ ให้ใส่วัน-เวลาที่ตรวจจริงของผลนั้น</p><p>ถ้า pH ไม่ได้วัดในวันหมดอายุ ให้ใส่เหตุผลตามที่ระบบถาม</p></div></section>
         <section class="guide-card"><div class="guide-no">5</div><div><h2>แนบหลักฐานกับผลแต่ละส่วน</h2><p>CBC, ADAM และ pH มีช่องหลักฐานของตัวเอง ให้แนบรูปหรือ PDF ให้ตรงกับผลที่กรอก</p><div class="guide-callout">ถ้าต้องแก้ผลภายหลัง ให้เก็บหลักฐานเดิมไว้และแนบหลักฐานใหม่เพิ่ม</div></div></section>
         <section class="guide-card"><div class="guide-no">6</div><div><h2>บันทึกและส่งแพทย์</h2><p><strong>Prepare</strong> บันทึกไว้และกลับมาเติมข้อมูลได้ ส่วนรายการ <strong>ใช้เป็น QC</strong> เมื่อกรอกครบและมีหลักฐานครบ ให้ส่งแพทย์ทบทวน</p><p>ถ้าพบข้อมูลผิดหลัง LOCK ให้แจ้ง Admin พร้อมเหตุผลและหลักฐานที่ถูกต้อง ระบบจะเก็บประวัติการแก้ไว้ให้ตรวจย้อนหลัง</p></div></section>
+        <section class="guide-card"><div class="guide-no">7</div><div><h2>กรณีแบ่ง Platelet ไปจ่าย</h2><p>อย่านำ Yield หรือ Platelet Related ของถุงหลักไปใช้กับส่วนที่แบ่งโดยตรง ให้คำนวณใหม่ตามปริมาตรที่แบ่งจริงทุกครั้ง</p><div class="guide-callout">เข้าเมนู <strong>คำนวณแบ่งจ่าย</strong> เลือกถุงหลัก → ใส่ปริมาตรที่แบ่ง → ระบบคำนวณ Yield และ Platelet Related ของส่วนแบ่งให้</div><div class="actions left-actions" style="margin-top:10px"><button class="btn" data-go-route="#/platelet/split">เปิดตัวคำนวณแบ่งจ่าย</button></div></div></section>
       </div>
       <div class="panel guide-terms"><h2>คำที่เจอบ่อย</h2><div class="term-grid"><div><strong>Prepare</strong><span>รายการเตรียมตามปกติ</span></div><div><strong>QC</strong><span>รายการที่ใช้ตรวจคุณภาพ</span></div><div><strong>ร่าง</strong><span>ยังกลับมาเติมหรือแก้ข้อมูลได้</span></div><div><strong>รอแพทย์</strong><span>ส่งให้แพทย์ทบทวนแล้ว</span></div><div><strong>LOCK</strong><span>แพทย์ทบทวนเสร็จแล้ว</span></div></div></div>`;
     bindRouteButtons($('#view-guide'));
   }
 
+  function plateletSplitEligibleRecords(){
+    return state.records.filter(r=>!r.deleted_at&&num(r.volume_ml)!==null&&num(r.volume_ml)>0&&num(r.platelet_yield)!==null&&num(r.platelet_yield)>0)
+      .sort((a,b)=>String(b.collection_at||b.created_at||'').localeCompare(String(a.collection_at||a.created_at||'')));
+  }
+  function plateletSplitCalc(sourceVolume,sourceYield,splitVolume){
+    const sv=num(sourceVolume),sy=num(sourceYield),sp=num(splitVolume),factor=num(state.settings?.equivalent_unit_factor);
+    if(sv===null||sv<=0||sy===null||sy<=0||sp===null||sp<=0||sp>=sv)return null;
+    const ratio=sp/sv,splitYield=sy*ratio,remainingVolume=sv-sp,remainingYield=sy-splitYield;
+    return {sourceVolume:sv,sourceYield:sy,splitVolume:sp,ratio,splitYield,splitRelated:factor&&factor>0?splitYield/factor:null,remainingVolume,remainingYield,remainingRelated:factor&&factor>0?remainingYield/factor:null,factor};
+  }
+  function renderPlateletSplitCalculator(){
+    const rows=plateletSplitEligibleRecords();
+    const options=rows.slice(0,1000).map(r=>`<option value="${esc(r.product_no)}">${esc(r.product_type)} · ${fmt(r.volume_ml,2)} mL · Yield ${fmt(r.platelet_yield,3)}</option>`).join('');
+    $('#view-module').innerHTML=`
+      <div class="page-head"><div><div class="breadcrumb"><button class="link-btn" data-go-route="#/platelet">ภาพรวม Platelet</button><span>›</span><span>คำนวณแบ่งจ่าย</span></div><h1>คำนวณ Platelet แบ่งจ่าย</h1><p class="muted">คำนวณ Yield และ Platelet Related ใหม่ตามปริมาตรที่แบ่งจริง</p></div><div class="actions"><button class="btn" data-go-route="#/platelet/guide">ดูคู่มือ</button></div></div>
+      <div class="notice warning split-alert"><strong>สำคัญ:</strong> ห้ามใช้ค่า Yield / Platelet Related ของถุงหลักกับส่วนที่แบ่งโดยตรง</div>
+      <div class="split-calc-layout">
+        <section class="panel split-step-card"><div class="split-step-head"><span class="split-step-no">1</span><div><h2>เลือกถุงหลัก</h2><p>ค้นหาจาก Product No. ในระบบ หรือกรอกค่าถุงหลักเอง</p></div></div>
+          <div class="form-grid split-source-grid">
+            <div class="field span2"><label>Product No. ถุงหลัก</label><input id="splitSourceProduct" list="splitSourceList" placeholder="พิมพ์หรือสแกน Product No."><datalist id="splitSourceList">${options}</datalist></div>
+            <div class="field"><label>Volume ถุงหลัก (mL)</label><input id="splitSourceVolume" type="number" inputmode="decimal" min="0" step="0.01" placeholder="เช่น 294"></div>
+            <div class="field"><label>Yield ถุงหลัก (×10¹¹ cells)</label><input id="splitSourceYield" type="number" inputmode="decimal" min="0" step="0.001" placeholder="เช่น 2.500"></div>
+          </div>
+          <div id="splitSourceHint" class="split-source-hint muted small">ถ้าเลือกรายการที่มีในแอป ระบบจะดึง Volume และ Yield ให้อัตโนมัติ</div>
+        </section>
+        <section class="panel split-step-card"><div class="split-step-head"><span class="split-step-no">2</span><div><h2>ใส่ปริมาตรที่แบ่งจริง</h2><p>ใช้ปริมาตรที่แบ่งไปจ่ายจริง ไม่ใช่ปริมาตรถุงหลัก</p></div></div>
+          <div class="form-grid"><div class="field"><label>ปริมาตรที่แบ่งจ่าย (mL) <span class="required-star">*</span></label><input id="splitVolume" type="number" inputmode="decimal" min="0" step="0.01" placeholder="เช่น 60"></div><div class="field"><label>Product No. ส่วนแบ่ง (ถ้ามี)</label><input id="splitChildProduct" placeholder="กรอกถ้ามีเลขแยก"></div></div>
+          <div id="splitInputError" class="notice danger small hidden"></div>
+        </section>
+        <section class="panel split-result-panel"><div class="split-step-head"><span class="split-step-no result">3</span><div><h2>ผลคำนวณ</h2><p>ระบบคำนวณตามสัดส่วนปริมาตรของถุงหลัก</p></div></div>
+          <div id="splitEmptyResult" class="empty split-empty"><strong>ใส่ข้อมูลด้านบนเพื่อคำนวณ</strong><span>ระบบจะแสดงผลทันที</span></div>
+          <div id="splitResult" class="hidden">
+            <div class="split-primary-result"><div><span>Yield ของส่วนแบ่ง</span><strong id="splitYieldResult">–</strong><small>×10¹¹ cells</small></div><div><span>Platelet Related / Equivalent Units</span><strong id="splitRelatedResult">–</strong><small id="splitFactorText">–</small></div></div>
+            <div class="split-secondary-grid"><div class="split-mini"><span>ปริมาตรถุงหลัก</span><strong id="splitSourceVolumeResult">–</strong></div><div class="split-mini"><span>สัดส่วนที่แบ่ง</span><strong id="splitRatioResult">–</strong></div><div class="split-mini"><span>ปริมาตรคงเหลือ</span><strong id="splitRemainVolumeResult">–</strong></div><div class="split-mini"><span>Yield คงเหลือ</span><strong id="splitRemainYieldResult">–</strong></div></div>
+            <div class="split-formula"><strong>สูตร:</strong> Yield ส่วนแบ่ง = Yield ถุงหลัก × (Volume ที่แบ่ง ÷ Volume ถุงหลัก)</div>
+            <div class="form-grid split-note-grid"><div class="field span2"><label>หมายเหตุ (ถ้ามี)</label><input id="splitNote" placeholder="เช่น แบ่งเพื่อจ่ายผู้ป่วย / ตรวจสอบก่อนนำค่าไปใช้"></div></div>
+            <div class="notice info small split-audit-note"><strong>การบันทึก:</strong> เก็บเป็นประวัติการคำนวณ (Audit log) เท่านั้น ไม่สร้างถุงใหม่และไม่แก้ค่าของถุงหลัก</div>
+            <div class="actions split-actions"><button class="btn" id="splitCopy">คัดลอกผล</button><button class="btn primary" id="splitSave">บันทึกการคำนวณ</button></div>
+            <div id="splitSavedInfo" class="notice good small hidden"></div>
+          </div>
+        </section>
+      </div>`;
+    bindRouteButtons($('#view-module'));
+    const src=$('#splitSourceProduct'),sv=$('#splitSourceVolume'),sy=$('#splitSourceYield'),sp=$('#splitVolume');
+    const findSource=()=>rows.find(r=>String(r.product_no).trim().toLowerCase()===String(src.value||'').trim().toLowerCase())||null;
+    const refreshSource=()=>{const r=findSource();if(r){sv.value=Number(r.volume_ml).toFixed(2);sy.value=Number(r.platelet_yield).toFixed(3);$('#splitSourceHint').innerHTML=`ดึงจากรายการ <strong>${esc(r.product_type)}</strong> · ${esc(dateTH(r.collection_at,false))} · ผู้บันทึก ${esc(profileName(r.created_by))}`;}else{$('#splitSourceHint').textContent='ไม่พบ Product No. นี้ในรายการที่มี Volume และ Yield ครบ สามารถกรอกค่าถุงหลักเองได้';}refresh();};
+    const currentCalc=()=>plateletSplitCalc(sv.value,sy.value,sp.value);
+    const refresh=()=>{
+      const svv=num(sv.value),syy=num(sy.value),spp=num(sp.value),err=$('#splitInputError');
+      let msg='';if(svv!==null&&svv<=0)msg='Volume ถุงหลักต้องมากกว่า 0 mL';else if(syy!==null&&syy<=0)msg='Yield ถุงหลักต้องมากกว่า 0';else if(spp!==null&&spp<=0)msg='ปริมาตรที่แบ่งต้องมากกว่า 0 mL';else if(svv!==null&&spp!==null&&spp>=svv)msg='ปริมาตรที่แบ่งต้องน้อยกว่าปริมาตรถุงหลัก';
+      err.classList.toggle('hidden',!msg);err.textContent=msg;
+      const c=currentCalc();$('#splitEmptyResult').classList.toggle('hidden',!!c);$('#splitResult').classList.toggle('hidden',!c);$('#splitSavedInfo').classList.add('hidden');if(!c)return;
+      $('#splitYieldResult').textContent=fmt(c.splitYield,3);$('#splitRelatedResult').textContent=fmt(c.splitRelated,2);$('#splitFactorText').textContent=c.factor?`คำนวณด้วย factor ${fmt(c.factor,2)} ×10¹¹ cells / U`:'ยังไม่มีค่า factor';$('#splitSourceVolumeResult').textContent=`${fmt(c.sourceVolume,2)} mL`;$('#splitRatioResult').textContent=`${fmt(c.ratio*100,1)}%`;$('#splitRemainVolumeResult').textContent=`${fmt(c.remainingVolume,2)} mL`;$('#splitRemainYieldResult').textContent=`${fmt(c.remainingYield,3)} ×10¹¹`;
+    };
+    src.addEventListener('change',refreshSource);src.addEventListener('blur',()=>{if(src.value.trim())refreshSource();});[sv,sy,sp].forEach(el=>el.addEventListener('input',refresh));
+    $('#splitCopy').onclick=async()=>{const c=currentCalc();if(!c)return;const source=src.value.trim()||'–',child=$('#splitChildProduct').value.trim()||'–';const out=`Platelet แบ่งจ่าย\nถุงหลัก: ${source}\nส่วนแบ่ง: ${child}\nVolume ถุงหลัก: ${fmt(c.sourceVolume,2)} mL\nVolume ที่แบ่ง: ${fmt(c.splitVolume,2)} mL\nYield ส่วนแบ่ง: ${fmt(c.splitYield,3)} ×10¹¹ cells\nPlatelet Related: ${fmt(c.splitRelated,2)} U\nVolume คงเหลือ: ${fmt(c.remainingVolume,2)} mL\nYield คงเหลือ: ${fmt(c.remainingYield,3)} ×10¹¹ cells`;
+      try{await navigator.clipboard.writeText(out);showToast('คัดลอกผลแล้ว','good');}catch(_e){showToast('คัดลอกอัตโนมัติไม่ได้ กรุณาคัดลอกจากหน้าจอ','error');}};
+    $('#splitSave').onclick=async()=>{const c=currentCalc();if(!c){showToast('กรอกข้อมูลให้ครบก่อนบันทึก','error');return;}const sourceRecord=findSource();const sourceNo=src.value.trim()||null,childNo=$('#splitChildProduct').value.trim()||null,note=$('#splitNote').value.trim()||null;
+      try{await logActivity('platelet_split_calculation','platelet_split',sourceRecord?.id||null,{source_product_no:sourceNo,split_product_no:childNo,source_volume_ml:c.sourceVolume,source_yield_x10e11:c.sourceYield,split_volume_ml:c.splitVolume,split_yield_x10e11:c.splitYield,split_related_units:c.splitRelated,remaining_volume_ml:c.remainingVolume,remaining_yield_x10e11:c.remainingYield,equivalent_unit_factor:c.factor,note});const box=$('#splitSavedInfo');box.innerHTML=`บันทึกการคำนวณในประวัติระบบแล้ว · ${esc(profileName(state.user.id))} · ${esc(dateTH(new Date().toISOString()))}`;box.classList.remove('hidden');showToast('บันทึกการคำนวณแล้ว','good');}catch(e){showToast(errText(e),'error');}};
+  }
+
   function renderModulePlaceholder(module,page='dashboard'){
+    if(module==='platelet'&&page==='split') return renderPlateletSplitCalculator();
     if(module==='plasma') return renderPlasmaPage(page);
     if(module==='rbc') return renderRbcPage(page);
     const meta=MODULE_META[module]||{label:module?.toUpperCase()||'-',title:'Module'};
@@ -1058,7 +1121,7 @@
     const noPool=productSummaries.reduce((n,x)=>n+x.weeks.filter(w=>w.status==='no_pool').length,0);
     const productCards=productSummaries.map(p=>{const remaining=Math.max(0,4-p.complete);return `<button type="button" class="type-progress-card platelet-progress-card ${p.complete>=4?'complete':''}" data-product-type="${esc(p.product_type)}"><div class="type-progress-head"><div><strong>${esc(p.product_type)}</strong><small>${p.complete}/4 สัปดาห์</small></div><span class="badge ${p.complete>=4?'pass':'incomplete'}">${p.complete>=4?'ครบ':`เหลือ ${remaining}`}</span></div><div class="tracking-bar"><span style="width:${Math.min(100,p.complete/4*100)}%"></span></div><div class="type-progress-foot"><span>ครบแล้ว <b>${p.complete}</b></span><span>เป้าหมาย 4 สัปดาห์</span></div></button>`;}).join('');
     $('#view-dashboard').innerHTML=`
-      <div class="page-head"><div><h1>ภาพรวม Platelet</h1><p class="muted">Prepare และ QC</p></div><div class="actions"><input id="plateletDashMonth" class="month-input" type="month" value="${esc(ym)}"><button class="btn" data-go-route="#/platelet/guide">คู่มือ Platelet</button>${staffWriteUi()?'<button class="btn" id="plateletNoPoolBtn">ไม่มีผลิตภัณฑ์สัปดาห์นี้</button><button class="btn primary" id="dashNew">+ บันทึก Platelet</button>':''}${reviewerUi()?'<button class="btn" data-go-route="#/review">งานรอตรวจทวน</button>':''}</div></div>
+      <div class="page-head"><div><h1>ภาพรวม Platelet</h1><p class="muted">Prepare และ QC</p></div><div class="actions"><input id="plateletDashMonth" class="month-input" type="month" value="${esc(ym)}"><button class="btn" data-go-route="#/platelet/guide">คู่มือ Platelet</button><button class="btn" data-go-route="#/platelet/split">คำนวณแบ่งจ่าย</button>${staffWriteUi()?'<button class="btn" id="plateletNoPoolBtn">ไม่มีผลิตภัณฑ์สัปดาห์นี้</button><button class="btn primary" id="dashNew">+ บันทึก Platelet</button>':''}${reviewerUi()?'<button class="btn" data-go-route="#/review">งานรอตรวจทวน</button>':''}</div></div>
       <div class="grid cards">
         ${metric('เดือนนี้',month.length,'รายการทั้งหมด')}${metric('ครบ 4 สัปดาห์',`${typesComplete}/${products.length||0}`,'แยกตามชนิดผลิตภัณฑ์')}${metric('QC จริง',qc,'รายการที่ใช้เป็น QC')}${metric('ไม่มีผลิตภัณฑ์',noPool,'สัปดาห์ที่มีหลักฐาน')}${metric('รอแพทย์ทบทวน',submitted,'เฉพาะ Platelet QC')}
       </div>
