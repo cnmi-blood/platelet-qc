@@ -1,7 +1,8 @@
-/* CNMI Blood Component QC v5.3.21 - platelet split dispensing calculator */
+/* CNMI Blood Component QC v5.3.22 - Staff Planner weekly QC owner bridge */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
+  const SPB = window.STAFF_PLANNER_BRIDGE_CONFIG || {};
   const $ = (s,root=document)=>root.querySelector(s);
   const $$ = (s,root=document)=>[...root.querySelectorAll(s)];
   const esc = v => String(v ?? '').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -20,7 +21,7 @@
     return `<span class="badge ${cls}">${esc(poolReleaseTH(s))}</span>`;
   };
   const measuredTH = iso => iso ? dateTH(iso) : 'ยังไม่บันทึก';
-  const state = { sb:null, session:null, user:null, profile:null, settings:null, productSettings:[], records:[], plateletWeeklyEvents:[], plateletWeeklyEvidence:[], plateletWeeklyReady:false, plateletDashboardMonth:'', plasmaSettings:null, plasmaProductSettings:[], plasmaRecords:[], plasmaBatches:[], plasmaReady:false, plasmaDashboardMonth:'', rbcSettings:null, rbcProductSettings:[], rbcRecords:[], rbcMonthlyProduction:[], rbcReady:false, profiles:[], nonconformances:[], nonconformanceEvidence:[], nonconformanceReady:false, currentNonconformanceId:null, ncModuleFilter:'', ncStatusFilter:'', ncWizardStepById:{}, currentRecordId:null, currentEvidence:[], currentPool:[], currentPlasmaRecordId:null, currentPlasmaEvidence:[], currentPlasmaBatchId:null, currentRbcRecordId:null, currentRbcEvidence:[], rbcDashboardMonth:'', lastLoginPassword:null, uiMode:'staff', auditUserFilter:'', resetTargetId:null, showDeletedRecords:false, showDeletedPlasma:false, showDeletedRbc:false, currentView:'home', currentModule:null, currentPage:null, sessionRetryTimer:null, sidebarCollapsed:localStorage.getItem('bloodqc_sidebar_collapsed')==='1', openNavGroup:null, plasmaBatchPage:1 };
+  const state = { sb:null, staffPlannerSb:null, staffPlannerOwnersByMonth:{}, staffPlannerBridgeStatus:'idle', staffPlannerBridgeError:'', session:null, user:null, profile:null, settings:null, productSettings:[], records:[], plateletWeeklyEvents:[], plateletWeeklyEvidence:[], plateletWeeklyReady:false, plateletDashboardMonth:'', plasmaSettings:null, plasmaProductSettings:[], plasmaRecords:[], plasmaBatches:[], plasmaReady:false, plasmaDashboardMonth:'', rbcSettings:null, rbcProductSettings:[], rbcRecords:[], rbcMonthlyProduction:[], rbcReady:false, profiles:[], nonconformances:[], nonconformanceEvidence:[], nonconformanceReady:false, currentNonconformanceId:null, ncModuleFilter:'', ncStatusFilter:'', ncWizardStepById:{}, currentRecordId:null, currentEvidence:[], currentPool:[], currentPlasmaRecordId:null, currentPlasmaEvidence:[], currentPlasmaBatchId:null, currentRbcRecordId:null, currentRbcEvidence:[], rbcDashboardMonth:'', lastLoginPassword:null, uiMode:'staff', auditUserFilter:'', resetTargetId:null, showDeletedRecords:false, showDeletedPlasma:false, showDeletedRbc:false, currentView:'home', currentModule:null, currentPage:null, sessionRetryTimer:null, sidebarCollapsed:localStorage.getItem('bloodqc_sidebar_collapsed')==='1', openNavGroup:null, plasmaBatchPage:1 };
   const productSetting = type => state.productSettings.find(x=>x.product_type===type);
   const activeProducts = () => state.productSettings.filter(x=>x.is_active).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||a.product_type.localeCompare(b.product_type));
   const productOptions = selected => activeProducts().map(x=>`<option value="${esc(x.product_type)}" ${selected===x.product_type?'selected':''}>${esc(x.product_type)}</option>`).join('');
@@ -88,10 +89,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.21 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.22 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.21 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.22 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -110,6 +111,61 @@
   function sameBangkokDate(a,b){ return a&&b && inputFromISO(a).slice(0,10)===inputFromISO(b).slice(0,10); }
   function firstOfMonthISO(){ const now=new Date(); return new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),1)).toISOString(); }
   function cfgReady(){ return C.SUPABASE_URL && C.SUPABASE_KEY && !C.SUPABASE_URL.includes('PASTE_') && !C.SUPABASE_KEY.includes('PASTE_'); }
+  function staffPlannerBridgeConfigured(){
+    const url=String(SPB.SUPABASE_URL||'').trim(),key=String(SPB.SUPABASE_KEY||SPB.SUPABASE_ANON_KEY||'').trim();
+    return !!(window.supabase&&url&&key&&!url.includes('PASTE_')&&!key.includes('PASTE_'));
+  }
+  function ensureStaffPlannerBridgeClient(){
+    if(state.staffPlannerSb)return state.staffPlannerSb;
+    if(!staffPlannerBridgeConfigured()){state.staffPlannerBridgeStatus='unconfigured';return null;}
+    const key=SPB.SUPABASE_KEY||SPB.SUPABASE_ANON_KEY;
+    state.staffPlannerSb=window.supabase.createClient(SPB.SUPABASE_URL,key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+    return state.staffPlannerSb;
+  }
+  async function loadStaffPlannerOwners(ym,force=false){
+    if(!/^\d{4}-\d{2}$/.test(String(ym||'')))return [];
+    if(!force&&Array.isArray(state.staffPlannerOwnersByMonth[ym]))return state.staffPlannerOwnersByMonth[ym];
+    const client=ensureStaffPlannerBridgeClient();
+    if(!client){state.staffPlannerOwnersByMonth[ym]=[];return [];}
+    state.staffPlannerBridgeStatus='loading';state.staffPlannerBridgeError='';
+    try{
+      const {data,error}=await client.rpc('bloodqc_weekly_position_assignments',{p_month:ym});
+      if(error)throw error;
+      const rows=(data||[]).map(x=>({month_key:String(x.month_key||ym),week_slot:Number(x.week_slot),position_code:String(x.position_code||''),staff_nickname:String(x.staff_nickname||'').trim(),assignment_days:Number(x.assignment_days||0),first_work_date:x.first_work_date||null,last_work_date:x.last_work_date||null}));
+      state.staffPlannerOwnersByMonth[ym]=rows;state.staffPlannerBridgeStatus='ready';return rows;
+    }catch(e){
+      console.warn('Staff Planner bridge unavailable',e);state.staffPlannerBridgeStatus='error';state.staffPlannerBridgeError=errText(e);state.staffPlannerOwnersByMonth[ym]=[];return [];
+    }
+  }
+  function qcOwnerPosition(module,productType=''){
+    const type=String(productType||'');
+    if(module==='rbc'&&/post[-\s]?storage/i.test(type))return 'BB-Report';
+    return 'BB-Manual 3';
+  }
+  function plannedOwnerRow(ym,slot,module,productType=''){
+    const pos=qcOwnerPosition(module,productType),rows=state.staffPlannerOwnersByMonth[ym]||[];
+    return rows.find(x=>Number(x.week_slot)===Number(slot)&&x.position_code===pos)||null;
+  }
+  function plannedOwnerText(ym,slot,module,productType=''){
+    const pos=qcOwnerPosition(module,productType),row=plannedOwnerRow(ym,slot,module,productType);
+    if(row?.staff_nickname)return `ผู้รับผิดชอบ: ${row.staff_nickname} · ${pos}`;
+    if(state.staffPlannerBridgeStatus==='unconfigured')return `ตำแหน่งผู้รับผิดชอบ: ${pos} · ยังไม่ได้ตั้งค่าการเชื่อม Staff Planner`;
+    if(state.staffPlannerBridgeStatus==='error')return `ตำแหน่งผู้รับผิดชอบ: ${pos} · เชื่อม Staff Planner ไม่สำเร็จ`;
+    return `ตำแหน่งผู้รับผิดชอบ: ${pos} · ยังไม่พบผู้รับผิดชอบในสัปดาห์นี้`;
+  }
+  function plannedOwnerSummaryHtml(ym,module,productType=''){
+    const pos=qcOwnerPosition(module,productType),rows=[1,2,3,4].map(slot=>({slot,row:plannedOwnerRow(ym,slot,module,productType)}));
+    return `<div class="planner-owner-summary"><div class="planner-owner-summary-head"><div><strong>ผู้รับผิดชอบ QC ตาม Staff Planner</strong><small>ตำแหน่ง ${esc(pos)} · ดึงชื่อประจำสัปดาห์อัตโนมัติ</small></div><span class="planner-bridge-badge ${state.staffPlannerBridgeStatus==='ready'?'ready':'muted'}">${state.staffPlannerBridgeStatus==='ready'?'เชื่อมแล้ว':'Read-only'}</span></div><div class="planner-owner-week-grid">${rows.map(x=>`<div class="planner-owner-week"><span>สัปดาห์ ${x.slot}</span><strong>${esc(x.row?.staff_nickname||'–')}</strong></div>`).join('')}</div></div>`;
+  }
+  async function refreshPlannerOwnerHint(hostId,dateStr,module,productType=''){
+    const host=$('#'+hostId);if(!host)return;
+    const d=String(dateStr||'').slice(0,10),ym=d.slice(0,7),slot=plateletWeekSlot(d),pos=qcOwnerPosition(module,productType);
+    if(!d||!slot){host.innerHTML=`<span>ผู้รับผิดชอบตาม Staff Planner</span><strong>เลือกวันที่ก่อน</strong><small>ตำแหน่ง ${esc(pos)}</small>`;return;}
+    host.innerHTML=`<span>ผู้รับผิดชอบตาม Staff Planner</span><strong>กำลังตรวจสอบ...</strong><small>ตำแหน่ง ${esc(pos)}</small>`;
+    await loadStaffPlannerOwners(ym);
+    const row=plannedOwnerRow(ym,slot,module,productType);
+    host.innerHTML=`<span>ผู้รับผิดชอบตาม Staff Planner · สัปดาห์ ${slot}</span><strong>${esc(row?.staff_nickname||'ยังไม่พบชื่อ')}</strong><small>${esc(pos)}${row?.assignment_days?` · ถูกจัด ${row.assignment_days} วันในสัปดาห์นี้`:''}</small>`;
+  }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
     const payload={app_version:'5.3.21',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
@@ -339,6 +395,7 @@
     const savedMode=localStorage.getItem('bloodqc_ui_mode')||localStorage.getItem('platelet_ui_mode')||'staff';
     state.uiMode=p.role==='admin' ? (savedMode==='reviewer'&&p.can_review===true?'reviewer':savedMode==='admin'?'admin':'staff') : p.role;
     await loadSettings(); await loadProductSettings(); await loadProfiles(); await loadRecords(); await loadPlateletWeeklyData(); await loadPlasmaModuleData(); await loadRbcModuleData(); await loadNonconformanceData();
+    loadStaffPlannerOwners(plateletMonthKey()).catch(()=>{});
     applyUiMode(false);
     const loginKey=`bloodqc_login_${state.user.id}_${String(state.session?.access_token||'').slice(-16)}`;
     if(!sessionStorage.getItem(loginKey)){
@@ -1146,12 +1203,13 @@
     return dlg;
   }
 
-  function openPlateletWeekSummary(productType,ym){
+  async function openPlateletWeekSummary(productType,ym){
     const dlg=ensureDetailDialogShell();
+    await loadStaffPlannerOwners(ym);
     const weeks=plateletWeeklySummary(ym,productType),complete=weeks.filter(w=>w.complete).length;
     $('#detailTitle').textContent=`Platelet QC · ${productType}`;
     $('#detailSubtitle').textContent=`${plateletMonthLabel(ym)} · ครบ ${complete}/4 สัปดาห์`;
-    $('#detailBody').innerHTML=`<div class="platelet-week-popup-list">${weeks.map(w=>{const label=plateletWeekLabel(ym,w.slot),owner='ผู้เก็บตามตำแหน่งใน App Staff Planner';if(w.status==='qc')return `<div class="platelet-week-popup-row qc"><div><strong>${esc(label)}</strong><small>${owner} · เก็บ QC แล้ว ${w.qc.length} รายการ</small></div><span class="badge pass">เก็บแล้ว</span></div>`;if(w.status==='no_pool')return `<div class="platelet-week-popup-row no_pool"><div><strong>${esc(label)}</strong><small>${owner} · สัปดาห์นี้ไม่มีผลิตภัณฑ์ และมีหลักฐานแล้ว</small></div><div class="platelet-week-popup-actions"><span class="badge draft">ไม่มีผลิตภัณฑ์</span><button type="button" class="btn tiny-btn weekly-evidence-view" data-event-id="${w.noPool[0].id}">ดูหลักฐาน</button></div></div>`;return `<div class="platelet-week-popup-row pending"><div><strong>${esc(label)}</strong><small>${owner}</small></div><span class="badge incomplete">ยังไม่ได้เก็บ</span></div>`;}).join('')}</div><div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="plateletWeekPopupClose">ปิด</button></div>`;
+    $('#detailBody').innerHTML=`<div class="platelet-week-popup-list">${weeks.map(w=>{const label=plateletWeekLabel(ym,w.slot),owner=plannedOwnerText(ym,w.slot,'platelet',productType);if(w.status==='qc')return `<div class="platelet-week-popup-row qc"><div><strong>${esc(label)}</strong><small>${esc(owner)} · เก็บ QC แล้ว ${w.qc.length} รายการ</small></div><span class="badge pass">เก็บแล้ว</span></div>`;if(w.status==='no_pool')return `<div class="platelet-week-popup-row no_pool"><div><strong>${esc(label)}</strong><small>${esc(owner)} · สัปดาห์นี้ไม่มีผลิตภัณฑ์ และมีหลักฐานแล้ว</small></div><div class="platelet-week-popup-actions"><span class="badge draft">ไม่มีผลิตภัณฑ์</span><button type="button" class="btn tiny-btn weekly-evidence-view" data-event-id="${w.noPool[0].id}">ดูหลักฐาน</button></div></div>`;return `<div class="platelet-week-popup-row pending"><div><strong>${esc(label)}</strong><small>${esc(owner)}</small></div><span class="badge incomplete">ยังไม่ได้เก็บ</span></div>`;}).join('')}</div><div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="plateletWeekPopupClose">ปิด</button></div>`;
     $$('.weekly-evidence-view',$('#detailBody')).forEach(b=>b.onclick=()=>viewPlateletWeeklyEvidence(b.dataset.eventId));
     $('#plateletWeekPopupClose').onclick=()=>$('#detailDialog').close();
     dlg.showModal();
@@ -1244,7 +1302,7 @@
       <form id="recordForm">
       <div class="panel purpose-panel"><h2>1. ประเภทรายการ</h2><div class="purpose-selector" role="radiogroup" aria-label="ประเภทการบันทึก"><label class="purpose-option ${purpose==='prepare'?'selected':''}"><input type="radio" name="record_purpose" value="prepare" ${purpose==='prepare'?'checked':''} ${editable?'':'disabled'}><span><strong>Prepare</strong><small>ค่าเริ่มต้น</small></span></label><label class="purpose-option ${purpose==='qc'?'selected':''}"><input type="radio" name="record_purpose" value="qc" ${purpose==='qc'?'checked':''} ${editable?'':'disabled'}><span><strong>ใช้เป็น QC</strong></span></label></div></div>
       ${adminCorrection?`<div class="panel admin-correction-panel"><div class="section-title-row"><h2>การแก้ไขโดย Admin</h2><span class="section-badge warning">เก็บก่อน–หลังใน Audit Log</span></div><div class="field"><label>เหตุผลการแก้ไขโดย Admin</label><textarea id="admin_edit_reason" placeholder="เช่น เจ้าหน้าที่แจ้งผลผิด ตรวจหลักฐานใหม่แล้วแก้ไข"></textarea></div></div>`:''}
-      <div class="panel"><h2>2. ข้อมูลผลิตภัณฑ์</h2><div class="form-grid">
+      <div class="panel"><h2>2. ข้อมูลผลิตภัณฑ์</h2><div id="plateletPlannerOwnerHint" class="planner-owner-hint"><span>ผู้รับผิดชอบตาม Staff Planner</span><strong>เลือกผลิตภัณฑ์และวันที่ก่อน</strong><small>ระบบจะดึงชื่อประจำสัปดาห์ให้อัตโนมัติ</small></div><div class="form-grid">
         ${field('Product No.','product_no',r?.product_no,'text',false,'','required')}
         <div class="field"><label class="required">ผลิตภัณฑ์</label><select id="product_type" ${editable?'':'disabled'}><option value="">เลือก</option>${productOptions(r?.product_type)}${r?.product_type&&!productSetting(r.product_type)?`<option value="${esc(r.product_type)}" selected>${esc(r.product_type)} (ข้อมูลเดิม)</option>`:''}</select></div>
         <div class="field"><label>Group</label><select id="blood_group" ${editable?'':'disabled'}><option value="">เลือก</option>${['O','A','B','AB'].map(x=>`<option ${r?.blood_group===x?'selected':''}>${x}</option>`).join('')}</select></div>
@@ -1277,7 +1335,9 @@
       </form>`;
     setEditable(editable); applyProductWeightConfig(r); togglePool(); updateCalcPreview(); updatePoolRuleStatus(); renderEvidenceLists(r?.id,editable,locked);
     $$('input[name="record_purpose"]').forEach(el=>el.addEventListener('change',()=>{$$('.purpose-option').forEach(x=>x.classList.toggle('selected',$('input',x)?.checked));updateCalcPreview();}));
-    $('#product_type').addEventListener('change',()=>{applyProductWeightConfig(null);togglePool();updateCalcPreview();if(!r)maybeAutoSelectPlateletQc();}); ['collection_at','gross_weight_g','plt_value_1','plt_value_2','plt_use_mode','wbc_adam','ph_value','ph_measured_at','plt_measured_at','wbc_measured_at'].forEach(id=>$('#'+id)?.addEventListener('input',updateCalcPreview));
+    const refreshPlateletOwner=()=>refreshPlannerOwnerHint('plateletPlannerOwnerHint',$('#collection_at')?.value,'platelet',$('#product_type')?.value||'');
+    $('#product_type').addEventListener('change',()=>{applyProductWeightConfig(null);togglePool();updateCalcPreview();refreshPlateletOwner();if(!r)maybeAutoSelectPlateletQc();}); ['collection_at','gross_weight_g','plt_value_1','plt_value_2','plt_use_mode','wbc_adam','ph_value','ph_measured_at','plt_measured_at','wbc_measured_at'].forEach(id=>$('#'+id)?.addEventListener('input',updateCalcPreview));
+    $('#collection_at')?.addEventListener('change',refreshPlateletOwner);refreshPlateletOwner();
     $$('.pool-pyi,.pool-unit').forEach(x=>x.addEventListener('input',updatePoolPreview));
     $('#recordGuideBtn').onclick=()=>switchView('guide'); if($('#recordNoPoolBtn')) $('#recordNoPoolBtn').onclick=openPlateletNoPoolDialog; $('#cancelEdit').onclick=()=>switchView('records'); if($('#clearForm')) $('#clearForm').onclick=clearNewRecordForm; if($('#saveDraft')) $('#saveDraft').onclick=()=>saveRecord(false); if($('#submitReview')) $('#submitReview').onclick=submitRecord; if($('#returnForCorrection')) $('#returnForCorrection').onclick=returnForCorrection; if($('#approveAndLock')) $('#approveAndLock').onclick=approveAndLock; if($('#unlockRecord')) $('#unlockRecord').onclick=unlockRecord;
     if(!r&&$('#collection_at')){$('#collection_at').addEventListener('change',()=>maybeAutoSelectPlateletQc());$('#collection_at').addEventListener('blur',()=>maybeAutoSelectPlateletQc());}
@@ -1700,14 +1760,15 @@
     $$('.plasma-progress-card',$('#view-module')).forEach(b=>b.onclick=()=>openPlasmaProductSummary(b.dataset.productType,ym));
     bindRouteButtons($('#view-module'));bindPlasmaRecordLinks($('#view-module'));bindPlasmaBatchPdf($('#view-module'));bindPlasmaBatchPager();
   }
-  function openPlasmaProductSummary(productType,ym){
+  async function openPlasmaProductSummary(productType,ym){
+    await loadStaffPlannerOwners(ym);
     const dlg=ensureDetailDialogShell(),rows=state.plasmaRecords.filter(r=>!r.deleted_at&&r.product_type===productType&&String(r.manufactured_on||'').slice(0,7)===ym).sort((a,b)=>String(a.manufactured_on||'').localeCompare(String(b.manufactured_on||''))||String(a.created_at||'').localeCompare(String(b.created_at||'')));
     const target=4,done=rows.length;
     $('#detailTitle').textContent=`FFP QC · ${productType}`;
     $('#detailSubtitle').textContent=`${plateletMonthLabel(ym)} · ทำ QC แล้ว ${done}/${target} ถุง`;
-    const slots=Array.from({length:target},(_,i)=>{const r=rows[i];return r?`<div class="platelet-week-popup-row qc"><div><strong>ถุงที่ ${i+1}</strong><small>${esc(r.product_no)} · วันที่ผลิต ${esc(r.manufactured_on||'–')} · ${esc(plasmaOutlabState(r))}</small></div><button type="button" class="btn tiny-btn plasma-summary-open" data-id="${r.id}">ดูรายการ</button></div>`:`<div class="platelet-week-popup-row pending"><div><strong>ถุงที่ ${i+1}</strong><small>ยังไม่มีรายการ QC ในเดือนนี้</small></div><span class="badge incomplete">ยังไม่ได้เก็บ</span></div>`;}).join('');
+    const slots=Array.from({length:target},(_,i)=>{const r=rows[i];if(!r)return `<div class="platelet-week-popup-row pending"><div><strong>ถุงที่ ${i+1}</strong><small>ยังไม่มีรายการ QC ในเดือนนี้</small></div><span class="badge incomplete">ยังไม่ได้เก็บ</span></div>`;const slot=plateletWeekSlot(r.manufactured_on),owner=slot?plannedOwnerText(ym,slot,'plasma',productType):'';return `<div class="platelet-week-popup-row qc"><div><strong>ถุงที่ ${i+1}</strong><small>${esc(r.product_no)} · วันที่ผลิต ${esc(r.manufactured_on||'–')} · ${esc(plasmaOutlabState(r))}${owner?`<br>${esc(owner)}`:''}</small></div><button type="button" class="btn tiny-btn plasma-summary-open" data-id="${r.id}">ดูรายการ</button></div>`;}).join('');
     const extra=rows.slice(target); const extraHtml=extra.length?`<div class="product-popup-extra"><strong>รายการเกินเป้าหมาย ${extra.length} ถุง</strong>${extra.map(r=>`<button type="button" class="btn small-btn plasma-summary-open" data-id="${r.id}">${esc(r.product_no)}</button>`).join('')}</div>`:'';
-    $('#detailBody').innerHTML=`<div class="platelet-week-popup-list">${slots}</div>${extraHtml}<div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="plasmaSummaryClose">ปิด</button></div>`;
+    $('#detailBody').innerHTML=`${plannedOwnerSummaryHtml(ym,'plasma',productType)}<div class="platelet-week-popup-list">${slots}</div>${extraHtml}<div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="plasmaSummaryClose">ปิด</button></div>`;
     $$('.plasma-summary-open',$('#detailBody')).forEach(b=>b.onclick=()=>{dlg.close();openPlasmaDetail(b.dataset.id);}); $('#plasmaSummaryClose').onclick=()=>dlg.close(); dlg.showModal();
   }
 
@@ -1789,7 +1850,7 @@ function bindPlasmaBatchPdf(root=document){
       ${deleted?`<div class="notice bad"><strong>รายการนี้ถูกลบแล้ว</strong><br>${esc(r.delete_reason||'–')}</div>`:''}${locked&&!adminUi()?'<div class="notice good"><strong>LOCK แล้ว</strong> หากพบข้อมูลผิดให้แจ้ง Admin พร้อมหลักฐาน</div>':''}${r?.status==='draft'&&r?.returned_at&&r?.review_note?`<div class="notice warning"><strong>แพทย์ส่งกลับแก้ไข</strong><br>${esc(r.review_note)}</div>`:''}
       <form id="plasmaRecordForm">
       ${r&&adminUi()&&!deleted?`<div class="panel admin-correction-panel"><h2>การแก้ไขโดย Admin</h2><div class="field"><label>เหตุผลการแก้ไข</label><textarea id="plasma_admin_reason" placeholder="เช่น เจ้าหน้าที่แจ้งผลผิด ตรวจหลักฐานใหม่แล้วแก้ไข"></textarea></div></div>`:''}
-      <div class="panel"><h2>1. ข้อมูล FFP</h2><div class="form-grid">${plasmaField('Product No.','plasma_product_no',r?.product_no,'text',false,true)}<div class="field"><label class="required">ชนิด FFP</label><select id="plasma_product_type"><option value="">เลือก</option>${plasmaProductOptions(r?.product_type)}</select></div><div class="field"><label>Group</label><select id="plasma_group"><option value="">เลือก</option>${['O','A','B','AB'].map(g=>`<option ${r?.blood_group===g?'selected':''}>${g}</option>`).join('')}</select></div>${plasmaField('วันที่ผลิต','plasma_manufactured_on',plasmaDateInput(r?.manufactured_on),'date')}${plasmaField('วันหมดอายุ','plasma_expiry_on',plasmaDateInput(r?.expiry_on),'date',true)}<div class="field"><label>เครื่องปั่น</label><select id="plasma_centrifuge"><option value="">เลือก</option><option value="1" ${r?.centrifuge_no==='1'?'selected':''}>1</option><option value="2" ${r?.centrifuge_no==='2'?'selected':''}>2</option></select></div>${plasmaField('เวลา','plasma_prep_time',plasmaTimeInput(r?.prep_time),'time')}</div></div>
+      <div class="panel"><h2>1. ข้อมูล FFP</h2><div id="plasmaPlannerOwnerHint" class="planner-owner-hint"><span>ผู้รับผิดชอบตาม Staff Planner</span><strong>เลือกชนิด FFP และวันที่ผลิตก่อน</strong><small>ตำแหน่ง BB-Manual 3</small></div><div class="form-grid">${plasmaField('Product No.','plasma_product_no',r?.product_no,'text',false,true)}<div class="field"><label class="required">ชนิด FFP</label><select id="plasma_product_type"><option value="">เลือก</option>${plasmaProductOptions(r?.product_type)}</select></div><div class="field"><label>Group</label><select id="plasma_group"><option value="">เลือก</option>${['O','A','B','AB'].map(g=>`<option ${r?.blood_group===g?'selected':''}>${g}</option>`).join('')}</select></div>${plasmaField('วันที่ผลิต','plasma_manufactured_on',plasmaDateInput(r?.manufactured_on),'date')}${plasmaField('วันหมดอายุ','plasma_expiry_on',plasmaDateInput(r?.expiry_on),'date',true)}<div class="field"><label>เครื่องปั่น</label><select id="plasma_centrifuge"><option value="">เลือก</option><option value="1" ${r?.centrifuge_no==='1'?'selected':''}>1</option><option value="2" ${r?.centrifuge_no==='2'?'selected':''}>2</option></select></div>${plasmaField('เวลา','plasma_prep_time',plasmaTimeInput(r?.prep_time),'time')}</div></div>
       <div class="panel"><div class="section-title-row"><h2>2. น้ำหนักและ Volume</h2>${r?.weight_recorded_by?`<span class="section-badge">ผู้กรอก ${esc(profileName(r.weight_recorded_by))} · ${esc(dateTH(r.weight_recorded_at))}</span>`:''}</div><div class="form-grid">${plasmaField('น้ำหนักที่ชั่งได้ (g)','plasma_gross_weight_g',r?.gross_weight_g,'number',false,false,'0.01')}${plasmaField('น้ำหนักถุงเปล่า (g)','plasma_tare',r?.bag_tare_weight_g,'number',true)}${plasmaField('Density','plasma_density',r?.density,'number',true)}${plasmaField('Volume (mL)','plasma_volume',r?.volume_ml,'number',true)}</div></div>
       <div class="panel"><div class="section-title-row"><h2>3. นำส่ง Factor VIII</h2>${r?.segment_prepared_by?`<span class="section-badge">ผู้เตรียม/นำส่ง ${esc(profileName(r.segment_prepared_by))} · ${esc(dateTH(r.segment_prepared_at))}</span>`:''}</div>${batch?`<div class="detail-grid">${dcell('ชุดนำส่ง',batch.batch_no)}${dcell('วันที่-เวลานำส่ง',dateTH(batch.sent_at))}${dcell('ผู้เตรียมสิ่งส่งตรวจ',profileName(batch.prepared_by))}${dcell('เจ้าหน้าที่ RFS',batch.rfs_staff_name||'–')}</div><div class="actions left-actions" style="margin-top:12px"><button type="button" class="btn" id="plasmaPrintBatch">Export PDF ใบนำส่ง</button></div>`:`<div class="notice info small">ยังไม่ได้จัดเข้าชุดนำส่ง Factor VIII${r?'':' · บันทึกรายการก่อน'}</div>${r&&editable?'<button type="button" class="btn" id="plasmaOpenBatch">สร้าง/จัดชุดใบนำส่ง</button>':''}`}</div>
       <div class="panel measurement-entry-panel"><div class="section-title-row"><h2>4. ผล Factor VIII</h2>${r?.factor_recorded_by?`<span class="section-badge">ผู้กรอกผล ${esc(profileName(r.factor_recorded_by))} · ${esc(dateTH(r.factor_recorded_at))}</span>`:''}</div><div class="form-grid">${plasmaField('Factor VIII (%)','plasma_factor_viii_percent',r?.factor_viii_percent,'number',false,false,'0.1')}${plasmaField('วันที่ทดสอบ','plasma_factor_tested_on',plasmaDateInput(r?.factor_tested_on),'date')}<div class="calc-box"><span>Factor VIII</span><strong id="plasma_iu_ml">${fmt(r?.factor_viii_iu_ml,3)}</strong><small>IU/mL</small></div><div class="calc-box"><span>Factor VIII</span><strong id="plasma_iu_bag">${fmt(r?.factor_viii_iu_bag,2)}</strong><small>IU/bag</small></div></div><div id="plasma_qc_preview" style="margin-top:10px"></div>${plasmaEvidenceBox(r,editable,locked)}</div>
@@ -1797,7 +1858,9 @@ function bindPlasmaBatchPdf(root=document){
       <div class="sticky-actions"><div class="left"><button type="button" class="btn" id="plasmaBack">กลับรายการทั้งหมด</button></div><div class="right ${!r?'new-record-actions':''}">${!r&&editable?'<button type="button" class="btn clear-form-btn" id="plasmaClear">ล้างฟอร์ม</button>':''}${editable?'<button type="button" class="btn primary" id="plasmaSave">บันทึก</button>':''}${r&&r.status==='draft'&&editable?'<button type="button" class="btn primary" id="plasmaSubmit">ส่งตรวจทวน</button>':''}${r&&r.status==='locked'&&adminUi()&&!deleted?'<button type="button" class="btn danger" id="plasmaUnlock">ปลดล็อกเป็น Draft</button>':''}</div></div></form>`;
     if(!editable)$$('#plasmaRecordForm input,#plasmaRecordForm select,#plasmaRecordForm textarea').forEach(el=>{if(!el.readOnly)el.disabled=true;});
     updatePlasmaPreview();renderPlasmaEvidence(editable,locked);bindRouteButtons($('#view-module'));
+    const refreshPlasmaOwner=()=>refreshPlannerOwnerHint('plasmaPlannerOwnerHint',$('#plasma_manufactured_on')?.value,'plasma',$('#plasma_product_type')?.value||'');
     ['plasma_product_type','plasma_gross_weight_g','plasma_factor_viii_percent','plasma_manufactured_on'].forEach(id=>$('#'+id)?.addEventListener('input',updatePlasmaPreview));
+    $('#plasma_product_type')?.addEventListener('change',refreshPlasmaOwner);$('#plasma_manufactured_on')?.addEventListener('change',refreshPlasmaOwner);refreshPlasmaOwner();
     $('#plasmaBack').onclick=()=>location.hash=ROUTES.plasma.records;if($('#plasmaClear'))$('#plasmaClear').onclick=()=>{if(confirm('ล้างฟอร์มทั้งหมด?'))renderPlasmaRecordForm();};if($('#plasmaSave'))$('#plasmaSave').onclick=()=>savePlasmaRecord(false);if($('#plasmaSubmit'))$('#plasmaSubmit').onclick=submitPlasmaRecord;if($('#plasmaUnlock'))$('#plasmaUnlock').onclick=unlockPlasmaRecord;if($('#plasmaOpenBatch'))$('#plasmaOpenBatch').onclick=openPlasmaBatchBuilder;if($('#plasmaPrintBatch'))$('#plasmaPrintBatch').onclick=()=>printPlasmaOutlabBatch(batch.id);
   }
   function collectPlasmaRecord(){
@@ -2055,14 +2118,15 @@ function printPlasmaOutlabBatch(batchId){
     $$('.rbc-progress-card',$('#view-module')).forEach(b=>b.onclick=()=>openRbcProductSummary(b.dataset.product,ym));
     bindRouteButtons($('#view-module')); bindRbcRecordLinks($('#view-module'));
   }
-  function openRbcProductSummary(productType,ym){
+  async function openRbcProductSummary(productType,ym){
+    await loadStaffPlannerOwners(ym);
     const dlg=ensureDetailDialogShell(),rows=state.rbcRecords.filter(r=>!r.deleted_at&&r.product_type===productType&&String(r.manufactured_on||'').slice(0,7)===ym).sort((a,b)=>String(a.manufactured_on||'').localeCompare(String(b.manufactured_on||''))||String(a.created_at||'').localeCompare(String(b.created_at||'')));
     const target=RBC_MONTHLY_TARGET_PER_PRODUCT,done=rows.length;
     $('#detailTitle').textContent=`RBC QC · ${productType}`;
     $('#detailSubtitle').textContent=`${plateletMonthLabel(ym)} · ทำ QC แล้ว ${done}/${target} ถุง`;
-    const slots=Array.from({length:target},(_,i)=>{const r=rows[i];return r?`<div class="platelet-week-popup-row qc"><div><strong>ถุงที่ ${i+1}</strong><small>${esc(r.product_no)} · วันที่ผลิต ${esc(r.manufactured_on||'–')} · ${r.qc_status==='pass'?'ผ่านเกณฑ์ QC':r.qc_status==='review'?'ต้องตรวจสอบ QC':'ข้อมูล QC ยังไม่ครบ'}</small></div><button type="button" class="btn tiny-btn rbc-summary-open" data-id="${r.id}">ดูรายการ</button></div>`:`<div class="platelet-week-popup-row pending"><div><strong>ถุงที่ ${i+1}</strong><small>ยังไม่มีรายการ QC ในเดือนนี้</small></div><span class="badge incomplete">ยังไม่ได้เก็บ</span></div>`;}).join('');
+    const slots=Array.from({length:target},(_,i)=>{const r=rows[i];if(!r)return `<div class="platelet-week-popup-row pending"><div><strong>ถุงที่ ${i+1}</strong><small>ยังไม่มีรายการ QC ในเดือนนี้</small></div><span class="badge incomplete">ยังไม่ได้เก็บ</span></div>`;const slot=plateletWeekSlot(r.manufactured_on),owner=slot?plannedOwnerText(ym,slot,'rbc',productType):'';return `<div class="platelet-week-popup-row qc"><div><strong>ถุงที่ ${i+1}</strong><small>${esc(r.product_no)} · วันที่ผลิต ${esc(r.manufactured_on||'–')} · ${r.qc_status==='pass'?'ผ่านเกณฑ์ QC':r.qc_status==='review'?'ต้องตรวจสอบ QC':'ข้อมูล QC ยังไม่ครบ'}${owner?`<br>${esc(owner)}`:''}</small></div><button type="button" class="btn tiny-btn rbc-summary-open" data-id="${r.id}">ดูรายการ</button></div>`;}).join('');
     const extra=rows.slice(target); const extraHtml=extra.length?`<div class="product-popup-extra"><strong>รายการเกินเป้าหมาย ${extra.length} ถุง</strong>${extra.map(r=>`<button type="button" class="btn small-btn rbc-summary-open" data-id="${r.id}">${esc(r.product_no)}</button>`).join('')}</div>`:'';
-    $('#detailBody').innerHTML=`<div class="platelet-week-popup-list">${slots}</div>${extraHtml}<div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="rbcSummaryClose">ปิด</button></div>`;
+    $('#detailBody').innerHTML=`${plannedOwnerSummaryHtml(ym,'rbc',productType)}<div class="platelet-week-popup-list">${slots}</div>${extraHtml}<div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="rbcSummaryClose">ปิด</button></div>`;
     $$('.rbc-summary-open',$('#detailBody')).forEach(b=>b.onclick=()=>{dlg.close();openRbcDetail(b.dataset.id);}); $('#rbcSummaryClose').onclick=()=>dlg.close(); dlg.showModal();
   }
   function rbcRecordsTable(rows){
@@ -2151,7 +2215,7 @@ function printPlasmaOutlabBatch(batchId){
     const sourceDirect=ps?.source_input_mode==='direct_volume';
     $('#view-module').innerHTML=`<div class="page-head"><div><h1>${r?'แก้ไข':'บันทึก'} RBC QC</h1><p class="muted">LPRC / LDPRC</p></div><div class="actions"><button class="btn" data-go-route="#/rbc/guide">คู่มือ RBC</button>${r?statusBadge(r.status):''}</div></div>
       ${r?.review_note&&r.status==='draft'?`<div class="notice warning"><strong>แพทย์ส่งกลับแก้ไข:</strong> ${esc(r.review_note)}</div>`:''}
-      <div class="panel"><div class="section-title-row"><h2>1. ข้อมูลรายการ</h2><span class="section-badge">QC</span></div><div class="form-grid">${rbcField('Product No.','rbc_product_no',r?.product_no||'', 'text',!editable,true)}<div class="field"><label class="required">ชนิด RBC</label><select id="rbc_product_type" ${!editable?'disabled':''}><option value="">เลือก</option>${rbcProductOptions(type)}</select></div>${rbcField('วันที่ผลิต','rbc_manufactured_on',r?.manufactured_on||'', 'date',!editable,true)}${rbcField('เครื่องปั่น','rbc_centrifuge',r?.centrifuge_no||'', 'text',!editable)}<div class="field span2"><label>ผู้สร้างรายการ</label><div class="readonly-box">${esc(profileName(r?.created_by||state.user.id))}</div></div></div></div>
+      <div class="panel"><div class="section-title-row"><h2>1. ข้อมูลรายการ</h2><span class="section-badge">QC</span></div><div id="rbcPlannerOwnerHint" class="planner-owner-hint"><span>ผู้รับผิดชอบตาม Staff Planner</span><strong>เลือกชนิด RBC และวันที่ผลิตก่อน</strong><small>Post-Storage → BB-Report · ชนิดอื่น → BB-Manual 3</small></div><div class="form-grid">${rbcField('Product No.','rbc_product_no',r?.product_no||'', 'text',!editable,true)}<div class="field"><label class="required">ชนิด RBC</label><select id="rbc_product_type" ${!editable?'disabled':''}><option value="">เลือก</option>${rbcProductOptions(type)}</select></div>${rbcField('วันที่ผลิต','rbc_manufactured_on',r?.manufactured_on||'', 'date',!editable,true)}${rbcField('เครื่องปั่น','rbc_centrifuge',r?.centrifuge_no||'', 'text',!editable)}<div class="field span2"><label>ผู้สร้างรายการ</label><div class="readonly-box">${esc(profileName(r?.created_by||state.user.id))}</div></div></div></div>
       <div class="panel"><h2 id="rbcSourceTitle">2. ก่อนกระบวนการ</h2><div id="rbcSourceInputHost" class="form-grid">${sourceDirect?`${rbcField('Volume LPRC Top&Bottom จาก LIS (mL)','rbc_source_volume_direct',r?.source_volume_ml||'', 'number',!editable,true,'0.01')}<div class="field"><label>ที่มา</label><div class="readonly-box">กรอกจาก Volume ที่แสดงใน LIS</div></div>`:`${rbcField('น้ำหนักก่อนกระบวนการ (g)','rbc_source_gross',r?.source_gross_weight_g||'', 'number',!editable,true,'0.01')}${rbcField('น้ำหนักถุงเปล่า (g)','rbc_source_tare',ps?.source_tare_weight_g||'', 'number',true)}${rbcField('Density','rbc_source_density',ps?.source_density||'', 'number',true)}${rbcField('Volume ก่อนกระบวนการ (mL)','rbc_source_volume_preview',r?.source_volume_ml||'', 'text',true)}`}</div>${r?.source_recorded_by?`<div class="entry-attribution">ผู้กรอก ${esc(profileName(r.source_recorded_by))} · ${esc(dateTH(r.source_recorded_at))}</div>`:''}</div>
       <div class="panel measurement-entry-panel"><div class="section-title-row"><h2>3. CBC ก่อนกระบวนการ</h2><span class="section-badge">ก่อน</span></div><div class="form-grid">${rbcField('วัน-เวลาที่ตรวจ','rbc_pre_measured_at',inputFromISO(r?.pre_measured_at),'datetime-local',!editable,true)}<div class="field"><label>เครื่อง CBC</label><select id="rbc_pre_instrument" ${!editable?'disabled':''}><option ${(!r?.pre_cbc_instrument||r.pre_cbc_instrument==='Mindray')?'selected':''}>Mindray</option><option ${r?.pre_cbc_instrument==='Sysmex'?'selected':''}>Sysmex</option></select></div></div>${rbcRepeatTable('pre',r,ps?.product_class)}${r?.pre_recorded_by?`<div class="entry-attribution">ผู้กรอกผล ${esc(profileName(r.pre_recorded_by))} · ${esc(dateTH(r.pre_recorded_at))}</div>`:''}${rbcEvidenceBox('pre_cbc','หลักฐาน CBC ก่อนกระบวนการ',editable,locked)}</div>
       <div class="panel"><h2 id="rbcFinalTitle">4. หลังผลิต/กรอง</h2><div class="form-grid">${rbcField('น้ำหนักที่ชั่งได้ (g)','rbc_final_gross',r?.final_gross_weight_g||'', 'number',!editable,true,'0.01')}${rbcField('น้ำหนักถุงเปล่า (g)','rbcFinalTare',ps?.final_tare_weight_g||'', 'number',true)}${rbcField('Density','rbcFinalDensity',ps?.final_density||'', 'number',true)}${rbcField('Volume หลังผลิต/กรอง (mL)','rbcFinalVolume',r?.final_volume_ml||'', 'text',true)}</div>${r?.final_weight_recorded_by?`<div class="entry-attribution">ผู้กรอกน้ำหนัก ${esc(profileName(r.final_weight_recorded_by))} · ${esc(dateTH(r.final_weight_recorded_at))}</div>`:''}</div>
@@ -2163,8 +2227,11 @@ function printPlasmaOutlabBatch(batchId){
       <div class="sticky-actions"><div><button class="btn" id="rbcBack">กลับรายการทั้งหมด</button></div><div class="right ${!r?'new-record-actions':''}">${!r&&editable?'<button class="btn clear-form-btn" id="rbcClear">ล้างฟอร์ม</button>':''}${locked&&adminUi()?'<button class="btn" id="rbcUnlock">ปลด LOCK</button>':''}${editable?'<button class="btn primary" id="rbcSave">บันทึก</button>':''}${r&&r.status==='draft'&&staffWriteUi()?'<button class="btn good" id="rbcSubmit">ส่งแพทย์ทบทวน</button>':''}</div></div>`;
     // Disable pre repeat fields that helper rendered without disabled attribute.
     if(!editable) $$('[id^="rbc_pre"]',$('#view-module')).forEach(x=>{if(x.tagName==='INPUT'||x.tagName==='SELECT')x.disabled=true;});
-    $('#rbc_product_type').onchange=updateRbcFormProduct;
+    const refreshRbcOwner=()=>refreshPlannerOwnerHint('rbcPlannerOwnerHint',$('#rbc_manufactured_on')?.value,'rbc',$('#rbc_product_type')?.value||'');
+    $('#rbc_product_type').onchange=()=>{updateRbcFormProduct();refreshRbcOwner();};
+    $('#rbc_manufactured_on')?.addEventListener('change',refreshRbcOwner);
     $$('input,select',$('#view-module')).forEach(x=>x.addEventListener('input',updateRbcPreview));
+    refreshRbcOwner();
     $('#rbc_final_gross')?.addEventListener('input',updateRbcPreview);
     $$('.rbc-camera-pick').forEach(b=>b.onclick=()=>$('#rbc_camera_'+b.dataset.cat).click()); $$('.rbc-file-pick').forEach(b=>b.onclick=()=>$('#rbc_file_'+b.dataset.cat).click());
     ['pre_cbc','post_cbc','post_adam'].forEach(cat=>{$('#rbc_camera_'+cat)?.addEventListener('change',()=>uploadRbcEvidence(cat,'rbc_camera_'+cat));$('#rbc_file_'+cat)?.addEventListener('change',()=>uploadRbcEvidence(cat,'rbc_file_'+cat));});
