@@ -574,3 +574,20 @@ input,select,textarea{border-color:#cfd6de;border-radius:11px;min-height:42px}in
   .platelet-week-popup-row{min-height:0;padding:13px}.platelet-week-popup-row strong{font-size:14px}.platelet-week-popup-row small{font-size:12px}
 }
 @media(max-width:390px){.page-head>.actions{grid-template-columns:1fr}.page-head>.actions .month-input,.page-head>.actions .btn.primary{grid-column:auto}.cards{grid-template-columns:1fr 1fr}}
+
+
+/* v5.3.26 — safer review submit + multi-evidence upload */
+.evidence-multi-hint{display:block;margin-top:3px;color:#667085;font-size:11px;font-weight:650;line-height:1.35}
+.multi-file-label{font-size:11px;font-weight:700;opacity:.75;margin-left:4px}
+.review-submit-group{display:flex;align-items:center;gap:10px;margin-left:10px;padding-left:16px;border-left:1px solid #d9e1e7}
+.review-submit-group>small{max-width:180px;color:#667085;font-size:11px;font-weight:700;line-height:1.35}
+.btn.review-submit-btn{background:#0f766e;border-color:#0f766e;color:#fff;box-shadow:0 3px 10px rgba(15,118,110,.18)}
+.btn.review-submit-btn:hover{background:#0b665f;border-color:#0b665f;color:#fff}
+@media(max-width:760px){
+  .review-submit-group{display:grid;grid-template-columns:1fr;width:100%;margin:14px 0 0;padding:15px 0 0;border-left:0;border-top:2px dashed #cbd5dc;gap:8px}
+  .review-submit-group>small{max-width:none;text-align:center;font-size:12px}
+  .review-submit-group .btn{width:100%;min-height:54px}
+  .sticky-actions .right>.review-submit-group{grid-column:1/-1}
+  .evidence-multi-hint{font-size:11px}
+  .multi-file-label{display:block;margin:1px 0 0}
+}
