@@ -576,7 +576,7 @@ input,select,textarea{border-color:#cfd6de;border-radius:11px;min-height:42px}in
 @media(max-width:390px){.page-head>.actions{grid-template-columns:1fr}.page-head>.actions .month-input,.page-head>.actions .btn.primary{grid-column:auto}.cards{grid-template-columns:1fr 1fr}}
 
 
-/* v5.3.26 — safer review submit + multi-evidence upload */
+/* v5.3.27 — safer review submit + iOS-safe multi-evidence upload */
 .evidence-multi-hint{display:block;margin-top:3px;color:#667085;font-size:11px;font-weight:650;line-height:1.35}
 .multi-file-label{font-size:11px;font-weight:700;opacity:.75;margin-left:4px}
 .review-submit-group{display:flex;align-items:center;gap:10px;margin-left:10px;padding-left:16px;border-left:1px solid #d9e1e7}

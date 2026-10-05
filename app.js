@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.26 - Multi-evidence upload + safer doctor review submit */
+/* CNMI Blood Component QC v5.3.27 - iOS-safe multi-evidence upload + safer doctor review submit */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -89,10 +89,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.26 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.27 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.26 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.27 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -168,7 +168,7 @@
   }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'5.3.26',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.3.27',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -1508,32 +1508,71 @@
     }catch(e){showToast(errText(e),'error');return false;}
   }
 
+  async function stableUploadBody(file){
+    if(!file) throw new Error('ไม่พบไฟล์ที่เลือก');
+    const fileName=String(file.name||'ไฟล์');
+    const declaredSize=Number(file.size||0);
+    if(declaredSize<=0) throw new Error(`${fileName}: ไฟล์ไม่มีข้อมูล กรุณาเลือกรูปใหม่อีกครั้ง`);
+    if(declaredSize>10*1024*1024) throw new Error(`${fileName}: ไฟล์ต้องไม่เกิน 10 MB`);
+    // iOS/Safari บางครั้งส่ง File object จาก multi-select ผ่าน async network step แล้ว Storage อ่าน body ไม่ได้
+    // จึง copy bytes ออกมาเป็น Blob ที่คงที่ก่อนอัปโหลด เพื่อไม่ให้เกิด "No content provided".
+    let bytes;
+    try{
+      bytes=typeof file.arrayBuffer==='function'?await file.arrayBuffer():await new Response(file).arrayBuffer();
+    }catch(_){
+      throw new Error(`${fileName}: อ่านไฟล์จากเครื่องไม่สำเร็จ กรุณาเลือกรูปใหม่`);
+    }
+    if(!bytes?.byteLength) throw new Error(`${fileName}: ไฟล์ไม่มีข้อมูล กรุณาเลือกรูปใหม่อีกครั้ง`);
+    return new Blob([bytes],{type:file.type||'application/octet-stream'});
+  }
+  function evidenceUploadErrorText(e,fileName='ไฟล์'){
+    const raw=errText(e);
+    if(/no content provided/i.test(raw)) return `${fileName}: ระบบไม่ได้รับข้อมูลของไฟล์ กรุณาเลือกรูปใหม่อีกครั้ง`;
+    return `${fileName}: ${raw}`;
+  }
   async function uploadEvidence(cat,source='file'){
     const input=$('#'+(source==='camera'?'camera_':'file_')+cat);
     const files=Array.from(input?.files||[]);
     if(!files.length){showToast('เลือกไฟล์ก่อน','error');return;}
-    if(files.some(file=>file.size>10*1024*1024)){showToast('แต่ละไฟล์ต้องไม่เกิน 10 MB','error');input.value='';return;}
     try{
       let changeReason=null;
       if(state.currentRecordId&&adminUi()){
         changeReason=$('#admin_edit_reason')?.value.trim()||null;
         if(!changeReason){showToast('Admin กรุณาระบุเหตุผลการแก้ไขก่อนแนบหลักฐานใหม่','error');input.value='';$('#admin_edit_reason')?.focus();return;}
       }
-      const rid=await ensureSaved();if(!rid)return;
-      let uploaded=0;
-      for(let i=0;i<files.length;i++){
-        const file=files[i];
-        const clean=file.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-100);
-        const path=`${rid}/${cat}/${Date.now()}_${i}_${clean}`;
-        const {error:uerr}=await state.sb.storage.from('platelet-evidence').upload(path,file,{upsert:false,contentType:file.type||undefined});if(uerr)throw uerr;
-        const {data,error}=await state.sb.from('evidence_files').insert({record_id:rid,category:cat,storage_path:path,original_name:file.name,mime_type:file.type,file_size:file.size,uploaded_by:state.user.id,change_reason:changeReason}).select('*').single();
-        if(error){await state.sb.storage.from('platelet-evidence').remove([path]);throw error;}
-        state.currentEvidence.push(data);uploaded++;
+      // Copy file bytes before awaiting save/network calls. This is more reliable on iPhone/PWA multi-select.
+      const prepared=[];
+      for(const file of files){
+        try{prepared.push({file,body:await stableUploadBody(file)});}
+        catch(e){showToast(evidenceUploadErrorText(e,file?.name||'ไฟล์'),'error');input.value='';return;}
+      }
+      const rid=await ensureSaved();if(!rid){input.value='';return;}
+      let uploaded=0;const failed=[];
+      for(let i=0;i<prepared.length;i++){
+        const {file,body}=prepared[i];
+        const clean=String(file.name||`evidence_${i+1}`).replace(/[^a-zA-Z0-9._-]/g,'_').slice(-100)||`evidence_${i+1}`;
+        const unique=(globalThis.crypto?.randomUUID?.()||`${Date.now()}_${i}`);
+        const path=`${rid}/${cat}/${unique}_${clean}`;
+        let storageUploaded=false;
+        try{
+          const mime=file.type||body.type||'application/octet-stream';
+          const {error:uerr}=await state.sb.storage.from('platelet-evidence').upload(path,body,{upsert:false,contentType:mime});
+          if(uerr)throw uerr;
+          storageUploaded=true;
+          const {data,error}=await state.sb.from('evidence_files').insert({record_id:rid,category:cat,storage_path:path,original_name:file.name||clean,mime_type:mime,file_size:body.size,uploaded_by:state.user.id,change_reason:changeReason}).select('*').single();
+          if(error)throw error;
+          state.currentEvidence.push(data);uploaded++;
+        }catch(e){
+          if(storageUploaded) await state.sb.storage.from('platelet-evidence').remove([path]);
+          failed.push(evidenceUploadErrorText(e,file.name||`ไฟล์ ${i+1}`));
+        }
       }
       input.value='';
       const current=state.records.find(x=>x.id===rid);renderEvidenceLists(rid,true,current?.status==='locked');
-      showToast(uploaded>1?`อัปโหลดหลักฐานแล้ว ${uploaded} ไฟล์`:'อัปโหลดหลักฐานแล้ว','good');
-    }catch(e){input.value='';showToast(errText(e),'error');}
+      if(uploaded&&failed.length) showToast(`อัปโหลดสำเร็จ ${uploaded}/${prepared.length} ไฟล์ · ${failed[0]}`,'error');
+      else if(uploaded) showToast(uploaded>1?`อัปโหลดหลักฐานแล้ว ${uploaded} ไฟล์`:'อัปโหลดหลักฐานแล้ว','good');
+      else showToast(failed[0]||'อัปโหลดหลักฐานไม่สำเร็จ กรุณาลองใหม่','error');
+    }catch(e){input.value='';showToast(evidenceUploadErrorText(e),'error');}
   }
 
   async function viewEvidence(id){ const e=state.currentEvidence.find(x=>x.id===id);if(!e)return; const {data,error}=await state.sb.storage.from('platelet-evidence').createSignedUrl(e.storage_path,120);if(error){showToast(errText(error),'error');return;} window.open(data.signedUrl,'_blank','noopener'); }
