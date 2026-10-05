@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.29 - Admin soft delete for Plasma outlab batches + audit */
+/* CNMI Blood Component QC v5.3.30 - Admin can cancel empty/test Plasma outlab batches + audit */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -89,10 +89,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.29 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.30 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.29 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.30 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -168,7 +168,7 @@
   }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'5.3.29',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.3.30',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -1904,7 +1904,9 @@ function canEditPlasmaBatch(b){
 function canDeletePlasmaBatch(b){
   if(!b||b.deleted_at||!adminUi())return false;
   const rows=plasmaBatchRecords(b.id);
-  return rows.length>0&&rows.every(r=>r.status==='draft'&&r.factor_viii_percent==null);
+  // Admin must also be able to clean up empty/test batches (e.g. a batch created with 0 linked records).
+  // Empty rows are safe to cancel because there is no QC result/review state to preserve.
+  return rows.every(r=>r.status==='draft'&&r.factor_viii_percent==null);
 }
 function plasmaBatchesTable(rows){
   if(!rows.length)return '<div class="empty">ยังไม่มีชุดนำส่ง</div>';
@@ -1920,14 +1922,14 @@ function bindPlasmaBatchPdf(root=document){
 function openPlasmaBatchDeleteDialog(batchId){
   if(!adminUi())return;
   const b=plasmaBatchById(batchId);if(!b||b.deleted_at)return;
-  if(!canDeletePlasmaBatch(b)){showToast('ยกเลิกได้เฉพาะชุดที่รายการยังเป็น Draft และยังไม่มีผล Factor VIII','error');return;}
+  if(!canDeletePlasmaBatch(b)){showToast('ยกเลิกได้เฉพาะชุดที่ยังไม่มีผล Factor VIII และยังไม่ส่งแพทย์/LOCK','error');return;}
   const dlg=ensureDetailDialogShell();
   $('#detailTitle').textContent='ยกเลิกชุดนำส่ง';
-  $('#detailSubtitle').textContent=`${b.batch_no} · รายการจะกลับไปรอจัดชุดนำส่งใหม่`;
+  $('#detailSubtitle').textContent=`${b.batch_no} · ${plasmaBatchRecords(b.id).length ? 'รายการจะกลับไปรอจัดชุดนำส่งใหม่' : 'ชุดว่าง/ชุดทดสอบจะถูกเก็บเป็นประวัติการยกเลิก'}`;
   $('#detailBody').innerHTML=`<div class="notice warning"><strong>ข้อมูลจะไม่ถูกลบออกจากฐานข้อมูล</strong><br>ระบบจะเก็บเลขชุดเดิม ผู้ยกเลิก วันเวลา เหตุผล และ Product No. เดิมไว้สำหรับ Audit</div><div class="field"><label>เหตุผลที่ยกเลิก <span class="required-star">*</span></label><select id="batchDeleteReasonType"><option value="">กรุณาเลือกเหตุผล</option><option value="ทดสอบระบบ">ทดสอบระบบ</option><option value="สร้างซ้ำ">สร้างซ้ำ</option><option value="เลือก Product No. ผิด">เลือก Product No. ผิด</option><option value="วัน-เวลานำส่งผิด">วัน-เวลานำส่งผิด</option><option value="อื่น ๆ">อื่น ๆ</option></select></div><div class="field hidden" id="batchDeleteOtherWrap"><label>ระบุเหตุผลอื่น</label><textarea id="batchDeleteReasonOther" placeholder="ระบุเหตุผลที่ต้องยกเลิกชุดนำส่ง"></textarea></div><div class="actions"><button type="button" class="btn" id="batchDeleteCancel">กลับ</button><button type="button" class="btn danger" id="batchDeleteConfirm">ยืนยันยกเลิกชุดนำส่ง</button></div>`;
   $('#batchDeleteReasonType').onchange=e=>$('#batchDeleteOtherWrap').classList.toggle('hidden',e.target.value!=='อื่น ๆ');
   $('#batchDeleteCancel').onclick=()=>dlg.close();
-  $('#batchDeleteConfirm').onclick=async()=>{const t=$('#batchDeleteReasonType').value,other=$('#batchDeleteReasonOther').value.trim(),reason=t==='อื่น ๆ'?other:t;if(!reason){showToast('กรุณาระบุเหตุผลที่ยกเลิก','error');return;}if(!confirm(`ยืนยันยกเลิก ${b.batch_no}?\n\nรายการ FFP ในชุดนี้จะกลับไปสถานะรอจัดชุดนำส่ง`))return;await adminDeletePlasmaBatch(batchId,reason);};
+  $('#batchDeleteConfirm').onclick=async()=>{const t=$('#batchDeleteReasonType').value,other=$('#batchDeleteReasonOther').value.trim(),reason=t==='อื่น ๆ'?other:t;if(!reason){showToast('กรุณาระบุเหตุผลที่ยกเลิก','error');return;}if(!confirm(`ยืนยันยกเลิก ${b.batch_no}?\n\nหากมีรายการ FFP ในชุดนี้ ระบบจะคืนรายการกลับไปสถานะรอจัดชุดนำส่ง`))return;await adminDeletePlasmaBatch(batchId,reason);};
   dlg.showModal();
 }
 async function adminDeletePlasmaBatch(batchId,reason){
