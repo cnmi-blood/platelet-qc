@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.27 - iOS-safe multi-evidence upload + safer doctor review submit */
+/* CNMI Blood Component QC v5.3.29 - Admin soft delete for Plasma outlab batches + audit */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -89,10 +89,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.27 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.29 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.27 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.29 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -168,7 +168,7 @@
   }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'5.3.27',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.3.29',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -183,7 +183,7 @@
     return data;
   }
   function actionTH(a){
-    const m={login:'เข้าสู่ระบบ',logout:'ออกจากระบบ',ui_mode_change:'สลับโหมด',view_record:'เปิดดูรายการ',export_csv:'Export CSV',create_user:'สร้างบัญชีผู้ใช้',reset_password:'Reset password',update_profile:'แก้ข้อมูล/สิทธิ์ผู้ใช้',update_qc_settings:'แก้เกณฑ์การเตรียม/QC',update_product_settings:'แก้น้ำหนักถุง/Density',password_changed:'เปลี่ยนรหัสผ่าน',create:'สร้างรายการ',update:'แก้ไขรายการ',close:'ปิดเคส',admin_edit:'Admin แก้ไขรายการ',admin_delete:'Admin ลบรายการ',admin_restore:'Admin กู้คืนรายการ',insert:'เพิ่มข้อมูล',delete:'ลบข้อมูล',create_outlab_batch:'สร้างชุดนำส่ง Factor VIII',update_outlab_batch:'แก้ชุดนำส่ง Factor VIII',export_pdf:'Export PDF'};
+    const m={login:'เข้าสู่ระบบ',logout:'ออกจากระบบ',ui_mode_change:'สลับโหมด',view_record:'เปิดดูรายการ',export_csv:'Export CSV',create_user:'สร้างบัญชีผู้ใช้',reset_password:'Reset password',update_profile:'แก้ข้อมูล/สิทธิ์ผู้ใช้',update_qc_settings:'แก้เกณฑ์การเตรียม/QC',update_product_settings:'แก้น้ำหนักถุง/Density',password_changed:'เปลี่ยนรหัสผ่าน',create:'สร้างรายการ',update:'แก้ไขรายการ',close:'ปิดเคส',admin_edit:'Admin แก้ไขรายการ',admin_delete:'Admin ลบรายการ',admin_restore:'Admin กู้คืนรายการ',insert:'เพิ่มข้อมูล',delete:'ลบข้อมูล',create_outlab_batch:'สร้างชุดนำส่ง Factor VIII',update_outlab_batch:'แก้ชุดนำส่ง Factor VIII',delete_outlab_batch:'ยกเลิกชุดนำส่ง Factor VIII',export_pdf:'Export PDF'};
     if(m[a]) return m[a];
     if(a?.startsWith('status:draft→submitted')) return 'ส่งตรวจทวน';
     if(a?.startsWith('status:submitted→locked')) return 'แพทย์ทบทวนและ LOCK';
@@ -1865,7 +1865,8 @@
   }
 
   function sortedPlasmaBatches(){
-    return [...state.plasmaBatches].sort((a,b)=>{
+    const rows=[...state.plasmaBatches].filter(b=>adminUi()&&state.showDeletedPlasmaBatches?true:!b.deleted_at);
+    return rows.sort((a,b)=>{
       const bt=new Date(b.sent_at||b.created_at||0).getTime()||0,at=new Date(a.sent_at||a.created_at||0).getTime()||0;
       if(bt!==at)return bt-at;
       const bc=new Date(b.created_at||0).getTime()||0,ac=new Date(a.created_at||0).getTime()||0;
@@ -1878,32 +1879,65 @@
     state.plasmaBatchPage=Math.min(Math.max(1,Number(state.plasmaBatchPage)||1),totalPages);
     const start=(state.plasmaBatchPage-1)*pageSize,rows=all.slice(start,start+pageSize);
     const pager=all.length>pageSize?`<div class="batch-pager"><button class="btn small-btn" id="plasmaBatchPrev" ${state.plasmaBatchPage<=1?'disabled':''}>‹ ก่อนหน้า</button><strong>หน้า ${state.plasmaBatchPage}/${totalPages}</strong><button class="btn small-btn" id="plasmaBatchNext" ${state.plasmaBatchPage>=totalPages?'disabled':''}>ถัดไป ›</button></div>`:'';
-    return `<div class="panel"><h2>ชุดนำส่งล่าสุด</h2>${plasmaBatchesTable(rows)}${pager}</div>`;
+    return `<div class="panel"><div class="section-title-row"><h2>ชุดนำส่งล่าสุด</h2>${adminUi()?`<label class="inline-check"><input type="checkbox" id="plasmaShowDeletedBatches" ${state.showDeletedPlasmaBatches?'checked':''}> แสดงชุดที่ยกเลิกแล้ว</label>`:''}</div>${plasmaBatchesTable(rows)}${pager}</div>`;
   }
   function bindPlasmaBatchPager(){
     const prev=$('#plasmaBatchPrev'),next=$('#plasmaBatchNext');
     if(prev)prev.onclick=()=>{state.plasmaBatchPage=Math.max(1,state.plasmaBatchPage-1);renderPlasmaDashboard();};
     if(next)next.onclick=()=>{state.plasmaBatchPage+=1;renderPlasmaDashboard();};
+    const del=$('#plasmaShowDeletedBatches');if(del)del.onchange=e=>{state.showDeletedPlasmaBatches=e.target.checked;state.plasmaBatchPage=1;renderPlasmaDashboard();};
   }
 
 function plasmaBatchRecords(batchId){
   return state.plasmaRecords.filter(r=>r.outlab_batch_id===batchId&&!r.deleted_at);
 }
+function plasmaBatchSnapshotProducts(b){
+  const snap=Array.isArray(b?.deleted_products)?b.deleted_products:[];
+  return snap.map(x=>String(x?.product_no||'').trim()).filter(Boolean);
+}
 function canEditPlasmaBatch(b){
-  if(!b||!staffWriteUi())return false;
+  if(!b||b.deleted_at||!staffWriteUi())return false;
   if(!(adminUi()||b.prepared_by===state.user?.id))return false;
+  const rows=plasmaBatchRecords(b.id);
+  return rows.length>0&&rows.every(r=>r.status==='draft'&&r.factor_viii_percent==null);
+}
+function canDeletePlasmaBatch(b){
+  if(!b||b.deleted_at||!adminUi())return false;
   const rows=plasmaBatchRecords(b.id);
   return rows.length>0&&rows.every(r=>r.status==='draft'&&r.factor_viii_percent==null);
 }
 function plasmaBatchesTable(rows){
   if(!rows.length)return '<div class="empty">ยังไม่มีชุดนำส่ง</div>';
-  const table=`<div class="table-wrap"><table class="data-table"><thead><tr><th>ชุดนำส่ง</th><th>วัน-เวลานำส่ง</th><th>Product No.</th><th>ผู้เตรียม</th><th>จำนวน</th><th></th></tr></thead><tbody>${rows.map(b=>{const rr=plasmaBatchRecords(b.id);const n=rr.length;const nums=rr.slice(0,4).map(r=>esc(r.product_no)).join(', ')+(n>4?` +${n-4}`:'');const edit=canEditPlasmaBatch(b)?`<button class="btn small-btn plasma-batch-edit" data-id="${b.id}">แก้ไข</button>`:'';return `<tr><td><strong>${esc(b.batch_no)}</strong></td><td class="nowrap">${esc(dateTH(b.sent_at))}</td><td>${nums||'–'}</td><td>${esc(profileName(b.prepared_by))}</td><td>${n}</td><td><span class="batch-actions"><button class="btn small-btn plasma-batch-pdf" data-id="${b.id}">PDF</button>${edit}</span></td></tr>`}).join('')}</tbody></table></div>`;
-  const cards=rows.map(b=>{const rr=plasmaBatchRecords(b.id);const n=rr.length;const nums=rr.slice(0,4).map(r=>esc(r.product_no)).join(', ')+(n>4?` +${n-4}`:'');const edit=canEditPlasmaBatch(b)?`<button class="btn small-btn plasma-batch-edit" data-id="${b.id}">แก้ไข</button>`:'';return `<article class="mobile-data-card"><div class="mobile-data-card-head"><strong>${esc(b.batch_no)}</strong><span class="badge">${n} รายการ</span></div><div class="mobile-data-card-body">${mobilePair('วัน-เวลานำส่ง',esc(dateTH(b.sent_at)))}${mobilePair('Product No.',nums||'–')}${mobilePair('ผู้เตรียม',esc(profileName(b.prepared_by)))}${mobilePair('จำนวน',String(n))}</div><div class="mobile-card-actions"><button class="btn small-btn plasma-batch-pdf" data-id="${b.id}">PDF</button>${edit}</div></article>`;}).join('');
+  const table=`<div class="table-wrap"><table class="data-table"><thead><tr><th>ชุดนำส่ง</th><th>วัน-เวลานำส่ง</th><th>Product No.</th><th>ผู้เตรียม</th><th>จำนวน</th><th></th></tr></thead><tbody>${rows.map(b=>{const rr=plasmaBatchRecords(b.id);const snap=plasmaBatchSnapshotProducts(b);const deleted=!!b.deleted_at;const n=deleted?(Number(b.deleted_record_count)||snap.length):rr.length;const nums=(deleted?snap:rr.map(r=>r.product_no)).slice(0,4).map(esc).join(', ')+(n>4?` +${n-4}`:'');const edit=canEditPlasmaBatch(b)?`<button class="btn small-btn plasma-batch-edit" data-id="${b.id}">แก้ไข</button>`:'';const del=canDeletePlasmaBatch(b)?`<button class="btn small-btn danger-soft plasma-batch-delete" data-id="${b.id}">ยกเลิก</button>`:'';return `<tr class="${deleted?'deleted-row':''}"><td><strong>${esc(b.batch_no)}</strong>${deleted?' <span class="badge deleted">ยกเลิกแล้ว</span>':''}${deleted&&b.delete_reason?`<div class="muted small">เหตุผล: ${esc(b.delete_reason)}</div>`:''}</td><td class="nowrap">${esc(dateTH(b.sent_at))}</td><td>${nums||'–'}</td><td>${esc(profileName(b.prepared_by))}</td><td>${n}</td><td><span class="batch-actions">${deleted?'':`<button class="btn small-btn plasma-batch-pdf" data-id="${b.id}">PDF</button>`}${edit}${del}</span></td></tr>`}).join('')}</tbody></table></div>`;
+  const cards=rows.map(b=>{const rr=plasmaBatchRecords(b.id);const snap=plasmaBatchSnapshotProducts(b);const deleted=!!b.deleted_at;const n=deleted?(Number(b.deleted_record_count)||snap.length):rr.length;const nums=(deleted?snap:rr.map(r=>r.product_no)).slice(0,4).map(esc).join(', ')+(n>4?` +${n-4}`:'');const edit=canEditPlasmaBatch(b)?`<button class="btn small-btn plasma-batch-edit" data-id="${b.id}">แก้ไข</button>`:'';const del=canDeletePlasmaBatch(b)?`<button class="btn small-btn danger-soft plasma-batch-delete" data-id="${b.id}">ยกเลิก</button>`:'';return `<article class="mobile-data-card ${deleted?'deleted-row':''}"><div class="mobile-data-card-head"><strong>${esc(b.batch_no)}</strong><span class="badge ${deleted?'deleted':''}">${deleted?'ยกเลิกแล้ว':`${n} รายการ`}</span></div><div class="mobile-data-card-body">${mobilePair('วัน-เวลานำส่ง',esc(dateTH(b.sent_at)))}${mobilePair('Product No.',nums||'–')}${mobilePair('ผู้เตรียม',esc(profileName(b.prepared_by)))}${mobilePair('จำนวน',String(n))}${deleted?mobilePair('เหตุผลที่ยกเลิก',esc(b.delete_reason||'–')):''}</div><div class="mobile-card-actions">${deleted?'':`<button class="btn small-btn plasma-batch-pdf" data-id="${b.id}">PDF</button>`}${edit}${del}</div></article>`;}).join('');
   return responsiveDataTable(table,cards);
 }
 function bindPlasmaBatchPdf(root=document){
   $$('.plasma-batch-pdf',root).forEach(b=>b.onclick=()=>printPlasmaOutlabBatch(b.dataset.id));
   $$('.plasma-batch-edit',root).forEach(b=>b.onclick=()=>openPlasmaBatchBuilder(null,b.dataset.id));
+  $$('.plasma-batch-delete',root).forEach(b=>b.onclick=()=>openPlasmaBatchDeleteDialog(b.dataset.id));
+}
+function openPlasmaBatchDeleteDialog(batchId){
+  if(!adminUi())return;
+  const b=plasmaBatchById(batchId);if(!b||b.deleted_at)return;
+  if(!canDeletePlasmaBatch(b)){showToast('ยกเลิกได้เฉพาะชุดที่รายการยังเป็น Draft และยังไม่มีผล Factor VIII','error');return;}
+  const dlg=ensureDetailDialogShell();
+  $('#detailTitle').textContent='ยกเลิกชุดนำส่ง';
+  $('#detailSubtitle').textContent=`${b.batch_no} · รายการจะกลับไปรอจัดชุดนำส่งใหม่`;
+  $('#detailBody').innerHTML=`<div class="notice warning"><strong>ข้อมูลจะไม่ถูกลบออกจากฐานข้อมูล</strong><br>ระบบจะเก็บเลขชุดเดิม ผู้ยกเลิก วันเวลา เหตุผล และ Product No. เดิมไว้สำหรับ Audit</div><div class="field"><label>เหตุผลที่ยกเลิก <span class="required-star">*</span></label><select id="batchDeleteReasonType"><option value="">กรุณาเลือกเหตุผล</option><option value="ทดสอบระบบ">ทดสอบระบบ</option><option value="สร้างซ้ำ">สร้างซ้ำ</option><option value="เลือก Product No. ผิด">เลือก Product No. ผิด</option><option value="วัน-เวลานำส่งผิด">วัน-เวลานำส่งผิด</option><option value="อื่น ๆ">อื่น ๆ</option></select></div><div class="field hidden" id="batchDeleteOtherWrap"><label>ระบุเหตุผลอื่น</label><textarea id="batchDeleteReasonOther" placeholder="ระบุเหตุผลที่ต้องยกเลิกชุดนำส่ง"></textarea></div><div class="actions"><button type="button" class="btn" id="batchDeleteCancel">กลับ</button><button type="button" class="btn danger" id="batchDeleteConfirm">ยืนยันยกเลิกชุดนำส่ง</button></div>`;
+  $('#batchDeleteReasonType').onchange=e=>$('#batchDeleteOtherWrap').classList.toggle('hidden',e.target.value!=='อื่น ๆ');
+  $('#batchDeleteCancel').onclick=()=>dlg.close();
+  $('#batchDeleteConfirm').onclick=async()=>{const t=$('#batchDeleteReasonType').value,other=$('#batchDeleteReasonOther').value.trim(),reason=t==='อื่น ๆ'?other:t;if(!reason){showToast('กรุณาระบุเหตุผลที่ยกเลิก','error');return;}if(!confirm(`ยืนยันยกเลิก ${b.batch_no}?\n\nรายการ FFP ในชุดนี้จะกลับไปสถานะรอจัดชุดนำส่ง`))return;await adminDeletePlasmaBatch(batchId,reason);};
+  dlg.showModal();
+}
+async function adminDeletePlasmaBatch(batchId,reason){
+  if(!adminUi()||!reason?.trim())return;
+  try{
+    const {error}=await state.sb.rpc('soft_delete_plasma_outlab_batch',{p_batch_id:batchId,p_reason:reason.trim()});
+    if(error)throw error;
+    await logActivity('delete_outlab_batch','plasma_outlab_batch',batchId,{reason:reason.trim()});
+    await Promise.all([reloadPlasmaRecords(),reloadPlasmaBatches()]);state.plasmaBatchPage=1;$('#detailDialog').close();showToast('ยกเลิกชุดนำส่งแล้ว · เก็บประวัติ Audit ไว้','good');if(state.currentModule==='plasma')renderPlasmaPage(state.currentPage||'dashboard');
+  }catch(e){showToast(errText(e),'error');}
 }
 
   function renderPlasmaRecordsList(){
@@ -2025,6 +2059,7 @@ async function updatePlasmaBatch(batchId,exportAfter=true){
 function printPlasmaOutlabBatch(batchId){
   const b=plasmaBatchById(batchId);
   if(!b){showToast('ไม่พบชุดนำส่ง','error');return;}
+  if(b.deleted_at){showToast('ชุดนำส่งนี้ถูกยกเลิกแล้ว จึงไม่สามารถออก PDF ใหม่ได้','error');return;}
   const rows=state.plasmaRecords.filter(r=>r.outlab_batch_id===batchId&&!r.deleted_at).sort((a,b)=>String(a.product_type).localeCompare(String(b.product_type),'th')||String(a.product_no).localeCompare(String(b.product_no)));
   if(!rows.length){showToast('ไม่มีรายการในชุดนำส่ง','error');return;}
   if(document.fonts&&!(document.fonts.check('16px "TH Sarabun New"')||document.fonts.check('16px "TH SarabunNew"'))){showToast('เครื่องนี้ไม่พบ TH Sarabun New - PDF อาจใช้ฟอนต์สำรอง','warn');}
@@ -2114,7 +2149,7 @@ function printPlasmaOutlabBatch(batchId){
         <section class="guide-card"><div class="guide-no">1</div><div><h2>เลือกถุงและสร้างรายการ</h2><p>เมื่อเลือก FFP ที่จะทำ QC ให้เข้า <strong>Plasma → บันทึก FFP</strong> แล้วสร้าง Product No. ไว้ก่อน</p><p>กรอกชนิด FFP, Group, วันที่ผลิต, เครื่องปั่น และเวลาที่เตรียมตามจริง</p></div></section>
         <section class="guide-card"><div class="guide-no">2</div><div><h2>ชั่งน้ำหนักถุง</h2><p>ชั่งทั้งถุงแล้วกรอกเฉพาะ <strong>น้ำหนักที่ชั่งได้ (g)</strong> ระบบใส่น้ำหนักถุงเปล่าและ Density ให้ตามชนิดถุง</p><div class="guide-rule-row"><span class="guide-rule good">Top&Bottom 27.7 g</span><span class="guide-rule good">NLR-Reveos 28.2 g</span><span class="guide-rule good">LR-Reveos 28.2 g</span><span class="guide-rule warn">Density 1.025</span></div><div class="guide-callout">ระบบคำนวณ Volume ให้อัตโนมัติ</div></div></section>
         <section class="guide-card"><div class="guide-no">3</div><div><h2>เตรียม Segment</h2><p>ตรวจ Product No. ให้ตรงกับถุง แล้วเตรียม Segment ตามวิธีของหน่วย: <strong>แช่แข็ง → พัน Parafilm → เก็บแช่แข็ง</strong> จนถึงเวลานำส่ง</p></div></section>
-        <section class="guide-card"><div class="guide-no">4</div><div><h2>สร้างใบนำส่ง</h2><p>กด <strong>+ สร้างใบนำส่ง</strong> แล้วเลือกเฉพาะ Product No. ที่จะส่งในเที่ยวเดียวกัน จะรวม Top&Bottom, NLR-Reveos และ LR-Reveos ในใบเดียวก็ได้</p><div class="guide-callout"><strong>ส่งหลายถุง:</strong> เลือกทุกถุงที่ไปในเที่ยวเดียวกัน<br><strong>วันอื่นมีเพิ่ม:</strong> สร้างใบนำส่งใหม่เฉพาะถุงที่ส่งวันนั้น<br><strong>เลือกถุงผิด:</strong> ถ้ายังไม่มีผล Factor VIII ให้กดแก้ไขชุด แล้ว Export PDF ใหม่</div><p>ถ้ามีผล Factor VIII แล้วหรือส่งแพทย์แล้ว จะเปลี่ยนถุงในชุดเดิมไม่ได้</p></div></section>
+        <section class="guide-card"><div class="guide-no">4</div><div><h2>สร้างใบนำส่ง</h2><p>กด <strong>+ สร้างใบนำส่ง</strong> แล้วเลือกเฉพาะ Product No. ที่จะส่งในเที่ยวเดียวกัน จะรวม Top&Bottom, NLR-Reveos และ LR-Reveos ในใบเดียวก็ได้</p><div class="guide-callout"><strong>ส่งหลายถุง:</strong> เลือกทุกถุงที่ไปในเที่ยวเดียวกัน<br><strong>วันอื่นมีเพิ่ม:</strong> สร้างใบนำส่งใหม่เฉพาะถุงที่ส่งวันนั้น<br><strong>เลือกถุงผิด:</strong> ถ้ายังไม่มีผล Factor VIII ให้กดแก้ไขชุด แล้ว Export PDF ใหม่</div><p>ถ้ามีผล Factor VIII แล้วหรือส่งแพทย์แล้ว จะเปลี่ยนถุงในชุดเดิมไม่ได้</p><p><strong>Admin:</strong> หากเป็นชุดทดสอบหรือสร้างผิด และยังไม่มีผล Factor VIII สามารถกด “ยกเลิก” พร้อมระบุเหตุผล ระบบจะเก็บ Audit และคืน Product No. ไปรอจัดชุดใหม่</p></div></section>
         <section class="guide-card"><div class="guide-no">5</div><div><h2>เช็กใบนำส่งก่อนพิมพ์</h2><p>ตรวจ Product No., รหัสบริการ <strong>${esc(s.outlab_service_code||'250089')}</strong>, <strong>${esc(s.outlab_test_name||'Factor VIII assay')}</strong>, ผู้เตรียม, วัน-เวลา และชื่อ RFS ถ้ามี</p><p>ถ้ามีรายการมาก ระบบจะแบ่งหน้า PDF ให้เอง</p></div></section>
         <section class="guide-card"><div class="guide-no">6</div><div><h2>นำส่งและรอผล</h2><p>นำ Segment แช่แข็งพร้อมใบนำส่งไปตามขั้นตอนของหน่วย แล้วรอผล Factor VIII กลับมา</p><p>ผลส่งกลับที่ <strong>${esc(s.result_email||'transfusionbb_cnmi@mahidol.ac.th')}</strong></p></div></section>
         <section class="guide-card"><div class="guide-no">7</div><div><h2>กรอกผล Factor VIII</h2><p>เปิด Product No. ให้ตรงกับใบผล กรอก <strong>Factor VIII (%)</strong> และวันที่ทดสอบ แล้วแนบรูปหรือ PDF ของใบผลในหัวข้อเดียวกัน</p><div class="guide-callout"><strong>ห้ามบันทึกผลโดยไม่มีหลักฐาน</strong> และถ้าคนกรอกผลกับคนแนบไฟล์เป็นคนละคน ระบบจะแสดงตามจริง</div></div></section>
