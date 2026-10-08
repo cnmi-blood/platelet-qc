@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.31 - multi-evidence + no-product XLS/CSV + RBC machine validation/QC decision */
+/* CNMI Blood Component QC v5.3.32 - 5-year evidence storage saver: automatic image optimization */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -89,10 +89,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.31 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.32 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.31 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.32 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -168,7 +168,7 @@
   }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'5.3.31',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.3.32',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -1061,7 +1061,7 @@
     const input=$('#'+inputId),files=Array.from(input?.files||[]);if(!files.length)return;
     const tooBig=files.find(f=>f.size>10*1024*1024);if(tooBig){showToast(`${tooBig.name}: ไฟล์ต้องไม่เกิน 10 MB`,'error');input.value='';return;}
     const category=input?.dataset?.category||$('#ncEvidenceCategory')?.value||'other';
-    try{let uploaded=0;for(let i=0;i<files.length;i++){const file=files[i],clean=file.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-100),path=`nonconformance/${ncId}/${category}/${Date.now()}_${i}_${clean}`;const {error:u}=await state.sb.storage.from('bloodqc-evidence').upload(path,file,{upsert:false,contentType:file.type||undefined});if(u)throw u;const {data,error}=await state.sb.from('qc_nonconformance_evidence').insert({nonconformance_id:ncId,category,storage_path:path,original_name:file.name,mime_type:file.type,file_size:file.size,uploaded_by:state.user.id}).select('*').single();if(error){await state.sb.storage.from('bloodqc-evidence').remove([path]);throw error;}uploaded++;await logActivity('insert','nonconformance_evidence',data.id,{nonconformance_id:ncId,category});}input.value='';await reloadNonconformanceData();state.currentNonconformanceId=ncId;renderNonconformancePage();showToast(uploaded>1?`แนบหลักฐานแล้ว ${uploaded} ไฟล์`:'แนบหลักฐานแล้ว','good');}catch(e){showToast(errText(e),'error');}
+    try{let uploaded=0;for(let i=0;i<files.length;i++){const file=files[i],pf=await optimizeEvidenceFile(file),clean=pf.uploadName,path=`nonconformance/${ncId}/${category}/${Date.now()}_${i}_${clean}`;const {error:u}=await state.sb.storage.from('bloodqc-evidence').upload(path,pf.body,{upsert:false,contentType:pf.mime||undefined});if(u)throw u;const {data,error}=await state.sb.from('qc_nonconformance_evidence').insert({nonconformance_id:ncId,category,storage_path:path,original_name:file.name,mime_type:pf.mime,file_size:pf.body.size,uploaded_by:state.user.id}).select('*').single();if(error){await state.sb.storage.from('bloodqc-evidence').remove([path]);throw error;}uploaded++;await logActivity('insert','nonconformance_evidence',data.id,{nonconformance_id:ncId,category});}input.value='';await reloadNonconformanceData();state.currentNonconformanceId=ncId;renderNonconformancePage();showToast(uploaded>1?`แนบหลักฐานแล้ว ${uploaded} ไฟล์`:'แนบหลักฐานแล้ว','good');}catch(e){showToast(errText(e),'error');}
   }
   async function viewNcEvidence(id){const e=state.nonconformanceEvidence.find(x=>x.id===id);if(!e)return;const {data,error}=await state.sb.storage.from('bloodqc-evidence').createSignedUrl(e.storage_path,120);if(error)showToast(errText(error),'error');else window.open(data.signedUrl,'_blank','noopener');}
   async function deleteNcEvidence(id){const e=state.nonconformanceEvidence.find(x=>x.id===id);if(!e)return;if(!confirm(`ลบหลักฐาน ${e.original_name} ?`))return;try{const {error:s}=await state.sb.storage.from('bloodqc-evidence').remove([e.storage_path]);if(s)throw s;const {error}=await state.sb.from('qc_nonconformance_evidence').delete().eq('id',id);if(error)throw error;await reloadNonconformanceData();renderNonconformancePage();showToast('ลบหลักฐานแล้ว','good');}catch(e2){showToast(errText(e2),'error');}}
@@ -1288,9 +1288,9 @@
         const uploadedPaths=[];
         try{
           for(let i=0;i<selectedFiles.length;i++){
-            const file=selectedFiles[i],clean=file.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-100),path=`platelet_weekly/${event.id}/evidence/${Date.now()}_${i}_${clean}`;
-            const {error:u}=await state.sb.storage.from('bloodqc-evidence').upload(path,file,{upsert:false,contentType:file.type||undefined});if(u)throw u;uploadedPaths.push(path);
-            const {error:ferr}=await state.sb.from('platelet_weekly_evidence_files').insert({event_id:event.id,storage_path:path,original_name:file.name,mime_type:file.type,file_size:file.size,uploaded_by:state.user.id});if(ferr)throw ferr;
+            const file=selectedFiles[i],pf=await optimizeEvidenceFile(file),clean=pf.uploadName,path=`platelet_weekly/${event.id}/evidence/${Date.now()}_${i}_${clean}`;
+            const {error:u}=await state.sb.storage.from('bloodqc-evidence').upload(path,pf.body,{upsert:false,contentType:pf.mime||undefined});if(u)throw u;uploadedPaths.push(path);
+            const {error:ferr}=await state.sb.from('platelet_weekly_evidence_files').insert({event_id:event.id,storage_path:path,original_name:file.name,mime_type:pf.mime,file_size:pf.body.size,uploaded_by:state.user.id});if(ferr)throw ferr;
           }
         }catch(uploadErr){if(uploadedPaths.length)await state.sb.storage.from('bloodqc-evidence').remove(uploadedPaths);await state.sb.from('platelet_weekly_evidence_files').delete().eq('event_id',event.id);await state.sb.from('platelet_weekly_events').delete().eq('id',event.id);throw uploadErr;}
         await reloadPlateletWeeklyData();dlg.close();showToast(`บันทึกไม่มีผลิตภัณฑ์สัปดาห์นี้พร้อมหลักฐาน ${selectedFiles.length} ไฟล์แล้ว`,'good');renderDashboard();
@@ -1534,6 +1534,40 @@
     if(!bytes?.byteLength) throw new Error(`${fileName}: ไฟล์ไม่มีข้อมูล กรุณาเลือกรูปใหม่อีกครั้ง`);
     return new Blob([bytes],{type:file.type||'application/octet-stream'});
   }
+  function evidenceUploadName(fileName,mime){
+    const raw=String(fileName||'evidence').replace(/[^a-zA-Z0-9._-]/g,'_').slice(-100)||'evidence';
+    if(mime==='image/jpeg') return raw.replace(/\.[^.]+$/,'')+'.jpg';
+    return raw;
+  }
+  async function optimizeEvidenceFile(file){
+    const originalName=String(file?.name||'evidence');
+    const originalSize=Number(file?.size||0);
+    const originalMime=String(file?.type||'application/octet-stream');
+    const originalBody=await stableUploadBody(file);
+    const isImage=/^image\//i.test(originalMime) && !/gif|svg/i.test(originalMime);
+    if(!isImage || originalSize<700*1024) return {body:originalBody,mime:originalMime,uploadName:evidenceUploadName(originalName,originalMime),originalName,originalSize,optimized:false};
+    try{
+      let bitmap=null,img=null,width=0,height=0;
+      if(typeof createImageBitmap==='function'){
+        bitmap=await createImageBitmap(originalBody);width=bitmap.width;height=bitmap.height;
+      }else{
+        const url=URL.createObjectURL(originalBody);
+        try{img=await new Promise((resolve,reject)=>{const x=new Image();x.onload=()=>resolve(x);x.onerror=reject;x.src=url;});width=img.naturalWidth||img.width;height=img.naturalHeight||img.height;}finally{URL.revokeObjectURL(url);}
+      }
+      if(!width||!height) throw new Error('อ่านขนาดรูปไม่ได้');
+      const maxSide=2200,scale=Math.min(1,maxSide/Math.max(width,height));
+      const outW=Math.max(1,Math.round(width*scale)),outH=Math.max(1,Math.round(height*scale));
+      const canvas=document.createElement('canvas');canvas.width=outW;canvas.height=outH;
+      const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('ไม่รองรับ canvas');
+      ctx.fillStyle='#fff';ctx.fillRect(0,0,outW,outH);ctx.drawImage(bitmap||img,0,0,outW,outH);bitmap?.close?.();
+      const compressed=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('ย่อรูปไม่สำเร็จ')),'image/jpeg',0.86));
+      if(compressed.size>=originalBody.size*0.92) return {body:originalBody,mime:originalMime,uploadName:evidenceUploadName(originalName,originalMime),originalName,originalSize,optimized:false};
+      return {body:compressed,mime:'image/jpeg',uploadName:evidenceUploadName(originalName,'image/jpeg'),originalName,originalSize,optimized:true};
+    }catch(err){
+      console.warn('Image optimization skipped',originalName,err);
+      return {body:originalBody,mime:originalMime,uploadName:evidenceUploadName(originalName,originalMime),originalName,originalSize,optimized:false};
+    }
+  }
   function evidenceUploadErrorText(e,fileName='ไฟล์'){
     const raw=errText(e);
     if(/no content provided/i.test(raw)) return `${fileName}: ระบบไม่ได้รับข้อมูลของไฟล์ กรุณาเลือกรูปใหม่อีกครั้ง`;
@@ -1552,19 +1586,20 @@
       // Copy file bytes before awaiting save/network calls. This is more reliable on iPhone/PWA multi-select.
       const prepared=[];
       for(const file of files){
-        try{prepared.push({file,body:await stableUploadBody(file)});}
+        try{prepared.push({file,prepared:await optimizeEvidenceFile(file)});}
         catch(e){showToast(evidenceUploadErrorText(e,file?.name||'ไฟล์'),'error');input.value='';return;}
       }
       const rid=await ensureSaved();if(!rid){input.value='';return;}
       let uploaded=0;const failed=[];
       for(let i=0;i<prepared.length;i++){
-        const {file,body}=prepared[i];
-        const clean=String(file.name||`evidence_${i+1}`).replace(/[^a-zA-Z0-9._-]/g,'_').slice(-100)||`evidence_${i+1}`;
+        const {file,prepared:pfile}=prepared[i];
+        const body=pfile.body;
+        const clean=pfile.uploadName||`evidence_${i+1}`;
         const unique=(globalThis.crypto?.randomUUID?.()||`${Date.now()}_${i}`);
         const path=`${rid}/${cat}/${unique}_${clean}`;
         let storageUploaded=false;
         try{
-          const mime=file.type||body.type||'application/octet-stream';
+          const mime=pfile.mime||body.type||'application/octet-stream';
           const {error:uerr}=await state.sb.storage.from('platelet-evidence').upload(path,body,{upsert:false,contentType:mime});
           if(uerr)throw uerr;
           storageUploaded=true;
@@ -2015,7 +2050,7 @@ async function adminDeletePlasmaBatch(batchId,reason){
     $$('.plasma-ev-view').forEach(b=>b.onclick=()=>viewPlasmaEvidence(b.dataset.id));$$('.plasma-ev-del').forEach(b=>b.onclick=()=>deletePlasmaEvidence(b.dataset.id));if($('#plasmaCameraBtn'))$('#plasmaCameraBtn').onclick=()=>$('#plasma_camera').click();if($('#plasmaFileBtn'))$('#plasmaFileBtn').onclick=()=>$('#plasma_file').click();if($('#plasma_camera'))$('#plasma_camera').onchange=()=>uploadPlasmaEvidence('plasma_camera');if($('#plasma_file'))$('#plasma_file').onchange=()=>uploadPlasmaEvidence('plasma_file');
   }
   async function uploadPlasmaEvidence(inputId){
-    try{const input=$('#'+inputId),files=Array.from(input?.files||[]);if(!files.length)return;const tooBig=files.find(f=>f.size>10*1024*1024);if(tooBig)throw new Error(`${tooBig.name}: ไฟล์ต้องไม่เกิน 10 MB`);const existed=!!state.currentPlasmaRecordId;if(!state.currentPlasmaRecordId){const ok=await savePlasmaRecord(true,true);if(!ok)return;}const rid=state.currentPlasmaRecordId;let reason=null;if(adminUi()&&existed){reason=$('#plasma_admin_reason')?.value.trim()||null;if(!reason)throw new Error('Admin กรุณาระบุเหตุผลการแก้ไขก่อนแนบหลักฐานใหม่');}let uploaded=0;for(let i=0;i<files.length;i++){const file=files[i],clean=file.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-100),path=`plasma/${rid}/factor_viii/${Date.now()}_${i}_${clean}`;const {error:u}=await state.sb.storage.from('bloodqc-evidence').upload(path,file,{upsert:false,contentType:file.type||undefined});if(u)throw u;const {data,error}=await state.sb.from('plasma_evidence_files').insert({record_id:rid,category:'factor_viii',storage_path:path,original_name:file.name,mime_type:file.type,file_size:file.size,uploaded_by:state.user.id,change_reason:reason}).select('*').single();if(error){await state.sb.storage.from('bloodqc-evidence').remove([path]);throw error;}state.currentPlasmaEvidence.push(data);uploaded++;}input.value='';renderPlasmaEvidence(true,false);showToast(uploaded>1?`แนบหลักฐาน Factor VIII แล้ว ${uploaded} ไฟล์`:'แนบหลักฐาน Factor VIII แล้ว','good');}catch(e){showToast(errText(e),'error');}
+    try{const input=$('#'+inputId),files=Array.from(input?.files||[]);if(!files.length)return;const tooBig=files.find(f=>f.size>10*1024*1024);if(tooBig)throw new Error(`${tooBig.name}: ไฟล์ต้องไม่เกิน 10 MB`);const existed=!!state.currentPlasmaRecordId;if(!state.currentPlasmaRecordId){const ok=await savePlasmaRecord(true,true);if(!ok)return;}const rid=state.currentPlasmaRecordId;let reason=null;if(adminUi()&&existed){reason=$('#plasma_admin_reason')?.value.trim()||null;if(!reason)throw new Error('Admin กรุณาระบุเหตุผลการแก้ไขก่อนแนบหลักฐานใหม่');}let uploaded=0;for(let i=0;i<files.length;i++){const file=files[i],pf=await optimizeEvidenceFile(file),clean=pf.uploadName,path=`plasma/${rid}/factor_viii/${Date.now()}_${i}_${clean}`;const {error:u}=await state.sb.storage.from('bloodqc-evidence').upload(path,pf.body,{upsert:false,contentType:pf.mime||undefined});if(u)throw u;const {data,error}=await state.sb.from('plasma_evidence_files').insert({record_id:rid,category:'factor_viii',storage_path:path,original_name:file.name,mime_type:pf.mime,file_size:pf.body.size,uploaded_by:state.user.id,change_reason:reason}).select('*').single();if(error){await state.sb.storage.from('bloodqc-evidence').remove([path]);throw error;}state.currentPlasmaEvidence.push(data);uploaded++;}input.value='';renderPlasmaEvidence(true,false);showToast(uploaded>1?`แนบหลักฐาน Factor VIII แล้ว ${uploaded} ไฟล์`:'แนบหลักฐาน Factor VIII แล้ว','good');}catch(e){showToast(errText(e),'error');}
   }
 
   async function viewPlasmaEvidence(id){const e=state.currentPlasmaEvidence.find(x=>x.id===id);if(!e)return;const {data,error}=await state.sb.storage.from('bloodqc-evidence').createSignedUrl(e.storage_path,120);if(error)showToast(errText(error),'error');else window.open(data.signedUrl,'_blank','noopener');}
@@ -2441,7 +2476,7 @@ function printPlasmaOutlabBatch(batchId){
     try{const {error}=await state.sb.from('rbc_records').update({status:'draft',last_unlock_reason:reason.trim()}).eq('id',state.currentRbcRecordId);if(error)throw error;await reloadRbcRecords();showToast('ปลดล็อกแล้ว','good');await renderRbcRecordForm();}catch(e){showToast(errText(e),'error');}
   }
   async function uploadRbcEvidence(cat,inputId){
-    try{const input=$('#'+inputId),files=Array.from(input?.files||[]);if(!files.length)return;const tooBig=files.find(f=>f.size>10*1024*1024);if(tooBig)throw new Error(`${tooBig.name}: ไฟล์ต้องไม่เกิน 10 MB`);const existed=!!state.currentRbcRecordId;if(!state.currentRbcRecordId){const ok=await saveRbcRecord(true,true);if(!ok)return;}const rid=state.currentRbcRecordId;let reason=null;if(adminUi()&&existed){reason=$('#rbc_admin_reason')?.value.trim()||null;if(!reason)throw new Error('Admin กรุณาระบุเหตุผลการแก้ไขก่อนแนบหลักฐานใหม่');}let uploaded=0;for(let i=0;i<files.length;i++){const file=files[i],clean=file.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-100),path=`rbc/${rid}/${cat}/${Date.now()}_${i}_${clean}`;const {error:u}=await state.sb.storage.from('bloodqc-evidence').upload(path,file,{upsert:false,contentType:file.type||undefined});if(u)throw u;const {data,error}=await state.sb.from('rbc_evidence_files').insert({record_id:rid,category:cat,storage_path:path,original_name:file.name,mime_type:file.type,file_size:file.size,uploaded_by:state.user.id,change_reason:reason}).select('*').single();if(error){await state.sb.storage.from('bloodqc-evidence').remove([path]);throw error;}state.currentRbcEvidence.push(data);uploaded++;}input.value='';renderRbcEvidenceLists(true,false);showToast(uploaded>1?`แนบหลักฐานแล้ว ${uploaded} ไฟล์`:'แนบหลักฐานแล้ว','good');}catch(e){showToast(errText(e),'error');}
+    try{const input=$('#'+inputId),files=Array.from(input?.files||[]);if(!files.length)return;const tooBig=files.find(f=>f.size>10*1024*1024);if(tooBig)throw new Error(`${tooBig.name}: ไฟล์ต้องไม่เกิน 10 MB`);const existed=!!state.currentRbcRecordId;if(!state.currentRbcRecordId){const ok=await saveRbcRecord(true,true);if(!ok)return;}const rid=state.currentRbcRecordId;let reason=null;if(adminUi()&&existed){reason=$('#rbc_admin_reason')?.value.trim()||null;if(!reason)throw new Error('Admin กรุณาระบุเหตุผลการแก้ไขก่อนแนบหลักฐานใหม่');}let uploaded=0;for(let i=0;i<files.length;i++){const file=files[i],pf=await optimizeEvidenceFile(file),clean=pf.uploadName,path=`rbc/${rid}/${cat}/${Date.now()}_${i}_${clean}`;const {error:u}=await state.sb.storage.from('bloodqc-evidence').upload(path,pf.body,{upsert:false,contentType:pf.mime||undefined});if(u)throw u;const {data,error}=await state.sb.from('rbc_evidence_files').insert({record_id:rid,category:cat,storage_path:path,original_name:file.name,mime_type:pf.mime,file_size:pf.body.size,uploaded_by:state.user.id,change_reason:reason}).select('*').single();if(error){await state.sb.storage.from('bloodqc-evidence').remove([path]);throw error;}state.currentRbcEvidence.push(data);uploaded++;}input.value='';renderRbcEvidenceLists(true,false);showToast(uploaded>1?`แนบหลักฐานแล้ว ${uploaded} ไฟล์`:'แนบหลักฐานแล้ว','good');}catch(e){showToast(errText(e),'error');}
   }
 
   async function viewRbcEvidence(id){const e=state.currentRbcEvidence.find(x=>x.id===id);if(!e)return;const {data,error}=await state.sb.storage.from('bloodqc-evidence').createSignedUrl(e.storage_path,120);if(error)showToast(errText(error),'error');else window.open(data.signedUrl,'_blank','noopener');}
