@@ -775,3 +775,29 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0
 .ph-schedule{border-top:1px solid #e8edf2;margin-top:12px;padding-top:12px}.ph-schedule summary{cursor:pointer;color:#526477;font-weight:600;font-size:13px}.ph-schedule .reminder-list{margin-top:9px}
 .platelet-progress-card .tracking-bar{margin-top:10px}.platelet-reminder-panel .reminder-row{padding:9px 12px}.platelet-reminder-panel .reminder-product small{font-size:11px}
 @media(max-width:760px){.home-pending-link{width:100%;text-align:center}.platelet-reminder-panel .section-title-row{flex-direction:row;flex-wrap:wrap}.platelet-reminder-panel .reminder-tag{font-size:11px}}
+
+/* v5.3.39 — phone-first compact reading, no changes to QC logic */
+@media (max-width:760px){
+  .topbar{height:56px!important;padding:5px 10px!important;gap:8px}
+  .mobile-menu-btn{width:42px;height:42px;flex:0 0 42px}
+  .brand{min-width:0;flex:1;gap:8px}
+  .brand img{width:35px;height:35px;flex-shrink:0}
+  .brand>div{min-width:0}.brand strong{font-size:14px!important;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .brand span{display:none!important}
+  .topbar-mode,.userbox{flex-shrink:0}
+  .sidebar{top:56px;height:calc(100dvh - 56px)}
+  .container,.content-shell .container{padding:12px 10px calc(75px + env(safe-area-inset-bottom))}
+  .page-head{margin-bottom:10px!important}.page-head h1{font-size:21px!important}
+  .page-head p{font-size:12px}.page-head>.actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important;margin-top:9px!important}
+  .page-head>.actions .month-input{grid-column:1/-1;min-height:43px!important}
+  .page-head>.actions .btn{min-height:42px!important;padding:8px 9px;font-size:13px}
+  .page-head>.actions .btn.primary{grid-column:1/-1}
+  .cards{gap:7px;margin-bottom:12px}.card.metric{padding:11px 12px}.metric .value{font-size:24px!important;margin-top:3px}.metric .label{font-size:11px}.metric .sub{margin-top:2px}
+  .panel{padding:12px!important;margin-bottom:11px;border-radius:14px}.section-title-row{margin-bottom:10px;padding-bottom:8px}.section-title-row h2{font-size:16px}
+  .module-grid{gap:10px}.module-card{min-height:0;padding:15px!important;border-radius:15px}.module-card h2{font-size:22px}.module-card-head p{font-size:12px;margin:3px 0 0}.module-stats{gap:7px;margin-top:10px}.module-stats span{padding:6px 8px;font-size:11px}.module-stats strong{font-size:18px}.module-actions{grid-template-columns:1fr 1fr!important;gap:7px;margin-top:12px}.module-actions .btn{min-height:43px!important;padding:8px 6px;font-size:13px}
+  .platelet-progress-grid,.type-progress-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px;margin-top:10px}.platelet-progress-card,.type-progress-card{min-width:0;padding:11px!important;border-radius:12px}.platelet-progress-card strong,.type-progress-card strong{font-size:13px;overflow-wrap:anywhere}.platelet-progress-card .tracking-bar,.type-progress-card .tracking-bar{height:5px;margin-top:7px}.platelet-progress-card .badge{font-size:10px;padding:3px 6px}
+  .filters{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px;padding:9px!important}.filters>input:first-child{grid-column:1/-1!important;min-width:0!important}.filters>select{grid-column:auto!important;min-width:0!important;width:100%}.filters>.btn{grid-column:1/-1!important;min-height:40px}.filters input,.filters select{min-width:0!important;min-height:43px!important;padding:8px;font-size:16px}
+  .mobile-data-cards{gap:8px!important}.mobile-data-card{gap:7px;padding:12px!important}.mobile-data-card-head .link-btn,.mobile-data-card-head strong{font-size:17px!important;overflow-wrap:anywhere}.mobile-data-card-body{gap:5px!important}.mobile-data-pair{grid-template-columns:90px minmax(0,1fr)!important;gap:8px}.mobile-data-label{font-size:11px!important}.mobile-data-value{font-size:13px!important;min-width:0}.mobile-record-more{grid-column:1/-1;margin-top:4px;border-top:1px solid #edf0f3;padding-top:6px}.mobile-record-more summary{cursor:pointer;color:#8b1e2d;font-size:12px;font-weight:750;list-style-position:inside;padding:6px 0}.mobile-record-extra{display:grid;gap:6px;padding:8px 0 4px}
+  .platelet-reminder-panel .reminder-row{padding:9px!important}
+}
+@media(max-width:350px){.platelet-progress-grid,.type-progress-grid{grid-template-columns:1fr!important}.brand strong{font-size:12px!important}}
