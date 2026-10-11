@@ -21,7 +21,7 @@
     return `<span class="badge ${cls}">${esc(poolReleaseTH(s))}</span>`;
   };
   const measuredTH = iso => iso ? dateTH(iso) : 'ยังไม่บันทึก';
-  const state = { sb:null, staffPlannerSb:null, staffPlannerOwnersByMonth:{}, staffPlannerBridgeStatus:'idle', staffPlannerBridgeError:'', session:null, user:null, profile:null, settings:null, productSettings:[], records:[], plateletWeeklyEvents:[], plateletWeeklyEvidence:[], plateletWeeklyReady:false, plateletDashboardMonth:'', plasmaSettings:null, plasmaProductSettings:[], plasmaRecords:[], plasmaBatches:[], plasmaReady:false, plasmaDashboardMonth:'', rbcSettings:null, rbcProductSettings:[], rbcRecords:[], rbcMonthlyProduction:[], rbcReady:false, profiles:[], nonconformances:[], deletedNonconformances:[], nonconformanceEvidence:[], nonconformanceReady:false, currentNonconformanceId:null, ncModuleFilter:'', ncStatusFilter:'', ncWizardStepById:{}, currentRecordId:null, currentEvidence:[], currentPool:[], currentPlasmaRecordId:null, currentPlasmaEvidence:[], currentPlasmaBatchId:null, currentRbcRecordId:null, currentRbcEvidence:[], rbcDashboardMonth:'', lastLoginPassword:null, uiMode:'staff', auditUserFilter:'', resetTargetId:null, showDeletedRecords:false, showDeletedPlasma:false, showDeletedRbc:false, currentView:'home', currentModule:null, currentPage:null, sessionRetryTimer:null, sidebarCollapsed:localStorage.getItem('bloodqc_sidebar_collapsed')==='1', openNavGroup:null, plasmaBatchPage:1 };
+  const state = { sb:null, staffPlannerSb:null, staffPlannerOwnersByMonth:{}, staffPlannerBridgeStatus:'idle', staffPlannerBridgeError:'', session:null, user:null, profile:null, settings:null, productSettings:[], records:[], plateletWeeklyEvents:[], plateletWeeklyEvidence:[], plateletWeeklyReady:false, plateletDashboardMonth:'', plasmaSettings:null, plasmaProductSettings:[], plasmaRecords:[], plasmaBatches:[], plasmaReady:false, plasmaDashboardMonth:'', rbcSettings:null, rbcProductSettings:[], rbcRecords:[], rbcMonthlyProduction:[], rbcReady:false, profiles:[], nonconformances:[], deletedNonconformances:[], ncTombstones:[], nonconformanceEvidence:[], nonconformanceReady:false, currentNonconformanceId:null, ncModuleFilter:'', ncStatusFilter:'', ncWizardStepById:{}, currentRecordId:null, currentEvidence:[], currentPool:[], currentPlasmaRecordId:null, currentPlasmaEvidence:[], currentPlasmaBatchId:null, currentRbcRecordId:null, currentRbcEvidence:[], rbcDashboardMonth:'', lastLoginPassword:null, uiMode:'staff', auditUserFilter:'', resetTargetId:null, showDeletedRecords:false, showDeletedPlasma:false, showDeletedRbc:false, currentView:'home', currentModule:null, currentPage:null, sessionRetryTimer:null, sidebarCollapsed:localStorage.getItem('bloodqc_sidebar_collapsed')==='1', openNavGroup:null, plasmaBatchPage:1 };
   const productSetting = type => state.productSettings.find(x=>x.product_type===type);
   const activeProducts = () => state.productSettings.filter(x=>x.is_active).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||a.product_type.localeCompare(b.product_type));
   const productOptions = selected => activeProducts().map(x=>`<option value="${esc(x.product_type)}" ${selected===x.product_type?'selected':''}>${esc(x.product_type)}</option>`).join('');
@@ -468,18 +468,23 @@
 
   async function loadNonconformanceData(){
     try{
-      const [ncRes,evRes]=await Promise.all([
+      const [ncRes,evRes,tombRes]=await Promise.all([
         state.sb.from('qc_nonconformances').select('*').order('created_at',{ascending:false}).limit(1000),
-        state.sb.from('qc_nonconformance_evidence').select('*').order('created_at',{ascending:false}).limit(2000)
+        state.sb.from('qc_nonconformance_evidence').select('*').order('created_at',{ascending:false}).limit(2000),
+        state.sb.rpc('bloodqc_nc_deleted_source_keys')
       ]);
       if(ncRes.error)throw ncRes.error;if(evRes.error)throw evRes.error;
       const allNc=ncRes.data||[];
       state.nonconformances=allNc.filter(n=>!n.deleted_at);
       state.deletedNonconformances=allNc.filter(n=>!!n.deleted_at);
+      // Deleted sources may be hidden by RLS or fall beyond the first 1,000 NC rows.
+      // A security-definer RPC returns only source keys, never sensitive NC content.
+      state.ncTombstones=tombRes.error?null:(tombRes.data||[]);
+      if(tombRes.error)console.warn('NC deleted-source RPC unavailable: run v5.3.47 SQL',tombRes.error);
       state.nonconformanceEvidence=evRes.data||[];state.nonconformanceReady=true;
     }catch(e){
       console.warn('Nonconformance module not ready',e);
-      state.nonconformances=[];state.deletedNonconformances=[];state.nonconformanceEvidence=[];state.nonconformanceReady=false;
+      state.nonconformances=[];state.deletedNonconformances=[];state.ncTombstones=[];state.nonconformanceEvidence=[];state.nonconformanceReady=false;
     }
     updateNcNavBadge();
   }
@@ -840,7 +845,7 @@
     return null;
   }
   function ncByRecord(module,recordId){return state.nonconformances.find(n=>n.module===module&&n.record_id===recordId)||null;}
-  function deletedNcByRecord(module,recordId){return (state.deletedNonconformances||[]).find(n=>n.module===module&&n.record_id===recordId)||null;}
+  function deletedNcByRecord(module,recordId){return (state.deletedNonconformances||[]).find(n=>n.module===module&&String(n.record_id)===String(recordId))||(state.ncTombstones||[]).find(n=>n.module===module&&String(n.record_id)===String(recordId))||null;}
   function anyNcByRecord(module,recordId){return ncByRecord(module,recordId)||deletedNcByRecord(module,recordId)||null;}
   function sourceQcBadge(module,r){return module==='plasma'?plasmaQcBadge(r?.qc_status):module==='rbc'?rbcRecordDecisionBadge(r):(r?.record_purpose==='qc'?plateletQcBadge(r):'');}
   function sourceRecordDate(module,r){return module==='platelet'?dateTH(r?.collection_at,false):esc(r?.manufactured_on||'–');}
@@ -916,6 +921,7 @@
   }
   async function createNonconformance(module,recordId){
     if(!state.nonconformanceReady){showToast('กรุณา Run SQL v5.3.23 ก่อนใช้งาน Corrective Action','error');location.hash=ROUTES.nonconformance;return;}
+    if(!Array.isArray(state.ncTombstones)){showToast('กรุณาตรวจสอบ SQL v5.3.47 ก่อนสร้าง NC','error');return;}
     const existing=ncByRecord(module,recordId);if(existing){state.currentNonconformanceId=existing.id;location.hash=ROUTES.nonconformance;return;}
     const deletedExisting=deletedNcByRecord(module,recordId);if(deletedExisting){showToast(`ถุงนี้เคยมี ${deletedExisting.nc_no||'NC'} และถูกลบพร้อมเก็บ Audit แล้ว ระบบจะไม่สร้าง NC ซ้ำอัตโนมัติ`,'error');return;}
     const r=recordForModule(module,recordId);if(!r){showToast('ไม่พบรายการ QC ต้นฉบับ','error');return;}
@@ -1131,7 +1137,10 @@
       const {error}=await state.sb.from('qc_nonconformances').update({deleted_at:deletedAt,deleted_by:state.user.id,delete_reason:cleanReason}).eq('id',id);
       if(error)throw error;
       await logActivity('delete','nonconformance',id,{nc_no:n.nc_no,module:n.module,record_id:n.record_id,reason:cleanReason,soft_delete:true});
-      state.currentNonconformanceId=null;delete state.ncWizardStepById[id];await reloadNonconformanceData();renderNonconformancePage();showToast(`ลบ ${n.nc_no} แล้ว และเก็บประวัติไว้ใน Audit Log`,'good');
+      state.currentNonconformanceId=null;delete state.ncWizardStepById[id];await reloadNonconformanceData();
+      // Preserve an immediate local tombstone so the candidate cannot flash back into the queue.
+      if(!deletedNcByRecord(n.module,n.record_id))state.ncTombstones.push({module:n.module,record_id:n.record_id,nc_no:n.nc_no});
+      renderNonconformancePage();showToast(`ลบ ${n.nc_no} แล้ว และเก็บประวัติไว้ใน Audit Log`,'good');
     }catch(e){showToast(errText(e),'error');throw e;}
   }
 
