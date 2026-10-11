@@ -801,3 +801,42 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0
   .platelet-reminder-panel .reminder-row{padding:9px!important}
 }
 @media(max-width:350px){.platelet-progress-grid,.type-progress-grid{grid-template-columns:1fr!important}.brand strong{font-size:12px!important}}
+
+/* v5.3.40 — consistent touch-friendly responsive UI across Platelet, FFP and RBC */
+@media(max-width:760px){
+  html,body,#appShell,.app-layout,.content-shell{max-width:100%;overflow-x:clip}
+  .topbar{position:sticky;top:0;z-index:90;box-sizing:border-box}
+  .topbar .brand{min-width:0;max-width:calc(100% - 55px)}
+  .topbar .brand strong{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .page-head{gap:6px}.page-head h1{line-height:1.2;overflow-wrap:anywhere}
+  .page-head>.actions{grid-template-columns:repeat(2,minmax(0,1fr))!important;align-items:stretch}
+  .page-head>.actions>*{min-width:0}
+  .page-head>.actions .btn{white-space:normal;line-height:1.25;min-height:44px!important}
+  .page-head>.actions .btn.primary{grid-column:auto!important}
+  .page-head>.actions .month-input{grid-column:1/-1!important;width:100%;max-width:100%}
+  .filters{gap:8px!important}.filters>input:first-child{grid-column:1/-1!important}
+  .filters>.btn{grid-column:1/-1!important}
+  .filters input,.filters select{max-width:100%;width:100%;font-size:16px!important}
+  .mobile-data-card{overflow:hidden;min-width:0}
+  .mobile-data-card-head{gap:8px;align-items:center}
+  .mobile-data-card-head .record-link,.mobile-data-card-head .plasma-record-link,.mobile-data-card-head .rbc-record-link{max-width:100%;overflow-wrap:anywhere}
+  .mobile-data-card-body{min-width:0}
+  .mobile-data-pair{align-items:start;min-width:0;grid-template-columns:minmax(75px,30%) minmax(0,1fr)!important}
+  .mobile-data-value{overflow-wrap:anywhere;line-height:1.4}
+  .mobile-record-more{display:block;min-width:0;width:100%;grid-column:1/-1}
+  .mobile-record-more summary{min-height:40px;display:flex;align-items:center;cursor:pointer;user-select:none}
+  .mobile-record-more summary:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+  .mobile-record-extra{min-width:0}
+  .type-progress-card,.rbc-progress-card,.platelet-progress-card{min-width:0;overflow:hidden}
+  .type-progress-card strong,.rbc-progress-card strong{overflow-wrap:anywhere}
+  .sticky-actions .btn,.module-actions .btn{white-space:normal;line-height:1.3}
+  .dialog{max-width:100vw;overflow-x:hidden}
+  .dialog #detailBody{overflow-wrap:anywhere}
+  .form-grid>*,.calc-grid>*,.cards>*,.module-grid>*{min-width:0}
+  input,select,textarea{max-width:100%}
+}
+@media(max-width:390px){
+ .page-head>.actions{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .page-head>.actions .btn{font-size:12px!important;padding:8px 5px!important}
+ .mobile-data-pair{grid-template-columns:minmax(72px,32%) minmax(0,1fr)!important}
+}
