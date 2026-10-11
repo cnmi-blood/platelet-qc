@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.39 - 5-year evidence storage saver: automatic image optimization */
+/* CNMI Blood Component QC v5.3.43 - centered popup system across the app */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -89,10 +89,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.39 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.43 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.39 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.43 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -905,6 +905,7 @@
     const r=x.record,params=failedParametersFor(x.module,r);
     return `<article class="nc-queue-card"><div class="nc-queue-head"><div><span class="badge">${esc(ncModuleTH(x.module))}</span><h3>${esc(r.product_no)}</h3><p>${esc(r.product_type)}</p></div>${sourceQcBadge(x.module,r)}</div>${ncParamHtml(params)}<div class="nc-queue-foot"><span class="muted small">${esc(sourceRecordDate(x.module,r))}</span>${staffWriteUi()?`<button class="btn primary nc-create" data-module="${x.module}" data-record-id="${r.id}">เริ่มตรวจสอบ</button>`:''}</div></article>`;
   }
+  // Existing NC remains until verification, CAPA decision and authorized closure; pH timing alone is not analytic QC failure.
   function renderNcCaseCard(n){
     const overdue=n.due_date&&n.status!=='closed'&&new Date(`${n.due_date}T23:59:59+07:00`)<new Date();
     return `<button type="button" class="nc-case-card nc-open-existing" data-nc-id="${n.id}"><div class="nc-case-card-head"><div><strong>${esc(n.nc_no)}</strong><span>${esc(n.product_no)} · ${esc(n.product_type)}</span></div>${ncStatusBadge(n.status)}</div><div class="nc-case-meta"><span>${esc(ncModuleTH(n.module))}</span><span>สร้าง ${esc(dateTH(n.created_at,false))}</span>${n.responsible_by?`<span>ผู้รับผิดชอบ ${esc(profileName(n.responsible_by))}</span>`:''}${n.due_date?`<span class="${overdue?'overdue':''}">ครบกำหนด ${esc(n.due_date)}</span>`:''}</div></button>`;
@@ -1087,7 +1088,7 @@
       if(!payload.effectiveness_method||payload.effectiveness_result!=='effective'){showToast('ปิดเคสได้เมื่อมีวิธีติดตามผล และผล Effectiveness = ได้ผล','error');return;}
     }else if(!workflow.capa_not_required_reason){showToast('กรุณาระบุเหตุผลที่ไม่จำเป็นต้องทำ Corrective Action','error');return;}
     if(!payload.close_note){showToast('กรุณาระบุสรุปก่อนปิดเคส','error');$('#ncCloseNote')?.focus();return;}
-    if(!confirm(`ยืนยันปิด ${n.nc_no} ?`))return;
+    if(!await qcConfirmCentered(`ยืนยันปิด ${n.nc_no} ?`,{title:'ปิดเคส QC ไม่ผ่าน',acceptText:'ปิดเคส'}))return;
     try{const {error}=await state.sb.from('qc_nonconformances').update({...payload,status:'closed'}).eq('id',id);if(error)throw error;await logActivity('close','nonconformance',id,{nc_no:n.nc_no,verification_result:payload.verification_result,capa_required:workflow.capa_required});await reloadNonconformanceData();state.currentNonconformanceId=id;renderNonconformancePage();showToast('ปิดเคส QC ไม่ผ่านแล้ว','good');}catch(e){showToast(errText(e),'error');}
   }
   async function adminDeleteNonconformance(id,reason){
@@ -1110,7 +1111,7 @@
     try{let uploaded=0;for(let i=0;i<files.length;i++){const file=files[i],pf=await optimizeEvidenceFile(file),clean=pf.uploadName,path=`nonconformance/${ncId}/${category}/${Date.now()}_${i}_${clean}`;const {error:u}=await state.sb.storage.from('bloodqc-evidence').upload(path,pf.body,{upsert:false,contentType:pf.mime||undefined});if(u)throw u;const {data,error}=await state.sb.from('qc_nonconformance_evidence').insert({nonconformance_id:ncId,category,storage_path:path,original_name:file.name,mime_type:pf.mime,file_size:pf.body.size,uploaded_by:state.user.id}).select('*').single();if(error){await state.sb.storage.from('bloodqc-evidence').remove([path]);throw error;}uploaded++;await logActivity('insert','nonconformance_evidence',data.id,{nonconformance_id:ncId,category});}input.value='';await reloadNonconformanceData();state.currentNonconformanceId=ncId;renderNonconformancePage();showToast(uploaded>1?`แนบหลักฐานแล้ว ${uploaded} ไฟล์`:'แนบหลักฐานแล้ว','good');}catch(e){showToast(errText(e),'error');}
   }
   async function viewNcEvidence(id){const e=state.nonconformanceEvidence.find(x=>x.id===id);if(!e)return;const {data,error}=await state.sb.storage.from('bloodqc-evidence').createSignedUrl(e.storage_path,120);if(error)showToast(errText(error),'error');else window.open(data.signedUrl,'_blank','noopener');}
-  async function deleteNcEvidence(id){const e=state.nonconformanceEvidence.find(x=>x.id===id);if(!e)return;if(!confirm(`ลบหลักฐาน ${e.original_name} ?`))return;try{const {error:s}=await state.sb.storage.from('bloodqc-evidence').remove([e.storage_path]);if(s)throw s;const {error}=await state.sb.from('qc_nonconformance_evidence').delete().eq('id',id);if(error)throw error;await reloadNonconformanceData();renderNonconformancePage();showToast('ลบหลักฐานแล้ว','good');}catch(e2){showToast(errText(e2),'error');}}
+  async function deleteNcEvidence(id){const e=state.nonconformanceEvidence.find(x=>x.id===id);if(!e)return;if(!await qcConfirmCentered(`ลบหลักฐาน ${e.original_name} ?`,{title:'ลบหลักฐาน',acceptText:'ลบ',acceptClass:'danger'}))return;try{const {error:s}=await state.sb.storage.from('bloodqc-evidence').remove([e.storage_path]);if(s)throw s;const {error}=await state.sb.from('qc_nonconformance_evidence').delete().eq('id',id);if(error)throw error;await reloadNonconformanceData();renderNonconformancePage();showToast('ลบหลักฐานแล้ว','good');}catch(e2){showToast(errText(e2),'error');}}
 
   function pendingReviewRecords(){
     const rows=state.records.filter(r=>!r.deleted_at && r.record_purpose==='qc' && r.status==='submitted').map(r=>({module:'platelet',record:r}));
@@ -1473,9 +1474,9 @@
       st==='below_min'?`ต่ำกว่า ${fmt(cond,0)}`:'';
     if($('#poolRuleHint')) $('#poolRuleHint').textContent=hint;
   }
-  function clearNewRecordForm(){
+  async function clearNewRecordForm(){
     if(state.currentRecordId) return;
-    if(!confirm('ล้างข้อมูลที่กรอกในฟอร์มนี้ทั้งหมด?')) return;
+    if(!await qcConfirmCentered('ล้างข้อมูลที่กรอกในฟอร์มนี้ทั้งหมด?',{title:'ล้างฟอร์ม Platelet',acceptText:'ล้างข้อมูล'})) return;
     renderRecordForm();
   }
   function calcFrontend(){
@@ -1675,7 +1676,7 @@
       adminReason=$('#admin_edit_reason')?.value.trim()||null;
       if(!adminReason){showToast('Admin กรุณาระบุเหตุผลการแก้ไขก่อนลบหลักฐาน','error');$('#admin_edit_reason')?.focus();return;}
     }
-    if(!confirm(`ลบหลักฐาน ${e.original_name} ?`))return;
+    if(!await qcConfirmCentered(`ลบหลักฐาน ${e.original_name} ?`,{title:'ลบหลักฐาน',acceptText:'ลบ',acceptClass:'danger'}))return;
     if(adminReason){
       const {error:logErr}=await state.sb.from('platelet_records').update({last_admin_edit_reason:adminReason,last_admin_edit_id:crypto.randomUUID()}).eq('id',state.currentRecordId);
       if(logErr){showToast(errText(logErr),'error');return;}
@@ -1684,7 +1685,7 @@
     const {error:s}=await state.sb.storage.from('platelet-evidence').remove([e.storage_path]);if(s)console.warn('storage cleanup failed',s);
     state.currentEvidence=state.currentEvidence.filter(x=>x.id!==id);renderEvidenceLists(state.currentRecordId,true,false);showToast('ลบหลักฐานแล้ว');
   }
-  async function submitRecord(){ if(!confirm('ยืนยันส่งให้แพทย์ทบทวน?\n\nระบบจะบันทึกข้อมูลล่าสุดและเปลี่ยนสถานะเป็น “รอแพทย์” เจ้าหน้าที่จะกลับมาแก้ไขเองไม่ได้จนกว่าแพทย์จะส่งกลับแก้ไข'))return; if(!await saveRecord(true))return; const current=state.records.find(r=>r.id===state.currentRecordId); if(current?.record_purpose!=='qc'){showToast('Prepare บันทึกได้ตามปกติ ไม่ต้องส่งแพทย์ทบทวน','good');return;} try{const {error}=await state.sb.from('platelet_records').update({status:'submitted'}).eq('id',state.currentRecordId);if(error)throw error;await loadRecords();showToast('ส่งให้แพทย์ทบทวนแล้ว','good');await renderRecordForm();}catch(e){showToast(errText(e),'error');} }
+  async function submitRecord(){ if(!await qcConfirmCentered('ยืนยันส่งให้แพทย์ทบทวน?\n\nระบบจะบันทึกข้อมูลล่าสุดและเปลี่ยนสถานะเป็น “รอแพทย์” เจ้าหน้าที่จะกลับมาแก้ไขเองไม่ได้จนกว่าแพทย์จะส่งกลับแก้ไข',{title:'ส่งให้แพทย์ทบทวน',acceptText:'ยืนยันส่ง'}))return; if(!await saveRecord(true))return; const current=state.records.find(r=>r.id===state.currentRecordId); if(current?.record_purpose!=='qc'){showToast('Prepare บันทึกได้ตามปกติ ไม่ต้องส่งแพทย์ทบทวน','good');return;} try{const {error}=await state.sb.from('platelet_records').update({status:'submitted'}).eq('id',state.currentRecordId);if(error)throw error;await loadRecords();showToast('ส่งให้แพทย์ทบทวนแล้ว','good');await renderRecordForm();}catch(e){showToast(errText(e),'error');} }
   async function refreshAfterReviewAction(){
     if(state.currentView==='review') renderReviewQueue();
     else if(state.currentView==='records') renderRecordsList();
@@ -1692,14 +1693,14 @@
     else if(state.currentView==='home') renderHome();
     else if(state.currentView==='record') await renderRecordForm();
   }
-  async function approveAndLock(recordId=state.currentRecordId,note=null){ const id=recordId; if(!id||!reviewerUi())return; const reviewNote=note===null?($('#review_note')?.value.trim()||null):note; if(!confirm('ยืนยันว่าตรวจทวนข้อมูลและหลักฐานแล้ว และอนุมัติให้ LOCK รายการนี้?'))return; try{const {error}=await state.sb.from('platelet_records').update({status:'locked',review_note:reviewNote}).eq('id',id);if(error)throw error;await loadRecords();showToast('ทบทวนและ LOCK แล้ว','good');if($('#detailDialog')?.open) $('#detailDialog').close(); await refreshAfterReviewAction();}catch(e){showToast(errText(e),'error');} }
-  async function returnForCorrection(recordId=state.currentRecordId,note=null){ const id=recordId; if(!id||!reviewerUi())return; const reviewNote=(note===null?$('#review_note')?.value:note)?.trim(); if(!reviewNote){showToast('กรุณาระบุเหตุผลที่ส่งกลับแก้ไข','error');($('#review_note')||$('#detail_review_note'))?.focus();return;} if(!confirm('ส่งรายการนี้กลับเป็น Draft ให้เจ้าหน้าที่แก้ไข?'))return; try{const {error}=await state.sb.from('platelet_records').update({status:'draft',review_note:reviewNote}).eq('id',id);if(error)throw error;await loadRecords();showToast('ส่งกลับให้แก้ไขแล้ว','good');if($('#detailDialog')?.open) $('#detailDialog').close(); await refreshAfterReviewAction();}catch(e){showToast(errText(e),'error');} }
-  async function unlockRecord(){ const reason=prompt('ระบุเหตุผลที่ต้องปลดล็อก (จำเป็น):');if(!reason?.trim())return; try{const {error}=await state.sb.from('platelet_records').update({status:'draft',last_unlock_reason:reason.trim()}).eq('id',state.currentRecordId);if(error)throw error;await loadRecords();showToast('ปลดล็อกแล้ว ระบบเพิ่ม Revision ใหม่','good');await renderRecordForm();}catch(e){showToast(errText(e),'error');} }
+  async function approveAndLock(recordId=state.currentRecordId,note=null){ const id=recordId; if(!id||!reviewerUi())return; const reviewNote=note===null?($('#review_note')?.value.trim()||null):note; if(!await qcConfirmCentered('ยืนยันว่าตรวจทวนข้อมูลและหลักฐานแล้ว และอนุมัติให้ LOCK รายการนี้?',{title:'อนุมัติและ LOCK Platelet',acceptText:'อนุมัติและ LOCK'}))return; try{const {error}=await state.sb.from('platelet_records').update({status:'locked',review_note:reviewNote}).eq('id',id);if(error)throw error;await loadRecords();showToast('ทบทวนและ LOCK แล้ว','good');if($('#detailDialog')?.open) $('#detailDialog').close(); await refreshAfterReviewAction();}catch(e){showToast(errText(e),'error');} }
+  async function returnForCorrection(recordId=state.currentRecordId,note=null){ const id=recordId; if(!id||!reviewerUi())return; const reviewNote=(note===null?$('#review_note')?.value:note)?.trim(); if(!reviewNote){showToast('กรุณาระบุเหตุผลที่ส่งกลับแก้ไข','error');($('#review_note')||$('#detail_review_note'))?.focus();return;} if(!await qcConfirmCentered('ส่งรายการนี้กลับเป็น Draft ให้เจ้าหน้าที่แก้ไข?',{title:'ส่งกลับแก้ไข Platelet',acceptText:'ส่งกลับแก้ไข',acceptClass:'danger'}))return; try{const {error}=await state.sb.from('platelet_records').update({status:'draft',review_note:reviewNote}).eq('id',id);if(error)throw error;await loadRecords();showToast('ส่งกลับให้แก้ไขแล้ว','good');if($('#detailDialog')?.open) $('#detailDialog').close(); await refreshAfterReviewAction();}catch(e){showToast(errText(e),'error');} }
+  async function unlockRecord(){ const reason=await qcPromptCentered('ระบุเหตุผลที่ต้องปลดล็อก', {title:'ปลดล็อกรายการ Platelet',placeholder:'เหตุผลที่ต้องปลดล็อก',required:true,multiline:true,acceptText:'ปลดล็อก'});if(!reason?.trim())return; try{const {error}=await state.sb.from('platelet_records').update({status:'draft',last_unlock_reason:reason.trim()}).eq('id',state.currentRecordId);if(error)throw error;await loadRecords();showToast('ปลดล็อกแล้ว ระบบเพิ่ม Revision ใหม่','good');await renderRecordForm();}catch(e){showToast(errText(e),'error');} }
   async function adminDeleteRecord(id){
     if(!adminUi())return;
-    const reason=prompt('ระบุเหตุผลที่ลบรายการ (จำเป็น):\nเช่น สร้าง Product No. ซ้ำ / บันทึกรายการผิดคน');
+    const reason=await qcPromptCentered('ระบุเหตุผลที่ลบรายการ', {title:'ลบรายการ Platelet',placeholder:'เช่น สร้าง Product No. ซ้ำ / บันทึกรายการผิดคน',required:true,multiline:true,acceptText:'ถัดไป',acceptClass:'danger'});
     if(!reason?.trim())return;
-    if(!confirm('ยืนยันลบรายการนี้ออกจากรายการใช้งาน? ข้อมูลและหลักฐานจะยังเก็บไว้เพื่อ Audit'))return;
+    if(!await qcConfirmCentered('ยืนยันลบรายการนี้ออกจากรายการใช้งาน? ข้อมูลและหลักฐานจะยังเก็บไว้เพื่อ Audit',{title:'ยืนยันลบรายการ Platelet',acceptText:'ยืนยันลบ',acceptClass:'danger'}))return;
     try{
       const {error}=await state.sb.from('platelet_records').update({deleted_at:new Date().toISOString(),deleted_by:state.user.id,delete_reason:reason.trim()}).eq('id',id);if(error)throw error;
       await loadRecords();showToast('ลบรายการแล้ว และเก็บประวัติไว้ใน Audit Log','good');$('#detailDialog')?.close();switchView('records');
@@ -1707,7 +1708,7 @@
   }
   async function adminRestoreRecord(id){
     if(!adminUi())return;
-    const reason=prompt('ระบุเหตุผลที่กู้คืนรายการ (จำเป็น):');if(!reason?.trim())return;
+    const reason=await qcPromptCentered('ระบุเหตุผลที่กู้คืนรายการ', {title:'กู้คืนรายการ Platelet',placeholder:'เหตุผลที่กู้คืน',required:true,multiline:true,acceptText:'กู้คืนรายการ'});if(!reason?.trim())return;
     try{
       const {error}=await state.sb.from('platelet_records').update({deleted_at:null,deleted_by:null,delete_reason:null,last_admin_edit_reason:reason.trim(),last_admin_edit_id:crypto.randomUUID()}).eq('id',id);if(error)throw error;
       await loadRecords();showToast('กู้คืนรายการแล้ว','good');$('#detailDialog')?.close();switchView('records');
@@ -2019,7 +2020,7 @@ function openPlasmaBatchDeleteDialog(batchId){
   $('#detailBody').innerHTML=`<div class="notice warning"><strong>ข้อมูลจะไม่ถูกลบออกจากฐานข้อมูล</strong><br>ระบบจะเก็บเลขชุดเดิม ผู้ยกเลิก วันเวลา เหตุผล และ Product No. เดิมไว้สำหรับ Audit</div><div class="field"><label>เหตุผลที่ยกเลิก <span class="required-star">*</span></label><select id="batchDeleteReasonType"><option value="">กรุณาเลือกเหตุผล</option><option value="ทดสอบระบบ">ทดสอบระบบ</option><option value="สร้างซ้ำ">สร้างซ้ำ</option><option value="เลือก Product No. ผิด">เลือก Product No. ผิด</option><option value="วัน-เวลานำส่งผิด">วัน-เวลานำส่งผิด</option><option value="อื่น ๆ">อื่น ๆ</option></select></div><div class="field hidden" id="batchDeleteOtherWrap"><label>ระบุเหตุผลอื่น</label><textarea id="batchDeleteReasonOther" placeholder="ระบุเหตุผลที่ต้องยกเลิกชุดนำส่ง"></textarea></div><div class="actions"><button type="button" class="btn" id="batchDeleteCancel">กลับ</button><button type="button" class="btn danger" id="batchDeleteConfirm">ยืนยันยกเลิกชุดนำส่ง</button></div>`;
   $('#batchDeleteReasonType').onchange=e=>$('#batchDeleteOtherWrap').classList.toggle('hidden',e.target.value!=='อื่น ๆ');
   $('#batchDeleteCancel').onclick=()=>dlg.close();
-  $('#batchDeleteConfirm').onclick=async()=>{const t=$('#batchDeleteReasonType').value,other=$('#batchDeleteReasonOther').value.trim(),reason=t==='อื่น ๆ'?other:t;if(!reason){showToast('กรุณาระบุเหตุผลที่ยกเลิก','error');return;}if(!confirm(`ยืนยันยกเลิก ${b.batch_no}?\n\nหากมีรายการ FFP ในชุดนี้ ระบบจะคืนรายการกลับไปสถานะรอจัดชุดนำส่ง`))return;await adminDeletePlasmaBatch(batchId,reason);};
+  $('#batchDeleteConfirm').onclick=async()=>{const t=$('#batchDeleteReasonType').value,other=$('#batchDeleteReasonOther').value.trim(),reason=t==='อื่น ๆ'?other:t;if(!reason){showToast('กรุณาระบุเหตุผลที่ยกเลิก','error');return;}if(!await qcConfirmCentered(`ยืนยันยกเลิก ${b.batch_no}?\n\nหากมีรายการ FFP ในชุดนี้ ระบบจะคืนรายการกลับไปสถานะรอจัดชุดนำส่ง`,{title:'ยกเลิกชุดนำส่ง',acceptText:'ยืนยันยกเลิก',acceptClass:'danger'}))return;await adminDeletePlasmaBatch(batchId,reason);};
   dlg.showModal();
 }
 async function adminDeletePlasmaBatch(batchId,reason){
@@ -2079,7 +2080,7 @@ async function adminDeletePlasmaBatch(batchId,reason){
     const refreshPlasmaOwner=()=>refreshPlannerOwnerHint('plasmaPlannerOwnerHint',$('#plasma_manufactured_on')?.value,'plasma',$('#plasma_product_type')?.value||'');
     ['plasma_product_type','plasma_gross_weight_g','plasma_factor_viii_percent','plasma_manufactured_on'].forEach(id=>$('#'+id)?.addEventListener('input',updatePlasmaPreview));
     $('#plasma_product_type')?.addEventListener('change',refreshPlasmaOwner);$('#plasma_manufactured_on')?.addEventListener('change',refreshPlasmaOwner);refreshPlasmaOwner();
-    $('#plasmaBack').onclick=()=>location.hash=ROUTES.plasma.records;if($('#plasmaClear'))$('#plasmaClear').onclick=()=>{if(confirm('ล้างฟอร์มทั้งหมด?'))renderPlasmaRecordForm();};if($('#plasmaSave'))$('#plasmaSave').onclick=()=>savePlasmaRecord(false);if($('#plasmaSubmit'))$('#plasmaSubmit').onclick=submitPlasmaRecord;if($('#plasmaUnlock'))$('#plasmaUnlock').onclick=unlockPlasmaRecord;if($('#plasmaOpenBatch'))$('#plasmaOpenBatch').onclick=openPlasmaBatchBuilder;if($('#plasmaPrintBatch'))$('#plasmaPrintBatch').onclick=()=>printPlasmaOutlabBatch(batch.id);
+    $('#plasmaBack').onclick=()=>location.hash=ROUTES.plasma.records;if($('#plasmaClear'))$('#plasmaClear').onclick=async()=>{if(await qcConfirmCentered('ล้างฟอร์มทั้งหมด?',{title:'ล้างฟอร์ม FFP',acceptText:'ล้างข้อมูล'}))renderPlasmaRecordForm();};if($('#plasmaSave'))$('#plasmaSave').onclick=()=>savePlasmaRecord(false);if($('#plasmaSubmit'))$('#plasmaSubmit').onclick=submitPlasmaRecord;if($('#plasmaUnlock'))$('#plasmaUnlock').onclick=unlockPlasmaRecord;if($('#plasmaOpenBatch'))$('#plasmaOpenBatch').onclick=openPlasmaBatchBuilder;if($('#plasmaPrintBatch'))$('#plasmaPrintBatch').onclick=()=>printPlasmaOutlabBatch(batch.id);
   }
   function collectPlasmaRecord(){
     const adminReason=$('#plasma_admin_reason')?.value.trim()||null;return {product_no:$('#plasma_product_no').value.trim(),product_type:$('#plasma_product_type').value,blood_group:$('#plasma_group').value||null,manufactured_on:$('#plasma_manufactured_on').value||null,centrifuge_no:$('#plasma_centrifuge').value||null,prep_time:$('#plasma_prep_time').value||null,gross_weight_g:num($('#plasma_gross_weight_g').value),factor_viii_percent:num($('#plasma_factor_viii_percent').value),factor_tested_on:$('#plasma_factor_tested_on').value||null,notes:$('#plasma_notes').value.trim()||null,...(adminUi()&&state.currentPlasmaRecordId&&adminReason?{last_admin_edit_reason:adminReason,last_admin_edit_id:crypto.randomUUID()}:{} )};
@@ -2100,9 +2101,9 @@ async function adminDeletePlasmaBatch(batchId,reason){
   }
 
   async function viewPlasmaEvidence(id){const e=state.currentPlasmaEvidence.find(x=>x.id===id);if(!e)return;const {data,error}=await state.sb.storage.from('bloodqc-evidence').createSignedUrl(e.storage_path,120);if(error)showToast(errText(error),'error');else window.open(data.signedUrl,'_blank','noopener');}
-  async function deletePlasmaEvidence(id){const e=state.currentPlasmaEvidence.find(x=>x.id===id);if(!e)return;if(!confirm(`ลบหลักฐาน ${e.original_name} ?`))return;try{const {error}=await state.sb.from('plasma_evidence_files').delete().eq('id',id);if(error)throw error;const {error:s}=await state.sb.storage.from('bloodqc-evidence').remove([e.storage_path]);if(s)console.warn('storage cleanup failed',s);state.currentPlasmaEvidence=state.currentPlasmaEvidence.filter(x=>x.id!==id);renderPlasmaEvidence(true,false);showToast('ลบหลักฐานแล้ว');}catch(e2){showToast(errText(e2),'error');}}
-  async function submitPlasmaRecord(){if(!confirm('ยืนยันส่งให้แพทย์ทบทวน?\n\nหลังส่ง เจ้าหน้าที่จะกลับมาแก้ไขเองไม่ได้จนกว่าแพทย์จะส่งกลับแก้ไข'))return;if(!await savePlasmaRecord(true))return;try{const {error}=await state.sb.from('plasma_records').update({status:'submitted'}).eq('id',state.currentPlasmaRecordId);if(error)throw error;await reloadPlasmaRecords();showToast('ส่งให้แพทย์ทบทวนแล้ว','good');await renderPlasmaRecordForm();}catch(e){showToast(errText(e),'error');}}
-  async function unlockPlasmaRecord(){const reason=prompt('ระบุเหตุผลที่ต้องปลดล็อก (จำเป็น):');if(!reason?.trim())return;try{const {error}=await state.sb.from('plasma_records').update({status:'draft',last_unlock_reason:reason.trim()}).eq('id',state.currentPlasmaRecordId);if(error)throw error;await reloadPlasmaRecords();showToast('ปลดล็อกแล้ว','good');await renderPlasmaRecordForm();}catch(e){showToast(errText(e),'error');}}
+  async function deletePlasmaEvidence(id){const e=state.currentPlasmaEvidence.find(x=>x.id===id);if(!e)return;if(!await qcConfirmCentered(`ลบหลักฐาน ${e.original_name} ?`,{title:'ลบหลักฐาน',acceptText:'ลบ',acceptClass:'danger'}))return;try{const {error}=await state.sb.from('plasma_evidence_files').delete().eq('id',id);if(error)throw error;const {error:s}=await state.sb.storage.from('bloodqc-evidence').remove([e.storage_path]);if(s)console.warn('storage cleanup failed',s);state.currentPlasmaEvidence=state.currentPlasmaEvidence.filter(x=>x.id!==id);renderPlasmaEvidence(true,false);showToast('ลบหลักฐานแล้ว');}catch(e2){showToast(errText(e2),'error');}}
+  async function submitPlasmaRecord(){if(!await qcConfirmCentered('ยืนยันส่งให้แพทย์ทบทวน?\n\nหลังส่ง เจ้าหน้าที่จะกลับมาแก้ไขเองไม่ได้จนกว่าแพทย์จะส่งกลับแก้ไข',{title:'ส่งให้แพทย์ทบทวน FFP',acceptText:'ยืนยันส่ง'}))return;if(!await savePlasmaRecord(true))return;try{const {error}=await state.sb.from('plasma_records').update({status:'submitted'}).eq('id',state.currentPlasmaRecordId);if(error)throw error;await reloadPlasmaRecords();showToast('ส่งให้แพทย์ทบทวนแล้ว','good');await renderPlasmaRecordForm();}catch(e){showToast(errText(e),'error');}}
+  async function unlockPlasmaRecord(){const reason=await qcPromptCentered('ระบุเหตุผลที่ต้องปลดล็อก', {title:'ปลดล็อกรายการ FFP',placeholder:'เหตุผลที่ต้องปลดล็อก',required:true,multiline:true,acceptText:'ปลดล็อก'});if(!reason?.trim())return;try{const {error}=await state.sb.from('plasma_records').update({status:'draft',last_unlock_reason:reason.trim()}).eq('id',state.currentPlasmaRecordId);if(error)throw error;await reloadPlasmaRecords();showToast('ปลดล็อกแล้ว','good');await renderPlasmaRecordForm();}catch(e){showToast(errText(e),'error');}}
 
 async function openPlasmaBatchBuilder(preselectId=null,editBatchId=null){
   if(!staffWriteUi())return;
@@ -2228,10 +2229,10 @@ function printPlasmaOutlabBatch(batchId){
       $$('.plasma-detail-ev').forEach(x=>x.onclick=()=>viewPlasmaEvidence(x.dataset.id));bindNcButtons($('#detailBody'));if($('#detailPlasmaPdf'))$('#detailPlasmaPdf').onclick=()=>printPlasmaOutlabBatch(b.id);if($('#detailEditBatch'))$('#detailEditBatch').onclick=()=>{$('#detailDialog').close();openPlasmaBatchBuilder(null,b.id);};if($('#detailCreateBatch'))$('#detailCreateBatch').onclick=()=>{$('#detailDialog').close();openPlasmaBatchBuilder(r.id);};$('#plasmaDetailClose').onclick=()=>$('#detailDialog').close();if($('#plasmaEdit'))$('#plasmaEdit').onclick=()=>{$('#detailDialog').close();state.currentPlasmaRecordId=id;location.hash=ROUTES.plasma.record;};if($('#plasmaReturn'))$('#plasmaReturn').onclick=()=>returnPlasmaForCorrection(id,$('#plasma_review_note').value);if($('#plasmaApprove'))$('#plasmaApprove').onclick=()=>approvePlasmaAndLock(id,$('#plasma_review_note').value);if($('#plasmaDelete'))$('#plasmaDelete').onclick=()=>adminDeletePlasma(id);if($('#plasmaRestore'))$('#plasmaRestore').onclick=()=>adminRestorePlasma(id);$('#detailDialog').showModal();logActivity('view_record','plasma_record',id,{module:'plasma',product_no:r.product_no}).catch(()=>{});
     }catch(e){showToast(errText(e),'error');}
   }
-  async function approvePlasmaAndLock(id,note=''){if(!reviewerUi())return;if(!confirm('ยืนยันว่าตรวจทวนผลและหลักฐานแล้ว และอนุมัติให้ LOCK?'))return;try{const {error}=await state.sb.from('plasma_records').update({status:'locked',review_note:note.trim()||null}).eq('id',id);if(error)throw error;await reloadPlasmaRecords();$('#detailDialog').close();showToast('ทบทวนและ LOCK แล้ว','good');renderReviewQueue();}catch(e){showToast(errText(e),'error');}}
+  async function approvePlasmaAndLock(id,note=''){if(!reviewerUi())return;if(!await qcConfirmCentered('ยืนยันว่าตรวจทวนผลและหลักฐานแล้ว และอนุมัติให้ LOCK?',{title:'อนุมัติและ LOCK FFP',acceptText:'อนุมัติและ LOCK'}))return;try{const {error}=await state.sb.from('plasma_records').update({status:'locked',review_note:note.trim()||null}).eq('id',id);if(error)throw error;await reloadPlasmaRecords();$('#detailDialog').close();showToast('ทบทวนและ LOCK แล้ว','good');renderReviewQueue();}catch(e){showToast(errText(e),'error');}}
   async function returnPlasmaForCorrection(id,note=''){if(!reviewerUi())return;note=note.trim();if(!note){showToast('กรุณาระบุเหตุผลที่ส่งกลับแก้ไข','error');return;}try{const {error}=await state.sb.from('plasma_records').update({status:'draft',review_note:note}).eq('id',id);if(error)throw error;await reloadPlasmaRecords();$('#detailDialog').close();showToast('ส่งกลับให้แก้ไขแล้ว','good');renderReviewQueue();}catch(e){showToast(errText(e),'error');}}
-  async function adminDeletePlasma(id){if(!adminUi())return;const reason=prompt('ระบุเหตุผลที่ลบรายการ (จำเป็น):');if(!reason?.trim())return;try{const {error}=await state.sb.from('plasma_records').update({deleted_at:new Date().toISOString(),delete_reason:reason.trim()}).eq('id',id);if(error)throw error;await reloadPlasmaRecords();$('#detailDialog').close();showToast('ลบรายการแล้วและเก็บ Audit ไว้','good');renderPlasmaPage('records');}catch(e){showToast(errText(e),'error');}}
-  async function adminRestorePlasma(id){if(!adminUi())return;const reason=prompt('ระบุเหตุผลที่กู้คืนรายการ:');if(!reason?.trim())return;try{const {error}=await state.sb.from('plasma_records').update({deleted_at:null,deleted_by:null,delete_reason:null,last_admin_edit_reason:reason.trim(),last_admin_edit_id:crypto.randomUUID()}).eq('id',id);if(error)throw error;await reloadPlasmaRecords();$('#detailDialog').close();showToast('กู้คืนรายการแล้ว','good');renderPlasmaPage('records');}catch(e){showToast(errText(e),'error');}}
+  async function adminDeletePlasma(id){if(!adminUi())return;const reason=await qcPromptCentered('ระบุเหตุผลที่ลบรายการ', {title:'ลบรายการ FFP',placeholder:'เช่น บันทึกผิด / สร้างซ้ำ',required:true,multiline:true,acceptText:'ยืนยันลบ',acceptClass:'danger'});if(!reason?.trim())return;try{const {error}=await state.sb.from('plasma_records').update({deleted_at:new Date().toISOString(),delete_reason:reason.trim()}).eq('id',id);if(error)throw error;await reloadPlasmaRecords();$('#detailDialog').close();showToast('ลบรายการแล้วและเก็บ Audit ไว้','good');renderPlasmaPage('records');}catch(e){showToast(errText(e),'error');}}
+  async function adminRestorePlasma(id){if(!adminUi())return;const reason=await qcPromptCentered('ระบุเหตุผลที่กู้คืนรายการ', {title:'กู้คืนรายการ FFP',placeholder:'เหตุผลที่กู้คืน',required:true,multiline:true,acceptText:'กู้คืนรายการ'});if(!reason?.trim())return;try{const {error}=await state.sb.from('plasma_records').update({deleted_at:null,deleted_by:null,delete_reason:null,last_admin_edit_reason:reason.trim(),last_admin_edit_id:crypto.randomUUID()}).eq('id',id);if(error)throw error;await reloadPlasmaRecords();$('#detailDialog').close();showToast('กู้คืนรายการแล้ว','good');renderPlasmaPage('records');}catch(e){showToast(errText(e),'error');}}
   function renderPlasmaGuide(){
     const s=state.plasmaSettings;
     $('#view-module').innerHTML=`
@@ -2501,7 +2502,7 @@ function printPlasmaOutlabBatch(batchId){
     $$('.rbc-camera-pick').forEach(b=>b.onclick=()=>$('#rbc_camera_'+b.dataset.cat).click()); $$('.rbc-file-pick').forEach(b=>b.onclick=()=>$('#rbc_file_'+b.dataset.cat).click());
     ['pre_cbc','post_cbc','post_adam'].forEach(cat=>{$('#rbc_camera_'+cat)?.addEventListener('change',()=>uploadRbcEvidence(cat,'rbc_camera_'+cat));$('#rbc_file_'+cat)?.addEventListener('change',()=>uploadRbcEvidence(cat,'rbc_file_'+cat));});
     renderRbcEvidenceLists(editable,locked); updateRbcPreview();
-    $('#rbcBack').onclick=()=>location.hash=ROUTES.rbc.records; if($('#rbcClear'))$('#rbcClear').onclick=()=>{if(confirm('ล้างฟอร์มทั้งหมด?')){state.currentRbcRecordId=null;renderRbcRecordForm();}}; if($('#rbcSave'))$('#rbcSave').onclick=()=>saveRbcRecord(false); if($('#rbcSubmit'))$('#rbcSubmit').onclick=submitRbcRecord; if($('#rbcUnlock'))$('#rbcUnlock').onclick=unlockRbcRecord;
+    $('#rbcBack').onclick=()=>location.hash=ROUTES.rbc.records; if($('#rbcClear'))$('#rbcClear').onclick=async()=>{if(await qcConfirmCentered('ล้างฟอร์มทั้งหมด?',{title:'ล้างฟอร์ม RBC',acceptText:'ล้างข้อมูล'})){state.currentRbcRecordId=null;renderRbcRecordForm();}}; if($('#rbcSave'))$('#rbcSave').onclick=()=>saveRbcRecord(false); if($('#rbcSubmit'))$('#rbcSubmit').onclick=submitRbcRecord; if($('#rbcUnlock'))$('#rbcUnlock').onclick=unlockRbcRecord;
     bindRouteButtons($('#view-module'));
   }
   function collectRbcRecord(){
@@ -2525,23 +2526,103 @@ function printPlasmaOutlabBatch(batchId){
     const adamAny=payload.post_adam_wbc!==null||payload.post_adam_measured_at!==null;if(ps?.product_class==='ldprc'&&adamAny&&(payload.post_adam_wbc===null||payload.post_adam_measured_at===null))return 'ADAM หลังผลิต/กรอง: เมื่อกรอกแล้ว ต้องกรอกค่า WBC และวัน-เวลาที่วัดให้ครบก่อนบันทึก';
     return '';
   }
-  function rbcShowMissingFields(message){
-    const host=$('#rbcQcDecision');if(host){host.insertAdjacentHTML('afterbegin',`<div class="notice warning rbc-form-validation" role="alert"><strong>ยังบันทึกไม่ได้</strong><div>${esc(message)}</div><small>กรุณาตรวจช่องตามชื่อที่แจ้ง รวมทั้งวันที่ตรวจและหลักฐานของแต่ละชุด</small></div>`);}
-    const section=message.startsWith('CBC ก่อน')?'rbc_pre_measured_at':message.startsWith('CBC หลัง')?'rbc_post_measured_at':message.startsWith('ADAM')?'rbc_post_adam_wbc':null;
-    if(section)$('#'+section)?.closest('.panel')?.scrollIntoView({behavior:'smooth',block:'start'});
+  function rbcClearFieldErrors(){ $$('.qc-field-missing').forEach(el=>{el.classList.remove('qc-field-missing');el.removeAttribute('aria-invalid');}); $$('.qc-missing-inline').forEach(el=>el.remove()); }
+  function rbcMarkMissing(ids){
+    const found=[];
+    ids.forEach(id=>{const el=$('#'+id);if(!el)return;el.classList.add('qc-field-missing');el.setAttribute('aria-invalid','true');found.push(el);});
+    if(found.length){const first=found[0];first.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>first.focus({preventScroll:true}),250);}
+    return found.length;
+  }
+  function rbcShowMissingFields(message,ids=[]){
+    rbcClearFieldErrors();
+    const host=$('#rbcQcDecision');if(host)host.insertAdjacentHTML('afterbegin',`<div class="notice warning rbc-form-validation" role="alert"><strong>ข้อมูลยังไม่ครบ</strong><div>${esc(message)}</div><small>ช่องสีแดงคือข้อมูลที่ต้องตรวจสอบ กดกรอกแล้วจะแสดงผล QC ใหม่ได้</small></div>`);
+    if(!rbcMarkMissing(ids)){
+      const id=message.startsWith('CBC ก่อน')?'rbc_pre_measured_at':message.startsWith('CBC หลัง')?'rbc_post_measured_at':message.startsWith('ADAM')?'rbc_post_adam_wbc':null;
+      if(id)$('#'+id)?.closest('.panel')?.scrollIntoView({behavior:'smooth',block:'center'});
+    }
+  }
+  function rbcRequiredSubmitFields(p,ps){
+    const ids=[];const notes=[];
+    const requireField=(id,value,label)=>{if(value===null||value===undefined||value===''){ids.push(id);notes.push(label);}};
+    requireField('rbc_product_no',p.product_no,'Product No.');requireField('rbc_product_type',p.product_type,'ชนิด RBC');
+    requireField('rbc_manufactured_on',p.manufactured_on,'วันที่ผลิต');
+    requireField('rbc_final_gross',p.final_gross_weight_g,'น้ำหนักหลังผลิต');
+    for(const prefix of ['pre','post']){
+      const heading=prefix==='pre'?'CBC ก่อนกระบวนการ':'CBC หลังผลิต';
+      requireField(`rbc_${prefix}_measured_at`,p[`${prefix}_measured_at`],`${heading} วัน-เวลา`);
+      for(const i of [1,2]){
+        const keys=prefix==='pre'?['hct','wbc','rbc','plt']:['hct','hb',...(ps?.product_class==='ldprc'?[]:['wbc']),'rbc','plt'];
+        keys.forEach(k=>{const col=k==='hct'?'hct_pct':k==='hb'?'hb_g_dl':k;const value=p[`${prefix}${i}_${col}`];requireField(`rbc_${prefix}${i}_${k}`,value,`${heading} เครื่อง ${i}: ${k.toUpperCase()}`);});
+      }
+    }
+    if(ps?.product_class==='ldprc'){
+      requireField('rbc_post_adam_wbc',p.post_adam_wbc,'ผล WBC จาก ADAM');
+      requireField('rbc_post_adam_measured_at',p.post_adam_measured_at,'เวลาตรวจ ADAM');
+    }
+    return {ids,notes};
+  }
+  function qcPopupDialog(options={}){
+    const {title='แจ้งเตือน',message='',mode='alert',acceptText='ตกลง',cancelText='ยกเลิก',acceptClass='primary',defaultValue='',placeholder='',required=false,multiline=false}=options||{};
+    return new Promise(resolve=>{
+      const el=document.createElement('dialog');el.className=`dialog qc-popup-dialog ${mode==='prompt'?'qc-popup-prompt':''}`;
+      const messageHtml=esc(String(message||'')).replace(/\n/g,'<br>');
+      const fieldHtml=mode==='prompt' ? (multiline
+        ? `<textarea class="qc-popup-input" rows="4" placeholder="${esc(placeholder||'')}" ${required?'data-required="1"':''}>${esc(defaultValue||'')}</textarea>`
+        : `<input class="qc-popup-input" type="text" value="${esc(defaultValue||'')}" placeholder="${esc(placeholder||'')}" ${required?'data-required="1"':''}>`
+      ) : '';
+      el.innerHTML=`<div class="qc-popup-body"><div class="qc-popup-head"><h3>${esc(title)}</h3></div><p>${messageHtml}</p>${fieldHtml}<div class="actions"><button type="button" class="btn qc-cancel">${esc(cancelText)}</button><button type="button" class="btn ${acceptClass} qc-accept">${esc(acceptText)}</button></div></div>`;
+      document.body.append(el);
+      const input=el.querySelector('.qc-popup-input');
+      const finish=v=>{try{el.close();}catch(_e){}el.remove();resolve(v)};
+      const accept=()=>{
+        if(mode==='prompt'){
+          const value=(input?.value||'').trim();
+          if(required && !value){input?.classList.add('qc-field-missing');input?.focus();return;}
+          finish(value||null);return;
+        }
+        finish(mode==='confirm'?true:true);
+      };
+      el.querySelector('.qc-cancel').onclick=()=>finish(mode==='confirm'?false:null);
+      el.querySelector('.qc-accept').onclick=accept;
+      if(input){
+        setTimeout(()=>input.focus(),30);
+        input.addEventListener('input',()=>input.classList.remove('qc-field-missing'));
+        input.addEventListener('keydown',e=>{if(e.key==='Enter' && !multiline){e.preventDefault();accept();}});
+      }
+      el.oncancel=e=>{e.preventDefault();finish(mode==='confirm'?false:null)};
+      el.showModal();
+      if(!input) setTimeout(()=>el.querySelector('.qc-accept')?.focus(),30);
+    });
+  }
+  function qcAlertCentered(message,options={}){return qcPopupDialog({...options,message,mode:'alert',cancelText:'',acceptText:options.acceptText||'ตกลง'});}
+  function qcConfirmCentered(message,options={}){return qcPopupDialog({...options,message,mode:'confirm',acceptText:options.acceptText||'ยืนยัน',cancelText:options.cancelText||'ยกเลิก'});}
+  function qcPromptCentered(message,options={}){return qcPopupDialog({...options,message,mode:'prompt',acceptText:options.acceptText||'บันทึก',cancelText:options.cancelText||'ยกเลิก'});}
+  function qcPromptCentered(message){
+    return new Promise(resolve=>{
+      const el=document.createElement('dialog');el.className='dialog qc-confirm-dialog qc-prompt-dialog';
+      el.innerHTML=`<form method="dialog" class="qc-confirm-body"><h3>ระบุเหตุผล</h3><label class="qc-prompt-label" for="qcPromptInput">${esc(message).replace(/\n/g,'<br>')}</label><textarea id="qcPromptInput" rows="3" autocomplete="off" required placeholder="กรุณาระบุเหตุผล"></textarea><div class="qc-prompt-error" role="alert" hidden>กรุณาระบุเหตุผลก่อนยืนยัน</div><div class="actions"><button type="button" class="btn qc-cancel">ยกเลิก</button><button type="submit" class="btn primary qc-accept">ยืนยัน</button></div></form>`;
+      document.body.append(el);
+      let settled=false;
+      const finish=value=>{if(settled)return;settled=true;if(el.open)el.close();el.remove();resolve(value);};
+      el.querySelector('.qc-cancel').onclick=()=>finish(null);
+      el.querySelector('form').onsubmit=e=>{e.preventDefault();const value=el.querySelector('textarea').value.trim();if(!value){el.querySelector('.qc-prompt-error').hidden=false;el.querySelector('textarea').focus();return;}finish(value);};
+      el.oncancel=e=>{e.preventDefault();finish(null);};
+      el.showModal();el.querySelector('textarea').focus();
+    });
   }
   function rbcQcDecisionHtml(p){
     if(!p)return '<div class="notice warning"><strong>การตัดสิน QC</strong><br>กรอกผล CBC ให้ครบในแต่ละเครื่อง แล้วระบบจะบอกว่าเครื่องใดผ่าน/ไม่ผ่าน</div>';
     const rows=[1,2].map(i=>{const x=p['r'+i],hasAny=['postH','postWT'].some(k=>x[k]!==null),txt=x.pass===true?'ผ่าน':x.pass===false?'ไม่ผ่าน':hasAny?'ข้อมูลยังไม่ครบ':'ยังไม่กรอก';const cls=x.pass===true?'pass':x.pass===false?'review':'incomplete';return `<span class="badge ${cls}">เครื่องที่ ${i}: ${txt}</span>`;});
     const completed=[p.r1,p.r2].filter(x=>x.pass!==null),anyFail=completed.some(x=>x.pass===false),allPass=completed.length&&completed.every(x=>x.pass===true);
     const summary=anyFail?'<strong>ต้องทำ Corrective Action</strong> — มีอย่างน้อย 1 เครื่องไม่ผ่าน แม้อีกเครื่องจะผ่าน':allPass?'<strong>ผ่านเกณฑ์ QC</strong> — เครื่องที่มีผลครบผ่านทั้งหมด':'<strong>ยังตัดสิน QC ไม่ได้</strong> — ต้องกรอกข้อมูลของเครื่องที่เริ่มกรอกให้ครบ';
-    return `<div class="notice ${anyFail?'warning':allPass?'good':'warning'}"><strong>เครื่องที่ใช้ตัดสิน QC</strong><div class="status-line" style="margin-top:8px">${rows.join(' ')}</div><div style="margin-top:8px">${summary}</div><small>เกณฑ์ประเมิน: Residual WBC, Hct และ Hemoglobin (g/unit) จาก CBC หลังผลิตและ Volume ล่าสุด · ไม่ใช้ RBC Count เป็นเกณฑ์ตัดสินผ่าน/ไม่ผ่าน QC · Hb (g/unit) = Hb (g/dL) × Volume หลังผลิต (mL) ÷ 100; ไม่ประมาณ Hb จาก Hct</small></div>`;
+    // Details remain available in calculated QC table and record audit; only show a brief alert on failures.
+    return anyFail?`<div class="notice warning"><strong>พบผล QC ไม่ผ่าน</strong> กรุณาตรวจสอบค่ารายเครื่องในตารางด้านบน</div>`:'';
   }
   function stripRbcResults(p){const x={...p,pre_measured_at:null,post_measured_at:null,post_adam_wbc:null,post_adam_measured_at:null};[1,2].forEach(i=>{['hct_pct','wbc','rbc','plt'].forEach(k=>x[`pre${i}_${k}`]=null);['hct_pct','hb_g_dl','wbc','rbc','plt'].forEach(k=>x[`post${i}_${k}`]=null);});return x;}
   async function saveRbcRecord(silent=false,autoEvidence=false){
     try{
       let payload=collectRbcRecord(); if(!payload.product_no||!payload.product_type){showToast('กรุณากรอก Product No. และชนิด RBC','error');return false;}
-      let id=state.currentRbcRecordId;const ps=rbcProductSetting(payload.product_type);if(autoEvidence&&!id)payload=stripRbcResults(payload);if(!autoEvidence){const groupedError=validateRbcGroupedInputs(payload,ps);if(groupedError){$$('.rbc-form-validation').forEach(x=>x.remove());rbcShowMissingFields(groupedError);showToast(groupedError,'error');return false;}if(rbcPayloadHasPreResult(payload)&&!rbcHasEvidence('pre_cbc')){showToast('ผล CBC ก่อนกระบวนการต้องมีหลักฐานก่อนบันทึก','error');return false;}if(rbcPayloadHasPostCbcResult(payload,ps)&&!rbcHasEvidence('post_cbc')){showToast('ผล CBC หลังผลิต/กรองต้องมีหลักฐานก่อนบันทึก','error');return false;}if(ps?.product_class==='ldprc'&&payload.post_adam_wbc!==null&&!rbcHasEvidence('post_adam')){showToast('ผล WBC จาก ADAM ต้องมีหลักฐานก่อนบันทึก','error');return false;}}
+      let id=state.currentRbcRecordId;const ps=rbcProductSetting(payload.product_type);if(autoEvidence&&!id)payload=stripRbcResults(payload);if(!autoEvidence){const groupedError=validateRbcGroupedInputs(payload,ps);if(groupedError){$$('.rbc-form-validation').forEach(x=>x.remove());const ids=[];const match=groupedError.match(/เครื่องที่ (\d)/);const prefix=groupedError.startsWith('CBC ก่อน')?'pre':groupedError.startsWith('CBC หลัง')?'post':null;if(match&&prefix){const names={'Hct':'hct','Hb':'hb','WBC':'wbc','RBC Count':'rbc','Platelet Count':'plt'};Object.entries(names).forEach(([label,key])=>{if(groupedError.includes(label))ids.push(`rbc_${prefix}${match[1]}_${key}`);});}rbcShowMissingFields(groupedError,ids);showToast(groupedError,'error');return false;}if(rbcPayloadHasPreResult(payload)&&!rbcHasEvidence('pre_cbc')){showToast('ผล CBC ก่อนกระบวนการต้องมีหลักฐานก่อนบันทึก','error');return false;}if(rbcPayloadHasPostCbcResult(payload,ps)&&!rbcHasEvidence('post_cbc')){showToast('ผล CBC หลังผลิต/กรองต้องมีหลักฐานก่อนบันทึก','error');return false;}if(ps?.product_class==='ldprc'&&payload.post_adam_wbc!==null&&!rbcHasEvidence('post_adam')){showToast('ผล WBC จาก ADAM ต้องมีหลักฐานก่อนบันทึก','error');return false;}}
       if(id&&adminUi()&&!payload.last_admin_edit_reason){showToast('Admin กรุณาระบุเหตุผลการแก้ไข','error');$('#rbc_admin_reason')?.focus();return false;}
       if(id){const {error}=await state.sb.from('rbc_records').update(payload).eq('id',id);if(error)throw error;}else{const {data,error}=await state.sb.from('rbc_records').insert({...payload,created_by:state.user.id}).select('id').single();if(error)throw error;id=data.id;state.currentRbcRecordId=id;}
       await reloadRbcRecords(); if(!silent)showToast('บันทึก RBC QC แล้ว','good'); if(!silent&&!autoEvidence)await renderRbcRecordForm(); return true;
@@ -2555,11 +2636,15 @@ function printPlasmaOutlabBatch(batchId){
       showToast('มีอย่างน้อย 1 เครื่องไม่ผ่าน ต้องเปิด Corrective Action ก่อนส่งแพทย์ทบทวน','error');
       await createNonconformance('rbc',latest.id);return;
     }
-    if(!confirm('ยืนยันส่งให้แพทย์ทบทวน?\n\nหลังส่ง เจ้าหน้าที่จะกลับมาแก้ไขเองไม่ได้จนกว่าแพทย์จะส่งกลับแก้ไข'))return;
-    try{const {error}=await state.sb.from('rbc_records').update({status:'submitted'}).eq('id',state.currentRbcRecordId);if(error)throw new Error('ส่งตรวจทวนไม่สำเร็จ: '+errText(error)+' — โปรดตรวจข้อมูล CBC ก่อน/หลังและหลักฐาน หรือแจ้ง Admin ตรวจเงื่อนไขฐานข้อมูล');await reloadRbcRecords();showToast('ส่งแพทย์ทบทวนแล้ว','good');location.hash=ROUTES.rbc.records;}catch(e){showToast(errText(e),'error');}
+    const required=rbcRequiredSubmitFields(collectRbcRecord(),rbcProductSetting(latest?.product_type));
+    if(required.ids.length){rbcShowMissingFields(`ต้องตรวจสอบ ${required.notes.length} ช่อง: ${required.notes.slice(0,5).join(', ')}${required.notes.length>5?' และอื่น ๆ':''}`,required.ids);return;}
+    const evid=['pre_cbc','post_cbc',...(rbcProductSetting(latest?.product_type)?.product_class==='ldprc'?['post_adam']:[])].filter(x=>!rbcHasEvidence(x));
+    if(evid.length){rbcShowMissingFields('ยังขาดหลักฐาน '+evid.join(', ')+' กรุณาแนบก่อนส่งแพทย์');return;}
+    if(!await qcConfirmCentered('ยืนยันส่งให้แพทย์ทบทวน?\n\nหลังส่ง เจ้าหน้าที่จะกลับมาแก้ไขเองไม่ได้จนกว่าแพทย์จะส่งกลับแก้ไข',{title:'ส่งให้แพทย์ทบทวน RBC',acceptText:'ยืนยันส่ง'}))return;
+    try{const {error}=await state.sb.from('rbc_records').update({status:'submitted'}).eq('id',state.currentRbcRecordId);if(error)throw new Error('ฐานข้อมูลไม่อนุญาตให้ส่งแพทย์: '+errText(error)+' — หากทุกช่องครบแล้ว ให้ Admin ตรวจ trigger/constraint ของ rbc_records (เกณฑ์เดิมอาจไม่ตรงกับ LDPRC)');await reloadRbcRecords();showToast('ส่งแพทย์ทบทวนแล้ว','good');location.hash=ROUTES.rbc.records;}catch(e){showToast(errText(e),'error');}
   }
   async function unlockRbcRecord(){
-    const reason=prompt('ระบุเหตุผลที่ต้องปลดล็อก (จำเป็น):');if(!reason?.trim())return;
+    const reason=await qcPromptCentered('ระบุเหตุผลที่ต้องปลดล็อก', {title:'ปลดล็อกรายการ RBC',placeholder:'เหตุผลที่ต้องปลดล็อก',required:true,multiline:true,acceptText:'ปลดล็อก'});if(!reason?.trim())return;
     try{const {error}=await state.sb.from('rbc_records').update({status:'draft',last_unlock_reason:reason.trim()}).eq('id',state.currentRbcRecordId);if(error)throw error;await reloadRbcRecords();showToast('ปลดล็อกแล้ว','good');await renderRbcRecordForm();}catch(e){showToast(errText(e),'error');}
   }
   async function uploadRbcEvidence(cat,inputId){
@@ -2567,7 +2652,7 @@ function printPlasmaOutlabBatch(batchId){
   }
 
   async function viewRbcEvidence(id){const e=state.currentRbcEvidence.find(x=>x.id===id);if(!e)return;const {data,error}=await state.sb.storage.from('bloodqc-evidence').createSignedUrl(e.storage_path,120);if(error)showToast(errText(error),'error');else window.open(data.signedUrl,'_blank','noopener');}
-  async function deleteRbcEvidence(id){const e=state.currentRbcEvidence.find(x=>x.id===id);if(!e)return;if(!confirm(`ลบหลักฐาน ${e.original_name} ?`))return;try{const {error}=await state.sb.from('rbc_evidence_files').delete().eq('id',id);if(error)throw error;const {error:s}=await state.sb.storage.from('bloodqc-evidence').remove([e.storage_path]);if(s)console.warn('storage cleanup failed',s);state.currentRbcEvidence=state.currentRbcEvidence.filter(x=>x.id!==id);renderRbcEvidenceLists(true,false);showToast('ลบหลักฐานแล้ว');}catch(e2){showToast(errText(e2),'error');}}
+  async function deleteRbcEvidence(id){const e=state.currentRbcEvidence.find(x=>x.id===id);if(!e)return;if(!await qcConfirmCentered(`ลบหลักฐาน ${e.original_name} ?`,{title:'ลบหลักฐาน',acceptText:'ลบ',acceptClass:'danger'}))return;try{const {error}=await state.sb.from('rbc_evidence_files').delete().eq('id',id);if(error)throw error;const {error:s}=await state.sb.storage.from('bloodqc-evidence').remove([e.storage_path]);if(s)console.warn('storage cleanup failed',s);state.currentRbcEvidence=state.currentRbcEvidence.filter(x=>x.id!==id);renderRbcEvidenceLists(true,false);showToast('ลบหลักฐานแล้ว');}catch(e2){showToast(errText(e2),'error');}}
   function rbcDetailEvidence(cat){const rows=state.currentRbcEvidence.filter(e=>e.category===cat);return rows.length?`<div class="detail-section-evidence"><div class="detail-evidence-title">หลักฐาน</div>${rows.map(e=>`<div class="evidence-item"><span class="name evidence-name"><strong>${esc(e.original_name)}</strong><small>ผู้แนบหลักฐาน ${esc(profileName(e.uploaded_by))} · ${esc(dateTH(e.created_at))}</small>${e.change_reason?`<small class="evidence-reason">Admin: ${esc(e.change_reason)}</small>`:''}</span><button class="btn small-btn rbc-detail-ev" data-id="${e.id}">ดู</button></div>`).join('')}</div>`:'<div class="measurement-evidence-empty">ยังไม่มีหลักฐาน</div>';}
   function rbcCalcDetail(r,ps,i){const postWT=rbcEffectiveResidual(r,i),unit=ps.product_class==='ldprc'?'×10⁶ cells/unit':'×10⁹ cells/unit';return `<tr><th>เครื่องที่ ${i}</th><td>${postWT==null?'–':fmt(postWT,3)+' '+unit}</td><td>${rbcEffectiveRemoval(r,i)==null?'–':fmt(rbcEffectiveRemoval(r,i),2)+'%'}</td><td>${r[`post${i}_hct_pct`]==null?'–':fmt(r[`post${i}_hct_pct`],2)+'%'}</td><td>${rbcStoredHb(r,i)==null?'ยังไม่ตรวจ':fmt(rbcStoredHb(r,i),2)+' g'} (≥ ${rbcHbMin(ps)})</td></tr>`;}
   async function openRbcDetail(id){
@@ -2591,10 +2676,10 @@ function printPlasmaOutlabBatch(batchId){
       <div class="dialog-actions">${(rbcEffectiveQcStatus(r)==='review')?ncActionButton('rbc',r.id):''}<button class="btn" id="rbcDetailCloseBottom">ปิด</button>${staffWriteUi()&&!r.deleted_at&&r.status!=='submitted'?`<button class="btn primary" id="rbcEdit">เปิดแก้ไข</button>`:''}${adminUi()?r.deleted_at?'<button class="btn good" id="rbcRestore">กู้คืนรายการ</button>':'<button class="btn danger" id="rbcDelete">ลบรายการ</button>':''}</div></div>`;
     $$('.rbc-detail-ev').forEach(b=>b.onclick=()=>viewRbcEvidence(b.dataset.id));bindNcButtons($('#detailDialog')); const close=()=>$('#detailDialog').close();$('#rbcDetailClose').onclick=close;$('#rbcDetailCloseBottom').onclick=close;if($('#rbcEdit'))$('#rbcEdit').onclick=()=>{close();state.currentRbcRecordId=id;location.hash=ROUTES.rbc.record;};if($('#rbcReturn'))$('#rbcReturn').onclick=()=>returnRbcForCorrection(id,$('#rbc_review_note').value);if($('#rbcApprove'))$('#rbcApprove').onclick=()=>approveRbcAndLock(id,$('#rbc_review_note').value);if($('#rbcDelete'))$('#rbcDelete').onclick=()=>adminDeleteRbc(id);if($('#rbcRestore'))$('#rbcRestore').onclick=()=>adminRestoreRbc(id);$('#detailDialog').showModal();logActivity('view_record','rbc_record',id,{module:'rbc',product_no:r.product_no}).catch(()=>{});
   }
-  async function approveRbcAndLock(id,note=''){if(!reviewerUi())return;if(!confirm('ยืนยันว่าตรวจทวนผลและหลักฐานแล้ว และอนุมัติให้ LOCK?'))return;try{const {error}=await state.sb.from('rbc_records').update({status:'locked',review_note:note.trim()||null}).eq('id',id);if(error)throw error;await reloadRbcRecords();$('#detailDialog').close();showToast('ทบทวนและ LOCK แล้ว','good');renderReviewQueue();}catch(e){showToast(errText(e),'error');}}
+  async function approveRbcAndLock(id,note=''){if(!reviewerUi())return;if(!await qcConfirmCentered('ยืนยันว่าตรวจทวนผลและหลักฐานแล้ว และอนุมัติให้ LOCK?',{title:'อนุมัติและ LOCK RBC',acceptText:'อนุมัติและ LOCK'}))return;try{const {error}=await state.sb.from('rbc_records').update({status:'locked',review_note:note.trim()||null}).eq('id',id);if(error)throw error;await reloadRbcRecords();$('#detailDialog').close();showToast('ทบทวนและ LOCK แล้ว','good');renderReviewQueue();}catch(e){showToast(errText(e),'error');}}
   async function returnRbcForCorrection(id,note=''){if(!reviewerUi())return;note=note.trim();if(!note){showToast('กรุณาระบุเหตุผลที่ส่งกลับแก้ไข','error');return;}try{const {error}=await state.sb.from('rbc_records').update({status:'draft',review_note:note}).eq('id',id);if(error)throw error;await reloadRbcRecords();$('#detailDialog').close();showToast('ส่งกลับให้แก้ไขแล้ว','good');renderReviewQueue();}catch(e){showToast(errText(e),'error');}}
-  async function adminDeleteRbc(id){if(!adminUi())return;const reason=prompt('ระบุเหตุผลที่ลบรายการ (จำเป็น):');if(!reason?.trim())return;try{const {error}=await state.sb.from('rbc_records').update({deleted_at:new Date().toISOString(),delete_reason:reason.trim()}).eq('id',id);if(error)throw error;await reloadRbcRecords();$('#detailDialog').close();showToast('ลบรายการแล้วและเก็บ Audit ไว้','good');renderRbcPage('records');}catch(e){showToast(errText(e),'error');}}
-  async function adminRestoreRbc(id){if(!adminUi())return;const reason=prompt('ระบุเหตุผลที่กู้คืนรายการ (จำเป็น):');if(!reason?.trim())return;try{const {error}=await state.sb.from('rbc_records').update({deleted_at:null,deleted_by:null,delete_reason:null,last_admin_edit_reason:reason.trim(),last_admin_edit_id:crypto.randomUUID()}).eq('id',id);if(error)throw error;await reloadRbcRecords();$('#detailDialog').close();showToast('กู้คืนรายการแล้ว','good');renderRbcPage('records');}catch(e){showToast(errText(e),'error');}}
+  async function adminDeleteRbc(id){if(!adminUi())return;const reason=await qcPromptCentered('ระบุเหตุผลที่ลบรายการ', {title:'ลบรายการ RBC',placeholder:'เหตุผลที่ลบรายการ',required:true,multiline:true,acceptText:'ยืนยันลบ',acceptClass:'danger'});if(!reason?.trim())return;try{const {error}=await state.sb.from('rbc_records').update({deleted_at:new Date().toISOString(),delete_reason:reason.trim()}).eq('id',id);if(error)throw error;await reloadRbcRecords();$('#detailDialog').close();showToast('ลบรายการแล้วและเก็บ Audit ไว้','good');renderRbcPage('records');}catch(e){showToast(errText(e),'error');}}
+  async function adminRestoreRbc(id){if(!adminUi())return;const reason=await qcPromptCentered('ระบุเหตุผลที่กู้คืนรายการ', {title:'กู้คืนรายการ Platelet',placeholder:'เหตุผลที่กู้คืน',required:true,multiline:true,acceptText:'กู้คืนรายการ'});if(!reason?.trim())return;try{const {error}=await state.sb.from('rbc_records').update({deleted_at:null,deleted_by:null,delete_reason:null,last_admin_edit_reason:reason.trim(),last_admin_edit_id:crypto.randomUUID()}).eq('id',id);if(error)throw error;await reloadRbcRecords();$('#detailDialog').close();showToast('กู้คืนรายการแล้ว','good');renderRbcPage('records');}catch(e){showToast(errText(e),'error');}}
   function renderRbcGuide(){
     const s=state.rbcSettings;
     $('#view-module').innerHTML=`<div class="page-head"><div><h1>คู่มือ RBC</h1><p class="muted">วิธีบันทึก QC LPRC / LDPRC</p></div><div class="actions">${staffWriteUi()?'<button class="btn primary" id="guideRbcNew">+ บันทึก RBC</button>':''}</div></div>

@@ -67,7 +67,7 @@ input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:10px;bac
   .sticky-actions{position:sticky;bottom:calc(var(--mobile-nav-h) + 8px + env(safe-area-inset-bottom));padding:8px;flex-direction:column;gap:7px;border-radius:14px}.sticky-actions .left,.sticky-actions .right{display:grid;grid-template-columns:1fr;width:100%;gap:7px}.sticky-actions .right.new-record-actions{grid-template-columns:1fr 1fr}.sticky-actions .btn{width:100%;min-height:48px}
   .table-wrap{border-radius:10px;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}.data-table{min-width:760px}.pool-table{min-width:520px}.pool-table th,.pool-table td,.data-table th,.data-table td{padding:9px 8px;font-size:12px}.pool-table td input{min-width:130px}
   .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px}.filters>input:first-child{grid-column:1 / -1;min-width:0}.filters>select{min-width:0}.filters>.btn{min-height:46px;min-width:0}.filters>#fProduct{grid-column:1}.filters>#fClear{grid-column:2}
-  .dialog{width:100vw;max-width:none;height:100dvh;max-height:100dvh;margin:0;border-radius:0}.dialog-head{padding:14px 12px}.dialog #detailBody{padding:14px 12px calc(90px + env(safe-area-inset-bottom))}.detail-grid{grid-template-columns:1fr 1fr;gap:8px}.detail-cell{padding:9px}.detail-cell span{font-size:11px}.detail-cell strong{font-size:13px;word-break:break-word}.icon-btn{width:40px;height:40px}
+  .dialog{width:min(960px,calc(100vw - 16px));max-width:calc(100vw - 16px);height:auto;max-height:92dvh;margin:auto;border-radius:18px}.dialog-head{padding:14px 12px}.dialog #detailBody{padding:14px 12px calc(20px + env(safe-area-inset-bottom))}.detail-grid{grid-template-columns:1fr 1fr;gap:8px}.detail-cell{padding:9px}.detail-cell span{font-size:11px}.detail-cell strong{font-size:13px;word-break:break-word}.icon-btn{width:40px;height:40px}
   .auth-card{width:100%;max-width:100%;padding:22px 18px;border-radius:20px}.center-screen{padding:12px}.auth-card h1{font-size:24px}.app-logo{width:64px;height:64px}.email-field input{min-height:48px}.email-field span{font-size:13px}
   .notice{padding:11px 12px;font-size:13px;line-height:1.5;margin:12px 0}
   .toast{left:10px;right:10px;bottom:calc(var(--mobile-nav-h) + 12px + env(safe-area-inset-bottom));max-width:none;text-align:center}
@@ -570,7 +570,7 @@ input,select,textarea{border-color:#cfd6de;border-radius:11px;min-height:42px}in
   .cards{grid-template-columns:1fr 1fr;gap:8px}.card{padding:13px}.metric .value{font-size:26px}.metric .sub{font-size:10.5px}
   .panel{padding:14px 12px;border-radius:15px}.module-card{padding:15px;border-radius:16px}.module-actions{grid-template-columns:1fr 1fr}.module-actions .btn{min-height:50px}
   .filters{display:grid;grid-template-columns:1fr;padding:9px}.filters>input:first-child,.filters>select,.filters>.btn{grid-column:auto!important;width:100%;min-width:0}
-  .dialog{border-radius:0}.dialog-head{padding:14px 12px}.dialog #detailBody{padding:14px 12px calc(96px + env(safe-area-inset-bottom))}
+  .dialog{border-radius:18px}.dialog-head{padding:14px 12px}.dialog #detailBody{padding:14px 12px calc(24px + env(safe-area-inset-bottom))}
   .platelet-week-popup-row{min-height:0;padding:13px}.platelet-week-popup-row strong{font-size:14px}.platelet-week-popup-row small{font-size:12px}
 }
 @media(max-width:390px){.page-head>.actions{grid-template-columns:1fr}.page-head>.actions .month-input,.page-head>.actions .btn.primary{grid-column:auto}.cards{grid-template-columns:1fr 1fr}}
@@ -840,3 +840,41 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0
  .page-head>.actions .btn{font-size:12px!important;padding:8px 5px!important}
  .mobile-data-pair{grid-template-columns:minmax(72px,32%) minmax(0,1fr)!important}
 }
+
+/* v5.3.43 — centered popup system across the app */
+.qc-popup-dialog{position:fixed!important;inset:0!important;margin:auto!important;width:min(500px,calc(100vw - 32px))!important;height:auto!important;max-height:min(85dvh,720px)!important;border-radius:22px!important;padding:0!important;overflow:auto!important;box-shadow:0 25px 75px rgba(12,25,44,.27)!important}
+.qc-popup-body{padding:24px;display:grid;gap:14px}.qc-popup-head h3{margin:0;font-size:20px;line-height:1.35}.qc-popup-body p{margin:0;line-height:1.7;color:#344054}.qc-popup-body .actions{justify-content:flex-end;gap:10px;display:flex;flex-wrap:wrap}.qc-popup-body .actions .btn{min-width:120px}
+.qc-popup-input{width:100%;min-height:46px;border:1px solid var(--line);border-radius:14px;padding:12px 14px;font:inherit;resize:vertical;background:#fff}.qc-popup-input:focus{outline:3px solid rgba(127,99,230,.14);border-color:var(--primary)}
+.qc-field-missing{border:2px solid #b42318!important;background:#fff0ef!important;box-shadow:0 0 0 3px rgba(180,35,24,.12)!important}
+.qc-field-missing:focus{outline:3px solid rgba(180,35,24,.3)!important;outline-offset:2px}
+.rbc-form-validation{border-color:#f4a79e!important;background:#fff0ef!important}
+@media(max-width:760px){.qc-popup-dialog{width:calc(100vw - 24px)!important;height:auto!important;max-height:85dvh!important;border-radius:18px!important}.qc-popup-body{padding:18px}.qc-popup-body .actions{display:grid;grid-template-columns:1fr 1fr}.qc-popup-body .actions .btn{width:100%;min-width:0}}
+
+/* v5.3.43 — Unified, viewport-centered modal system throughout the application. */
+dialog.dialog,dialog.qc-confirm-dialog,dialog.nc-delete-dialog,dialog.install-dialog,dialog.password-dialog {
+  position:fixed!important;inset:0!important;margin:auto!important;
+  box-sizing:border-box!important;
+  width:min(980px,calc(100vw - 32px))!important;
+  max-width:calc(100vw - 32px)!important;
+  height:fit-content!important;max-height:min(88dvh,860px)!important;
+  border:0!important;border-radius:20px!important;
+  overflow-x:hidden!important;overflow-y:auto!important;
+  overscroll-behavior:contain;
+}
+dialog.qc-confirm-dialog,dialog.password-dialog,dialog.nc-delete-dialog,dialog.install-dialog{width:min(520px,calc(100vw - 32px))!important}
+dialog.dialog::backdrop{background:rgba(15,23,42,.55);backdrop-filter:blur(2px)}
+dialog.dialog .dialog-head{position:sticky;top:0;z-index:3}
+.qc-prompt-label{font-weight:600;line-height:1.55}.qc-prompt-dialog textarea{width:100%;min-height:90px;resize:vertical;border:1px solid #cbd5e1;border-radius:12px;padding:12px;font:inherit}
+.qc-prompt-dialog textarea:focus{outline:3px solid rgba(147,35,55,.18);border-color:#932337}.qc-prompt-error{color:#b42318;font-size:13px}
+@media(max-width:760px){
+ dialog.dialog,dialog.qc-confirm-dialog,dialog.password-dialog,dialog.nc-delete-dialog,dialog.install-dialog{
+  width:calc(100vw - 20px)!important;max-width:calc(100vw - 20px)!important;
+  height:fit-content!important;max-height:calc(88dvh - env(safe-area-inset-bottom))!important;
+  border-radius:17px!important;
+ }
+ dialog.dialog #detailBody{padding:14px 12px 22px!important}
+ dialog.dialog .dialog-head{padding:14px 12px!important}
+}
+/* Non-blocking status popups also appear at viewport center. */
+.toast{position:fixed!important;top:50%!important;left:50%!important;right:auto!important;bottom:auto!important;width:max-content;max-width:min(440px,calc(100vw - 28px))!important;text-align:center;transform:translate(-50%,-45%)!important;z-index:2147483600!important;line-height:1.55}
+.toast.show{transform:translate(-50%,-50%)!important}
