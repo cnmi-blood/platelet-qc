@@ -665,7 +665,7 @@
   function qcBadge(s){ return `<span class="badge ${esc(s)}">${esc(qcTH(s))}</span>`; }
   function qcBadgeForRecord(r){ return r?.record_purpose==='qc' ? qcBadge(r.qc_status) : ''; }
   function deletedBadge(r){ return r?.deleted_at ? '<span class="badge deleted">ลบแล้ว</span>' : ''; }
-  function pHBadge(r){ if(!r.ph_measured_at||!r.expiry_at) return ''; return sameBangkokDate(r.ph_measured_at,r.expiry_at)?'<span class="badge pass">pH ตรงวัน Exp.</span>':'<span class="badge late">pH ไม่ตรงวัน Exp.</span>'; }
+  function pHBadge(r){ if(!r.ph_measured_at||!r.expiry_at) return ''; return sameBangkokDate(r.ph_measured_at,r.expiry_at)?'<span class="badge pass">pH ตรงวัน Exp.</span>':'<span class="badge late">วัด pH ไม่ตรงกำหนด (ตรวจสอบกระบวนการ)</span>'; }
   function waitingPH(r){ return r.status==='draft' && !r.ph_value && r.expiry_at; }
   function bangkokTodayKey(){ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()); }
   // pH is required for EVERY Platelet product, not only weekly QC samples.
@@ -842,7 +842,8 @@
       if(r.residual_wbc!=null&&Number(r.residual_wbc)>Number(s.residual_wbc_max))add('Residual WBC (เม็ดเลือดขาวคงเหลือ)',`${fmt(r.residual_wbc,3)} ×10⁶ cells/unit`,`≤ ${fmt(s.residual_wbc_max,2)} ×10⁶ cells/unit`);
       if(r.ph_value!=null&&Number(r.ph_value)<Number(s.ph_min))add('pH',fmt(r.ph_value,3),`≥ ${fmt(s.ph_min,2)}`);
       if(r.plt_repeat_diff_pct!=null&&Number(r.plt_repeat_diff_pct)>Number(s.plt_repeat_diff_max_pct))add('PLT repeat difference (ความต่างผลซ้ำ)',`${fmt(r.plt_repeat_diff_pct,1)}%`,`≤ ${fmt(s.plt_repeat_diff_max_pct,1)}%`,'check');
-      if(r.ph_measured_at&&r.expiry_at&&!sameBangkokDate(r.ph_measured_at,r.expiry_at))add('วันที่วัด pH',dateTH(r.ph_measured_at,false),'ควรวัดตรงวันหมดอายุ','check');
+      // Timing deviations are process findings, not failed analytical QC parameters.
+      // Keep them visible on the product record instead of classifying them as an NC failed parameter.
       if(['conditional_fail','below_min'].includes(r.pool_release_status))add('Pool PYI / ฉลาก',poolReleaseTH(r.pool_release_status),'ต้องผ่านเกณฑ์ Pool / เงื่อนไขฉลาก');
     }else if(module==='plasma'){
       const s=state.plasmaSettings||{};
@@ -1425,7 +1426,7 @@
         ${measurementEvidenceBox('cbc','หลักฐาน CBC / PLT')}
       </div>
       <div class="panel measurement-entry-panel"><div class="section-title-row"><h2>5. WBC จาก ADAM</h2><span class="section-badge">ผล + หลักฐาน</span></div><div class="form-grid">${field('WBC (/µL)','wbc_adam',r?.wbc_adam,'number',false,'0.0001')}${field('วัน-เวลาที่วัด ADAM','wbc_measured_at',inputFromISO(r?.wbc_measured_at),'datetime-local')}</div>${measurementEvidenceBox('adam','หลักฐาน ADAM / WBC')}</div>
-      <div class="panel measurement-entry-panel"><div class="section-title-row"><h2>6. pH ณ วันหมดอายุ</h2><span class="section-badge">ผล + หลักฐาน</span></div><div class="form-grid">${field('pH','ph_value',r?.ph_value,'number',false,'0.001')}${field('วัน-เวลาที่วัด pH','ph_measured_at',inputFromISO(r?.ph_measured_at),'datetime-local')}<div class="field span2"><label>เหตุผล ถ้าวัด pH ไม่ตรงวันหมดอายุ</label><input id="ph_deviation_reason" value="${esc(r?.ph_deviation_reason||'')}" ${editable?'':'disabled'} placeholder="เช่น เครื่องขัดข้อง / วัดล่าช้า 2 วัน"></div></div>${measurementEvidenceBox('ph','หลักฐาน pH')}</div>
+      <div class="panel measurement-entry-panel"><div class="section-title-row"><h2>6. pH ณ วันหมดอายุ</h2><span class="section-badge">ผล + หลักฐาน</span></div><div class="form-grid">${field('pH','ph_value',r?.ph_value,'number',false,'0.001')}${field('วัน-เวลาที่วัด pH','ph_measured_at',inputFromISO(r?.ph_measured_at),'datetime-local')}<div class="field span2"><label>เหตุผลที่วัด pH ไม่ตรงกำหนด (ไม่ใช่ผล QC ไม่ผ่าน)</label><input id="ph_deviation_reason" value="${esc(r?.ph_deviation_reason||'')}" ${editable?'':'disabled'} placeholder="เช่น เครื่องขัดข้อง / วัดล่าช้า 2 วัน"></div></div><div class="notice info" style="margin-top:8px">หากค่า pH ผ่านเกณฑ์แต่วันที่ตรวจคลาดเคลื่อน ให้บันทึกเหตุผลการล่าช้าและทบทวนตาม SOP โดยไม่ถือว่าเป็นค่า pH ไม่ผ่านเกณฑ์อัตโนมัติ</div>${measurementEvidenceBox('ph','หลักฐาน pH')}</div>
       <div class="panel"><h2>7. ผลคำนวณอัตโนมัติ</h2><div class="calc-grid"><div class="calc-box"><span>PLT ที่ใช้</span><strong id="cPlt">${fmt(r?.plt_used,2)}</strong><small>K/µL</small></div><div class="calc-box"><span>Platelet yield</span><strong id="cYield">${fmt(r?.platelet_yield,3)}</strong><small>×10¹¹ cells/unit</small></div><div class="calc-box"><span>Equivalent Units</span><strong id="cEq">${fmt(r?.equivalent_units,2)}</strong><small>factor ${state.settings.equivalent_unit_factor}</small></div><div class="calc-box"><span>Residual WBC</span><strong id="cWbc">${fmt(r?.residual_wbc,3)}</strong><small>×10⁶ cells/unit</small></div></div><div id="calcWarnings" style="margin-top:12px"></div></div>
       <div class="panel"><h2>8. หมายเหตุ</h2><textarea id="notes" ${editable?'':'disabled'} placeholder="บันทึกเหตุการณ์หรือข้อมูลเพิ่มเติม">${esc(r?.notes||'')}</textarea></div>
       <div class="sticky-actions"><div class="left"><button type="button" class="btn" id="cancelEdit">กลับรายการทั้งหมด</button></div><div class="right ${!r?'new-record-actions':''}">${!r&&editable?'<button type="button" class="btn clear-form-btn" id="clearForm">ล้างฟอร์ม</button>':''}${editable?'<button type="button" class="btn primary" id="saveDraft">บันทึกข้อมูล</button>':''}${r&&r.status==='draft'&&r.record_purpose==='qc'&&editable?'<div class="review-submit-group"><small>ขั้นตอนสุดท้าย · ส่งเมื่อกรอกและแนบหลักฐานครบแล้ว</small><button type="button" class="btn review-submit-btn" id="submitReview">ส่งให้แพทย์ทบทวน</button></div>':''}${r&&r.status==='locked'&&adminUi()&&!deleted?'<button type="button" class="btn danger" id="unlockRecord">ปลดล็อกเป็น Draft</button>':''}</div></div>
@@ -2515,14 +2516,19 @@ function printPlasmaOutlabBatch(batchId){
   function rbcPayloadHasPostCbcResult(p,ps){return [1,2].some(i=>['hct_pct','hb_g_dl','rbc','plt'].some(k=>p[`post${i}_${k}`]!==null)||(ps?.product_class!=='ldprc'&&p[`post${i}_wbc`]!==null));}
   function rbcMachineCompleteness(payload,ps,prefix,i){
     const keys=prefix==='pre'?['hct_pct','wbc','rbc','plt']:(ps?.product_class==='ldprc'?['hct_pct','hb_g_dl','rbc','plt']:['hct_pct','hb_g_dl','wbc','rbc','plt']);
-    const vals=keys.map(k=>payload[`${prefix}${i}_${k}`]);const filled=vals.filter(v=>v!==null).length;return {keys,filled,total:keys.length,any:filled>0,complete:filled===keys.length};
+    const vals=keys.map(k=>payload[`${prefix}${i}_${k}`]);const filled=vals.filter(v=>v!==null).length;const missing=keys.filter((k,j)=>vals[j]===null);return {keys,filled,total:keys.length,missing,any:filled>0,complete:filled===keys.length};
   }
   function validateRbcGroupedInputs(payload,ps){
-    for(const prefix of ['pre','post']){for(const i of [1,2]){const c=rbcMachineCompleteness(payload,ps,prefix,i);if(c.any&&!c.complete)return `${prefix==='pre'?'CBC ก่อนกระบวนการ':'CBC หลังผลิต/กรอง'} เครื่องที่ ${i}: เมื่อกรอกแล้ว ต้องกรอกทุกช่องในกล่องให้ครบก่อนบันทึก`;}}
+    for(const prefix of ['pre','post']){for(const i of [1,2]){const c=rbcMachineCompleteness(payload,ps,prefix,i);if(c.any&&!c.complete)return `${prefix==='pre'?'CBC ก่อนกระบวนการ':'CBC หลังผลิต/กรอง'} เครื่องที่ ${i}: ยังขาด ${c.missing.map(k=>({'hct_pct':'Hct','hb_g_dl':'Hb','wbc':'WBC','rbc':'RBC Count','plt':'Platelet Count'}[k]||k)).join(', ')} (กรอกครบทุกช่องในเครื่องที่เริ่มกรอก)`;}}
     if(rbcPayloadHasPreResult(payload)&&!payload.pre_measured_at)return 'CBC ก่อนกระบวนการ: กรุณาระบุวัน-เวลาที่ตรวจให้ครบก่อนบันทึก';
     if(rbcPayloadHasPostCbcResult(payload,ps)&&!payload.post_measured_at)return 'CBC หลังผลิต/กรอง: กรุณาระบุวัน-เวลาที่ตรวจให้ครบก่อนบันทึก';
     const adamAny=payload.post_adam_wbc!==null||payload.post_adam_measured_at!==null;if(ps?.product_class==='ldprc'&&adamAny&&(payload.post_adam_wbc===null||payload.post_adam_measured_at===null))return 'ADAM หลังผลิต/กรอง: เมื่อกรอกแล้ว ต้องกรอกค่า WBC และวัน-เวลาที่วัดให้ครบก่อนบันทึก';
     return '';
+  }
+  function rbcShowMissingFields(message){
+    const host=$('#rbcQcDecision');if(host){host.insertAdjacentHTML('afterbegin',`<div class="notice warning rbc-form-validation" role="alert"><strong>ยังบันทึกไม่ได้</strong><div>${esc(message)}</div><small>กรุณาตรวจช่องตามชื่อที่แจ้ง รวมทั้งวันที่ตรวจและหลักฐานของแต่ละชุด</small></div>`);}
+    const section=message.startsWith('CBC ก่อน')?'rbc_pre_measured_at':message.startsWith('CBC หลัง')?'rbc_post_measured_at':message.startsWith('ADAM')?'rbc_post_adam_wbc':null;
+    if(section)$('#'+section)?.closest('.panel')?.scrollIntoView({behavior:'smooth',block:'start'});
   }
   function rbcQcDecisionHtml(p){
     if(!p)return '<div class="notice warning"><strong>การตัดสิน QC</strong><br>กรอกผล CBC ให้ครบในแต่ละเครื่อง แล้วระบบจะบอกว่าเครื่องใดผ่าน/ไม่ผ่าน</div>';
@@ -2535,7 +2541,7 @@ function printPlasmaOutlabBatch(batchId){
   async function saveRbcRecord(silent=false,autoEvidence=false){
     try{
       let payload=collectRbcRecord(); if(!payload.product_no||!payload.product_type){showToast('กรุณากรอก Product No. และชนิด RBC','error');return false;}
-      let id=state.currentRbcRecordId;const ps=rbcProductSetting(payload.product_type);if(autoEvidence&&!id)payload=stripRbcResults(payload);if(!autoEvidence){const groupedError=validateRbcGroupedInputs(payload,ps);if(groupedError){showToast(groupedError,'error');return false;}if(rbcPayloadHasPreResult(payload)&&!rbcHasEvidence('pre_cbc')){showToast('ผล CBC ก่อนกระบวนการต้องมีหลักฐานก่อนบันทึก','error');return false;}if(rbcPayloadHasPostCbcResult(payload,ps)&&!rbcHasEvidence('post_cbc')){showToast('ผล CBC หลังผลิต/กรองต้องมีหลักฐานก่อนบันทึก','error');return false;}if(ps?.product_class==='ldprc'&&payload.post_adam_wbc!==null&&!rbcHasEvidence('post_adam')){showToast('ผล WBC จาก ADAM ต้องมีหลักฐานก่อนบันทึก','error');return false;}}
+      let id=state.currentRbcRecordId;const ps=rbcProductSetting(payload.product_type);if(autoEvidence&&!id)payload=stripRbcResults(payload);if(!autoEvidence){const groupedError=validateRbcGroupedInputs(payload,ps);if(groupedError){$$('.rbc-form-validation').forEach(x=>x.remove());rbcShowMissingFields(groupedError);showToast(groupedError,'error');return false;}if(rbcPayloadHasPreResult(payload)&&!rbcHasEvidence('pre_cbc')){showToast('ผล CBC ก่อนกระบวนการต้องมีหลักฐานก่อนบันทึก','error');return false;}if(rbcPayloadHasPostCbcResult(payload,ps)&&!rbcHasEvidence('post_cbc')){showToast('ผล CBC หลังผลิต/กรองต้องมีหลักฐานก่อนบันทึก','error');return false;}if(ps?.product_class==='ldprc'&&payload.post_adam_wbc!==null&&!rbcHasEvidence('post_adam')){showToast('ผล WBC จาก ADAM ต้องมีหลักฐานก่อนบันทึก','error');return false;}}
       if(id&&adminUi()&&!payload.last_admin_edit_reason){showToast('Admin กรุณาระบุเหตุผลการแก้ไข','error');$('#rbc_admin_reason')?.focus();return false;}
       if(id){const {error}=await state.sb.from('rbc_records').update(payload).eq('id',id);if(error)throw error;}else{const {data,error}=await state.sb.from('rbc_records').insert({...payload,created_by:state.user.id}).select('id').single();if(error)throw error;id=data.id;state.currentRbcRecordId=id;}
       await reloadRbcRecords(); if(!silent)showToast('บันทึก RBC QC แล้ว','good'); if(!silent&&!autoEvidence)await renderRbcRecordForm(); return true;
@@ -2550,7 +2556,7 @@ function printPlasmaOutlabBatch(batchId){
       await createNonconformance('rbc',latest.id);return;
     }
     if(!confirm('ยืนยันส่งให้แพทย์ทบทวน?\n\nหลังส่ง เจ้าหน้าที่จะกลับมาแก้ไขเองไม่ได้จนกว่าแพทย์จะส่งกลับแก้ไข'))return;
-    try{const {error}=await state.sb.from('rbc_records').update({status:'submitted'}).eq('id',state.currentRbcRecordId);if(error)throw error;await reloadRbcRecords();showToast('ส่งแพทย์ทบทวนแล้ว','good');location.hash=ROUTES.rbc.records;}catch(e){showToast(errText(e),'error');}
+    try{const {error}=await state.sb.from('rbc_records').update({status:'submitted'}).eq('id',state.currentRbcRecordId);if(error)throw new Error('ส่งตรวจทวนไม่สำเร็จ: '+errText(error)+' — โปรดตรวจข้อมูล CBC ก่อน/หลังและหลักฐาน หรือแจ้ง Admin ตรวจเงื่อนไขฐานข้อมูล');await reloadRbcRecords();showToast('ส่งแพทย์ทบทวนแล้ว','good');location.hash=ROUTES.rbc.records;}catch(e){showToast(errText(e),'error');}
   }
   async function unlockRbcRecord(){
     const reason=prompt('ระบุเหตุผลที่ต้องปลดล็อก (จำเป็น):');if(!reason?.trim())return;
