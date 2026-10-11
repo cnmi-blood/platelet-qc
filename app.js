@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.43 - centered popup system across the app */
+/* CNMI Blood Component QC v5.3.48 - centered popup system across the app */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -89,10 +89,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.43 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.48 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.43 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.48 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -480,7 +480,7 @@
       // Deleted sources may be hidden by RLS or fall beyond the first 1,000 NC rows.
       // A security-definer RPC returns only source keys, never sensitive NC content.
       state.ncTombstones=tombRes.error?null:(tombRes.data||[]);
-      if(tombRes.error)console.warn('NC deleted-source RPC unavailable: run v5.3.47 SQL',tombRes.error);
+      if(tombRes.error)console.warn('NC deleted-source RPC unavailable: run v5.3.48 SQL',tombRes.error);
       state.nonconformanceEvidence=evRes.data||[];state.nonconformanceReady=true;
     }catch(e){
       console.warn('Nonconformance module not ready',e);
@@ -677,7 +677,6 @@
     if(r?.platelet_yield!=null&&Number(r.platelet_yield)<Number(s.platelet_yield_min))out.push('platelet_yield');
     if(r?.residual_wbc!=null&&Number(r.residual_wbc)>Number(s.residual_wbc_max))out.push('residual_wbc');
     if(r?.ph_value!=null&&Number(r.ph_value)<Number(s.ph_min))out.push('ph_value');
-    if(r?.plt_repeat_diff_pct!=null&&Number(r.plt_repeat_diff_pct)>Number(s.plt_repeat_diff_max_pct))out.push('plt_repeat_diff');
     if(['conditional_fail','below_min'].includes(r?.pool_release_status))out.push('pool_release');
     return out;
   }
@@ -686,7 +685,12 @@
     if(plateletAnalyticReviewReasons(r).length)return 'review';
     // v5.3.45: pH timing is a process deviation. A delayed pH that analytically passes
     // must not turn an otherwise passing QC into "review" / NC.
-    if(r.qc_status==='review'&&plateletPhDelayed(r)&&r.ph_value!=null&&Number(r.ph_value)>=Number(state.settings?.ph_min))return 'pass';
+    // Difference between two CBC instruments is review information, NOT failed product QC.
+    // A legacy DB status can still be 'review' solely due to this difference or delayed pH.
+    // Override it only when all analytical product measurements are present and passing.
+    if(r.qc_status==='review'&&plateletAnalyticReviewReasons(r).length===0
+      &&r.platelet_yield!=null&&r.residual_wbc!=null&&r.ph_value!=null
+      &&(plateletPhDelayed(r)|| (r.plt_repeat_diff_pct!=null&&Number(r.plt_repeat_diff_pct)>Number(state.settings?.plt_repeat_diff_max_pct))))return 'pass';
     return r.qc_status;
   }
   function plateletQcLabel(r){const st=plateletEffectiveQcStatus(r);return st==='pass'&&plateletPhDelayed(r)?'QC ผ่าน · ตรวจ pH ล่าช้า':qcTH(st);}
@@ -870,7 +874,7 @@
       if(r.platelet_yield!=null&&Number(r.platelet_yield)<Number(s.platelet_yield_min))add('Platelet yield (ปริมาณเกล็ดเลือด)',`${fmt(r.platelet_yield,3)} ×10¹¹ cells/unit`,`≥ ${fmt(s.platelet_yield_min,2)} ×10¹¹ cells/unit`);
       if(r.residual_wbc!=null&&Number(r.residual_wbc)>Number(s.residual_wbc_max))add('Residual WBC (เม็ดเลือดขาวคงเหลือ)',`${fmt(r.residual_wbc,3)} ×10⁶ cells/unit`,`≤ ${fmt(s.residual_wbc_max,2)} ×10⁶ cells/unit`);
       if(r.ph_value!=null&&Number(r.ph_value)<Number(s.ph_min))add('pH',fmt(r.ph_value,3),`≥ ${fmt(s.ph_min,2)}`);
-      if(r.plt_repeat_diff_pct!=null&&Number(r.plt_repeat_diff_pct)>Number(s.plt_repeat_diff_max_pct))add('PLT repeat difference (ความต่างผลซ้ำ)',`${fmt(r.plt_repeat_diff_pct,1)}%`,`≤ ${fmt(s.plt_repeat_diff_max_pct,1)}%`,'check');
+      // PLT difference is displayed for physician review in the list, not treated as an NC reason.
       // Timing deviations are process findings, not failed analytical QC parameters.
       // Keep them visible on the product record instead of classifying them as an NC failed parameter.
       if(['conditional_fail','below_min'].includes(r.pool_release_status))add('Pool PYI / ฉลาก',poolReleaseTH(r.pool_release_status),'ต้องผ่านเกณฑ์ Pool / เงื่อนไขฉลาก');
@@ -921,7 +925,7 @@
   }
   async function createNonconformance(module,recordId){
     if(!state.nonconformanceReady){showToast('กรุณา Run SQL v5.3.23 ก่อนใช้งาน Corrective Action','error');location.hash=ROUTES.nonconformance;return;}
-    if(!Array.isArray(state.ncTombstones)){showToast('กรุณาตรวจสอบ SQL v5.3.47 ก่อนสร้าง NC','error');return;}
+    if(!Array.isArray(state.ncTombstones)){showToast('กรุณาตรวจสอบ SQL v5.3.48 ก่อนสร้าง NC','error');return;}
     const existing=ncByRecord(module,recordId);if(existing){state.currentNonconformanceId=existing.id;location.hash=ROUTES.nonconformance;return;}
     const deletedExisting=deletedNcByRecord(module,recordId);if(deletedExisting){showToast(`ถุงนี้เคยมี ${deletedExisting.nc_no||'NC'} และถูกลบพร้อมเก็บ Audit แล้ว ระบบจะไม่สร้าง NC ซ้ำอัตโนมัติ`,'error');return;}
     const r=recordForModule(module,recordId);if(!r){showToast('ไม่พบรายการ QC ต้นฉบับ','error');return;}
@@ -1391,8 +1395,8 @@
   function metric(label,value,sub){ return `<div class="card metric"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`; }
   function recordsTable(rows){
     if(!rows.length) return '<div class="empty">ยังไม่มีข้อมูล</div>';
-    const table=`<div class="table-wrap"><table class="data-table"><thead><tr><th>Product No.</th><th>ผลิตภัณฑ์</th><th>ประเภท</th><th>วันเจาะ</th><th>Group</th><th>Yield</th><th>Pool / ฉลาก</th><th>ผล QC</th><th>งานที่ยังขาด</th><th>สถานะ</th><th>ผู้บันทึก</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.deleted_at?'deleted-row':''}"><td><button class="link-btn record-link" data-id="${r.id}">${esc(r.product_no)}</button></td><td>${esc(r.product_type)}</td><td>${purposeBadge(r.record_purpose)} ${deletedBadge(r)}</td><td class="nowrap">${dateTH(r.collection_at,false)}</td><td>${esc(r.blood_group||'–')}</td><td>${fmt(r.platelet_yield,2)}</td><td>${poolReleaseBadge(r.pool_release_status)}</td><td>${r.record_purpose==='qc'?plateletQcBadge(r):'<span class="muted">–</span>'}</td><td>${r.record_purpose==='qc'?plateletTaskSummaryBadge(r):'<span class="muted">–</span>'}</td><td>${statusBadge(r.status)}</td><td>${esc(profileName(r.created_by))}</td></tr>`).join('')}</tbody></table></div>`;
-    const cards=rows.map(r=>`<article class="mobile-data-card ${r.deleted_at?'deleted-row':''}"><div class="mobile-data-card-head"><button class="link-btn record-link" data-id="${r.id}">${esc(r.product_no)}</button>${r.deleted_at?'<span class="badge deleted">ลบแล้ว</span>':''}</div><div class="mobile-data-card-body">${mobilePair('ผลิตภัณฑ์',esc(r.product_type))}${mobilePair('ผล QC',r.record_purpose==='qc'?plateletQcBadge(r):purposeBadge(r.record_purpose))}${mobilePair('งานที่ยังขาด',r.record_purpose==='qc'?plateletTaskSummaryBadge(r):'<span class="muted">–</span>')}${mobilePair('สถานะ',statusBadge(r.status))}<details class="mobile-record-more"><summary>ข้อมูลเพิ่มเติม</summary><div class="mobile-record-extra">${mobilePair('ประเภท',`${purposeBadge(r.record_purpose)} ${deletedBadge(r)}`)}${mobilePair('วันเจาะ',esc(dateTH(r.collection_at,false)))}${mobilePair('Group',esc(r.blood_group||'–'))}${mobilePair('Yield',fmt(r.platelet_yield,2))}${mobilePair('Pool / ฉลาก',poolReleaseBadge(r.pool_release_status))}${mobilePair('ผู้บันทึก',esc(profileName(r.created_by)))}</div></details></div></article>`).join('');
+    const table=`<div class="table-wrap"><table class="data-table"><thead><tr><th>Product No.</th><th>ผลิตภัณฑ์</th><th>ประเภท</th><th>วันเจาะ</th><th>Group</th><th>Yield</th><th>Residual WBC</th><th>Equivalent Units</th><th>ผลต่าง PLT 2 เครื่อง</th><th>Pool / ฉลาก</th><th>ผล QC</th><th>งานที่ยังขาด</th><th>สถานะ</th><th>ผู้บันทึก</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.deleted_at?'deleted-row':''}"><td><button class="link-btn record-link" data-id="${r.id}">${esc(r.product_no)}</button></td><td>${esc(r.product_type)}</td><td>${purposeBadge(r.record_purpose)} ${deletedBadge(r)}</td><td class="nowrap">${dateTH(r.collection_at,false)}</td><td>${esc(r.blood_group||'–')}</td><td>${fmt(r.platelet_yield,2)}</td><td>${r.residual_wbc==null?'–':fmt(r.residual_wbc,3)+' ×10⁶'}</td><td>${fmt(r.equivalent_units,2)}</td><td>${r.plt_repeat_diff_pct==null?'–':fmt(r.plt_repeat_diff_pct,1)+'%'}</td><td>${poolReleaseBadge(r.pool_release_status)}</td><td>${r.record_purpose==='qc'?plateletQcBadge(r):'<span class="muted">–</span>'}</td><td>${r.record_purpose==='qc'?plateletTaskSummaryBadge(r):'<span class="muted">–</span>'}</td><td>${statusBadge(r.status)}</td><td>${esc(profileName(r.created_by))}</td></tr>`).join('')}</tbody></table></div>`;
+    const cards=rows.map(r=>`<article class="mobile-data-card ${r.deleted_at?'deleted-row':''}"><div class="mobile-data-card-head"><button class="link-btn record-link" data-id="${r.id}">${esc(r.product_no)}</button>${r.deleted_at?'<span class="badge deleted">ลบแล้ว</span>':''}</div><div class="mobile-data-card-body">${mobilePair('ผลิตภัณฑ์',esc(r.product_type))}${mobilePair('ผล QC',r.record_purpose==='qc'?plateletQcBadge(r):purposeBadge(r.record_purpose))}${mobilePair('งานที่ยังขาด',r.record_purpose==='qc'?plateletTaskSummaryBadge(r):'<span class="muted">–</span>')}${mobilePair('สถานะ',statusBadge(r.status))}<details class="mobile-record-more"><summary>ข้อมูลเพิ่มเติม</summary><div class="mobile-record-extra">${mobilePair('ประเภท',`${purposeBadge(r.record_purpose)} ${deletedBadge(r)}`)}${mobilePair('วันเจาะ',esc(dateTH(r.collection_at,false)))}${mobilePair('Group',esc(r.blood_group||'–'))}${mobilePair('Yield',fmt(r.platelet_yield,2))}${mobilePair('Residual WBC',r.residual_wbc==null?'–':fmt(r.residual_wbc,3)+' ×10⁶ cells/unit')}${mobilePair('Equivalent Units',fmt(r.equivalent_units,2))}${mobilePair('ผลต่าง PLT 2 เครื่อง',r.plt_repeat_diff_pct==null?'–':fmt(r.plt_repeat_diff_pct,1)+'%')}${mobilePair('Pool / ฉลาก',poolReleaseBadge(r.pool_release_status))}${mobilePair('ผู้บันทึก',esc(profileName(r.created_by)))}</div></details></div></article>`).join('');
     return responsiveDataTable(table,cards);
   }
 
@@ -1530,10 +1534,11 @@
     const isQc=($('input[name="record_purpose"]:checked')?.value||'prepare')==='qc';
     const w=[]; if(c.gross!==null&&c.tare!==null&&c.gross<c.tare)w.push('น้ำหนักที่ชั่งได้น้อยกว่าน้ำหนักถุงเปล่า กรุณาตรวจสอบ'); if(c.gross!==null&&(c.tare===null||c.density===null))w.push('ยังไม่มีค่าน้ำหนักถุง/Density สำหรับผลิตภัณฑ์นี้');
     const cfg=currentProductConfig(); if(cfg?.requires_pool){ const pst=poolReleaseState(currentPoolSum(),c.y); const cond=Number(state.settings.pool_pyi_conditional_min??260),std=Number(state.settings.pool_pyi_standard_min??280),ym=Number(state.settings.pool_conditional_yield_min??2); if(pst==='below_min')w.push(`Pool PYI ต่ำกว่า ${fmt(cond,0)} ไม่เข้าเงื่อนไขอนุโลม`); if(pst==='conditional_pending')w.push(`Pool PYI อยู่ช่วง ${fmt(cond,0)}–<${fmt(std,0)} ต้องตรวจ Platelet yield และต้อง ≥ ${fmt(ym,2)} ×10¹¹ cells/unit`); if(pst==='conditional_fail')w.push(`Pool PYI อยู่ช่วงอนุโลม แต่ Platelet yield ต้อง ≥ ${fmt(ym,2)} ×10¹¹ cells/unit จึงผ่านสำหรับฉลากปกติ`); }
-    if(isQc){ if(c.diff!==null&&c.diff>Number(state.settings.plt_repeat_diff_max_pct))w.push(`PLT ซ้ำต่างกัน ${fmt(c.diff,1)}% มากกว่าเกณฑ์เตือน ${state.settings.plt_repeat_diff_max_pct}%`); if(c.y!==null&&c.y<Number(state.settings.platelet_yield_min))w.push(`Platelet yield ต่ำกว่า ${state.settings.platelet_yield_min}`); if(c.rw!==null&&c.rw>Number(state.settings.residual_wbc_max))w.push(`Residual WBC มากกว่า ${state.settings.residual_wbc_max}`); if(c.ph!==null&&c.ph<Number(state.settings.ph_min))w.push(`pH ต่ำกว่า ${state.settings.ph_min}`); }
+    if(isQc){ if(c.y!==null&&c.y<Number(state.settings.platelet_yield_min))w.push(`Platelet yield ต่ำกว่า ${state.settings.platelet_yield_min}`); if(c.rw!==null&&c.rw>Number(state.settings.residual_wbc_max))w.push(`Residual WBC มากกว่า ${state.settings.residual_wbc_max}`); if(c.ph!==null&&c.ph<Number(state.settings.ph_min))w.push(`pH ต่ำกว่า ${state.settings.ph_min}`); }
     const pm=$('#ph_measured_at')?.value, ex=$('#expiry_preview')?.value; if(pm&&ex&&pm.slice(0,10)!==ex.slice(0,10))w.push('วันที่วัด pH ไม่ตรงวันหมดอายุ ต้องใส่เหตุผลก่อนส่งตรวจทวน');
-    if(w.length) $('#calcWarnings').innerHTML=`<div class="notice warning"><strong>ต้องตรวจสอบ</strong><br>${w.map(esc).join('<br>')}</div>`;
-    else if(isQc) $('#calcWarnings').innerHTML='<div class="notice good">ยังไม่พบเงื่อนไขเตือนตามเกณฑ์ QC จากค่าที่กรอก</div>';
+    const diffNote=isQc&&c.diff!==null?`<div class="notice info" style="margin-top:8px"><strong>ข้อมูลประกอบแพทย์ทบทวน:</strong> ผลต่าง PLT 2 เครื่อง ${fmt(c.diff,1)}% (ไม่ใช้ตัดสิน QC/เปิด NC อัตโนมัติ)</div>`:'';
+    if(w.length) $('#calcWarnings').innerHTML=`<div class="notice warning"><strong>ต้องตรวจสอบ</strong><br>${w.map(esc).join('<br>')}</div>`+diffNote;
+    else if(isQc) $('#calcWarnings').innerHTML='<div class="notice good">ยังไม่พบเงื่อนไขเตือนตามเกณฑ์ QC จากค่าที่กรอก</div>'+diffNote;
     else $('#calcWarnings').innerHTML='';
     updatePoolRuleStatus();
   }
@@ -1867,7 +1872,7 @@
       <div class="panel"><h2>ค่าคำนวณ Volume จากน้ำหนัก</h2><p class="section-note">เจ้าหน้าที่กรอกน้ำหนักที่ชั่งได้เป็นกรัม ระบบใช้สูตร (น้ำหนักที่ชั่งได้ − น้ำหนักถุงเปล่า) ÷ Density และเก็บค่าที่ใช้คำนวณไว้กับแต่ละรายการเพื่อทวนสอบย้อนหลัง</p><div class="table-wrap"><table class="data-table product-setting-table"><thead><tr><th>ผลิตภัณฑ์</th><th>น้ำหนักถุงเปล่า (g)</th><th>Density</th><th>Pool</th><th></th></tr></thead><tbody>${state.productSettings.filter(x=>x.is_active).map(x=>`<tr data-product-type="${esc(x.product_type)}"><td><strong>${esc(x.product_type)}</strong></td><td><input class="ps-tare" type="number" step="0.01" min="0" value="${esc(x.tare_weight_g)}"></td><td><input class="ps-density" type="number" step="0.001" min="0.001" value="${esc(x.density)}"></td><td>${x.requires_pool?'LDPPC 3–6 Units':'–'}</td><td><button class="btn small-btn ps-save" type="button" data-product="${esc(x.product_type)}">บันทึก</button></td></tr>`).join('')}</tbody></table></div></div>
       <div class="panel"><h2>เกณฑ์การ Pool และฉลาก LDPPC</h2><p class="section-note">ใช้กับทั้ง Prepare ตามปกติและรายการที่ใช้เป็น QC ไม่เกี่ยวกับการเลือกว่าจะนับรายการนั้นเป็น QC หรือไม่</p><div class="form-grid">${settingField('Pool PYI เกณฑ์ปกติ ≥','s_pool_standard',s.pool_pyi_standard_min)}${settingField('Pool PYI อนุโลมขั้นต่ำ','s_pool_conditional',s.pool_pyi_conditional_min)}${settingField('Platelet yield ช่วงอนุโลม ต้อง ≥','s_pool_yield',s.pool_conditional_yield_min)}</div><div class="notice info small" style="margin-top:12px">ค่าเริ่มต้น: Pool PYI ≥ 280 ผ่านเกณฑ์ปกติ · Pool PYI 260–&lt;280 ให้ Pool ได้กรณีจำเป็น แต่ต้องมี Platelet yield ≥ 2.00 ×10¹¹ cells/unit จึงผ่านสำหรับฉลากปกติ</div></div>
       <div class="notice warning"><strong>ก่อนเริ่มใช้งานจริง:</strong> ตรวจสอบค่าน้ำหนักถุง/Density เกณฑ์ Pool/ฉลาก และเกณฑ์ QC ให้ตรงกับ WI/ข้อกำหนดที่หน่วยอนุมัติ การเปลี่ยนค่าจะถูกบันทึกใน Audit Log</div>
-      <div class="panel"><h2>เกณฑ์สำหรับรายการที่ใช้เป็น QC</h2><p class="section-note">ใช้ประเมินเฉพาะรายการที่เลือก “ใช้เป็น QC” เท่านั้น รายการ Prepare ตามปกติยังเก็บผลครบแต่ไม่นำไปตัดสิน QC</p><div class="form-grid">${settingField('Platelet yield ขั้นต่ำ','s_yield',s.platelet_yield_min)}${settingField('Equivalent Unit factor','s_factor',s.equivalent_unit_factor)}${settingField('Residual WBC สูงสุด','s_wbc',s.residual_wbc_max)}${settingField('pH ขั้นต่ำ','s_ph',s.ph_min)}${settingField('อายุผลิตภัณฑ์ (วัน)','s_expiry',s.expiry_days,1)}${settingField('PLT repeat ต่างกันสูงสุด (%)','s_diff',s.plt_repeat_diff_max_pct)}</div><div class="switch-row" style="margin-top:14px"><label><input id="s_cbc" type="checkbox" checked disabled> บังคับหลักฐาน CBC</label><label><input id="s_adam" type="checkbox" checked disabled> บังคับหลักฐาน ADAM</label><label><input id="s_ph_ev" type="checkbox" checked disabled> บังคับหลักฐาน pH</label></div><div class="actions" style="margin-top:14px"><button class="btn primary" id="saveSettings">บันทึกเกณฑ์</button></div></div>`;
+      <div class="panel"><h2>เกณฑ์สำหรับรายการที่ใช้เป็น QC</h2><p class="section-note">ใช้ประเมินเฉพาะรายการที่เลือก “ใช้เป็น QC” เท่านั้น รายการ Prepare ตามปกติยังเก็บผลครบแต่ไม่นำไปตัดสิน QC</p><div class="form-grid">${settingField('Platelet yield ขั้นต่ำ','s_yield',s.platelet_yield_min)}${settingField('Equivalent Unit factor','s_factor',s.equivalent_unit_factor)}${settingField('Residual WBC สูงสุด','s_wbc',s.residual_wbc_max)}${settingField('pH ขั้นต่ำ','s_ph',s.ph_min)}${settingField('อายุผลิตภัณฑ์ (วัน)','s_expiry',s.expiry_days,1)}${settingField('PLT ต่างกัน · จุดเตือนเพื่อดูประกอบ (%)','s_diff',s.plt_repeat_diff_max_pct)}</div><div class="switch-row" style="margin-top:14px"><label><input id="s_cbc" type="checkbox" checked disabled> บังคับหลักฐาน CBC</label><label><input id="s_adam" type="checkbox" checked disabled> บังคับหลักฐาน ADAM</label><label><input id="s_ph_ev" type="checkbox" checked disabled> บังคับหลักฐาน pH</label></div><div class="actions" style="margin-top:14px"><button class="btn primary" id="saveSettings">บันทึกเกณฑ์</button></div></div>`;
     $('#saveSettings').onclick=saveSettings;
     $$('.ps-save').forEach(b=>b.onclick=()=>saveProductSetting(b.dataset.product));
     bindRouteButtons($('#view-settings'));
@@ -1975,7 +1980,7 @@
     const typesComplete=tracking.filter(x=>x.complete).length;
     const trackingCards=tracking.map(x=>`<button type="button" class="type-progress-card dashboard-product-card plasma-progress-card ${x.complete?'complete':''}" data-product-type="${esc(x.product_type)}"><div class="type-progress-head"><div><strong>${esc(x.product_type)}</strong><small>${x.done}/4 ถุง</small></div><span class="badge ${x.complete?'pass':'incomplete'}">${x.complete?'ครบ':`เหลือ ${x.remaining}`}</span></div><div class="tracking-bar"><span style="width:${Math.min(100,x.done/target*100)}%"></span></div><div class="type-progress-foot"><span>ทำ QC แล้ว <b>${x.done}</b></span><span>เป้าหมาย 4</span></div></button>`).join('');
     $('#view-module').innerHTML=`<div class="page-head"><div><h1>ภาพรวม Plasma</h1><p class="muted">FFP · Factor VIII QC</p></div><div class="actions"><input id="plasmaDashMonth" class="month-input" type="month" value="${esc(ym)}"><button class="btn" data-go-route="#/plasma/guide">คู่มือ FFP</button>${staffWriteUi()?'<button class="btn" id="plasmaBatchBtn">+ สร้างใบนำส่ง</button><button class="btn primary" id="plasmaNewBtn">+ บันทึก FFP</button>':''}</div></div>
-      <div class="grid cards">${metric('เดือนนี้',month.length,'รายการ FFP QC')}${metric('ครบ 4 ถุง',`${typesComplete}/${products.length||0}`,'แยกตามชนิด FFP')}${metric('รอผล Factor VIII',waiting,'ส่ง Outlab แล้ว')}${metric('รอตรวจทวน',review,'Submitted')}${metric('LOCK',locked,'แพทย์ทบทวนแล้ว')}</div>
+      <div class="grid cards">${metric('เดือนนี้',month.length,'รายการ FFP QC')}${metric('ครบ 4 ถุง',`${typesComplete}/${products.length||0}`,'แยกตามชนิด FFP')}${metric('รอผล Factor VIII',waiting,'ส่ง Outlab แล้ว')}${metric('รอตรวจทวน',review,'Submitted')}${metric('ทบทวนเสร็จสิ้น',locked,'แพทย์ทบทวนและปิดผลแล้ว')}</div>
       <div class="panel qc-tracking-panel"><div class="section-title-row"><div><h2>ติดตาม FFP QC รายเดือน แยกชนิด</h2><p class="muted small">แต่ละชนิด FFP มีเป้าหมาย 4 ถุงต่อเดือน · คลิกการ์ดเพื่อดูรายละเอียด</p></div></div><div class="type-progress-grid">${trackingCards||'<div class="empty">ยังไม่มีชนิด FFP ที่เปิดใช้งาน</div>'}</div></div>
       <div class="panel"><h2>รายการล่าสุด</h2>${plasmaRecordsTable(rec.slice(0,12))}</div>
       ${plasmaRecentBatchesPanel()}`;
@@ -2373,7 +2378,7 @@ function printPlasmaOutlabBatch(batchId){
     const products=activeRbcProducts();
     const completedProducts=products.filter(p=>rbcQcDone(ym,p.product_type)>=RBC_MONTHLY_TARGET_PER_PRODUCT).length;
     $('#view-module').innerHTML=`<div class="page-head"><div><h1>ภาพรวม RBC</h1><p class="muted">LPRC / LDPRC QC</p></div><div class="actions"><button class="btn" data-go-route="#/rbc/guide">คู่มือ RBC</button>${staffWriteUi()?'<button class="btn primary" id="rbcNewBtn">+ บันทึก RBC</button>':''}</div></div>
-      <div class="grid cards">${metric('เดือนนี้',month.length,'รายการ RBC QC')}${metric('ครบ 4 ถุง',completedProducts,`จาก ${products.length} ชนิด`)}${metric('รอแพทย์ทบทวน',submitted,'Submitted')}${metric('QC ต้องตรวจสอบ',review,'ค่าบางรายการไม่เข้าเกณฑ์')}${metric('LOCK เดือนนี้',locked,'แพทย์ทบทวนแล้ว')}</div>
+      <div class="grid cards">${metric('เดือนนี้',month.length,'รายการ RBC QC')}${metric('ครบ 4 ถุง',completedProducts,`จาก ${products.length} ชนิด`)}${metric('รอแพทย์ทบทวน',submitted,'Submitted')}${metric('QC ต้องตรวจสอบ',review,'ค่าบางรายการไม่เข้าเกณฑ์')}${metric('ทบทวนเสร็จสิ้น',locked,'แพทย์ทบทวนและปิดผลแล้ว')}</div>
       <div class="panel rbc-month-panel compact"><div class="section-title-row"><div><h2>ความครบถ้วน QC รายเดือน</h2><p class="muted">ติดตาม 4 ถุงต่อชนิด · คลิกการ์ดเพื่อดูรายละเอียด</p></div><div class="rbc-month-select"><label>เดือน</label><input id="rbcDashMonth" type="month" value="${esc(ym)}"></div></div><div class="rbc-progress-grid">${products.map(p=>rbcTargetCard(p,ym)).join('')}</div></div>
       <div class="panel"><h2>รายการล่าสุด</h2>${rbcRecordsTable(rec.slice(0,12))}</div>`;
     $('#rbcDashMonth').onchange=e=>{state.rbcDashboardMonth=e.target.value||rbcMonthKey();renderRbcDashboard();};
