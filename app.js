@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.35 - 5-year evidence storage saver: automatic image optimization */
+/* CNMI Blood Component QC v5.3.36 - 5-year evidence storage saver: automatic image optimization */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -89,10 +89,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.35 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.36 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.35 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.36 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -168,7 +168,7 @@
   }
   async function logActivity(action,entityType='system',recordId=null,detail={}){
     if(!state.sb||!state.user||!state.profile||state.profile.must_change_password) return;
-    const payload={app_version:'5.3.35',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
+    const payload={app_version:'5.3.36',module:state.currentModule||'core',ui_mode:state.uiMode,...detail};
     const {error}=await state.sb.rpc('log_activity',{p_action:action,p_entity_type:entityType,p_record_id:recordId,p_detail:payload});
     if(error) console.warn('activity log failed',error);
   }
@@ -667,6 +667,39 @@
   function deletedBadge(r){ return r?.deleted_at ? '<span class="badge deleted">ลบแล้ว</span>' : ''; }
   function pHBadge(r){ if(!r.ph_measured_at||!r.expiry_at) return ''; return sameBangkokDate(r.ph_measured_at,r.expiry_at)?'<span class="badge pass">pH ตรงวัน Exp.</span>':'<span class="badge late">pH ไม่ตรงวัน Exp.</span>'; }
   function waitingPH(r){ return r.status==='draft' && !r.ph_value && r.expiry_at; }
+  function bangkokTodayKey(){ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()); }
+  function plateletMeasurementTasks(r){
+    if(!r||r.deleted_at||r.record_purpose!=='qc'||r.status==='locked')return [];
+    const tasks=[];
+    const pltMissing=r.plt_value_1==null&&r.plt_value_2==null;
+    const adamMissing=r.wbc_adam==null;
+    if(pltMissing)tasks.push({key:'cbc',label:'ยังไม่ได้วัด CBC / Platelet',level:'missing'});
+    if(adamMissing)tasks.push({key:'adam',label:'ยังไม่ได้วัด ADAM / WBC',level:'missing'});
+    if(r.ph_value==null){
+      const expiry=r.expiry_at?inputFromISO(r.expiry_at).slice(0,10):'';
+      const today=bangkokTodayKey();
+      if(expiry){
+        const dueLabel=dateTH(r.expiry_at,false);
+        if(expiry<today)tasks.push({key:'ph',label:`pH เลยกำหนดแล้ว · ควรวัด ${dueLabel}`,level:'overdue'});
+        else if(expiry===today)tasks.push({key:'ph',label:'ต้องวัด pH วันนี้ (วันหมดอายุ)',level:'due'});
+        else tasks.push({key:'ph',label:`รอวัด pH วันหมดอายุ · ${dueLabel}`,level:'upcoming'});
+      }else tasks.push({key:'ph',label:'ยังไม่ได้วัด pH',level:'missing'});
+    }
+    return tasks;
+  }
+  function plateletTaskSummaryBadge(r){
+    const tasks=plateletMeasurementTasks(r);if(!tasks.length)return '<span class="badge pass">ครบผลที่ต้องติดตาม</span>';
+    const urgent=tasks.some(x=>x.level==='overdue'||x.level==='due');
+    return `<span class="badge ${urgent?'review':'incomplete'}">ค้าง ${tasks.length} รายการ</span>`;
+  }
+  function plateletReminderPanel(records){
+    const rows=(records||[]).map(r=>({r,tasks:plateletMeasurementTasks(r)})).filter(x=>x.tasks.length).sort((a,b)=>{
+      const rank=x=>x.tasks.some(t=>t.level==='overdue')?0:x.tasks.some(t=>t.level==='due')?1:x.tasks.some(t=>t.level==='missing')?2:3;
+      return rank(a)-rank(b)||String(a.r.expiry_at||'').localeCompare(String(b.r.expiry_at||''));
+    });
+    if(!rows.length)return '<div class="notice good small"><strong>งาน QC ที่ต้องวัดเพิ่มเติม</strong> ตอนนี้ไม่มีรายการค้าง</div>';
+    return `<div class="panel platelet-reminder-panel"><div class="section-title-row"><div><h2>งาน QC ที่ยังต้องทำ</h2><p class="muted small">บอกว่ายังขาดการวัดอะไร และ pH ต้องวัดวันไหน</p></div><span class="badge review">${rows.length} ถุง</span></div><div class="reminder-list">${rows.slice(0,12).map(({r,tasks})=>`<button type="button" class="reminder-row record-link" data-id="${r.id}"><div class="reminder-product"><strong>${esc(r.product_no)}</strong><small>${esc(r.product_type)}</small></div><div class="reminder-tags">${tasks.map(t=>`<span class="reminder-tag ${t.level}">${esc(t.label)}</span>`).join('')}</div></button>`).join('')}</div>${rows.length>12?`<div class="muted small" style="margin-top:10px">และอีก ${rows.length-12} ถุง · ดูทั้งหมดที่เมนูรายการ</div>`:''}</div>`;
+  }
 
   function bindRouteButtons(root=document){
     $$('[data-go-route]',root).forEach(b=>b.onclick=()=>{
@@ -804,12 +837,11 @@
       if(r.factor_viii_iu_ml!=null&&Number(r.factor_viii_iu_ml)<Number(s.factor_viii_min_iu_ml))add('Factor VIII (ปัจจัย VIII)',`${fmt(r.factor_viii_iu_ml,3)} IU/mL`,`≥ ${fmt(s.factor_viii_min_iu_ml,2)} IU/mL`);
     }else if(module==='rbc'){
       const ps=rbcProductSetting(r.product_type),s=state.rbcSettings||{},cls=ps?.product_class||'lprc';
-      const residualMax=Number(cls==='ldprc'?s.ldprc_residual_wbc_max_x10e6:s.lprc_residual_wbc_max_x10e9),recoveryMin=Number(cls==='ldprc'?s.ldprc_rbc_recovery_min_pct:s.lprc_rbc_recovery_min_pct),unit=cls==='ldprc'?'×10⁶ cells/unit':'×10⁹ cells/unit';
+      const residualMax=Number(cls==='ldprc'?s.ldprc_residual_wbc_max_x10e6:s.lprc_residual_wbc_max_x10e9),unit=cls==='ldprc'?'×10⁶ cells/unit':'×10⁹ cells/unit';
       const runs=[1,2];
       runs.forEach(i=>{
-        const res=rbcEffectiveResidual(r,i),rec=rbcEffectiveRecovery(r,i),hct=num(r[`post${i}_hct_pct`]);
+        const res=rbcEffectiveResidual(r,i),hct=num(r[`post${i}_hct_pct`]);
         if(res!==null&&res>=residualMax)add(`Residual WBC (เม็ดเลือดขาวคงเหลือ) · ครั้งที่ ${i}`,`${fmt(res,3)} ${unit}`,`< ${fmt(residualMax,3)} ${unit}`);
-        if(rec!==null&&(rec<=recoveryMin||rbcRecoveryOutOfRange(rec)))add(`RBC Recovery (การคืนกลับเม็ดเลือดแดง) · ครั้งที่ ${i}`,`${fmt(rec,2)}%`,`> ${fmt(recoveryMin,2)}% และ ≤ 100%`);
         if(hct!==null&&(hct<Number(s.hct_min_pct)||hct>Number(s.hct_max_pct)))add(`Hct หลัง · ครั้งที่ ${i}`,`${fmt(hct,2)}%`,`${fmt(s.hct_min_pct,1)}–${fmt(s.hct_max_pct,1)}%`);
       });
     }
@@ -1214,7 +1246,6 @@
     const ym=state.plateletDashboardMonth||plateletMonthKey();state.plateletDashboardMonth=ym;
     const month=rec.filter(r=>monthKeyFromDateString(plateletDateFromRecord(r))===ym);
     const qc=month.filter(r=>r.record_purpose==='qc').length;
-    const wait=rec.filter(waitingPH).length;
     const submitted=month.filter(r=>r.record_purpose==='qc'&&r.status==='submitted').length;
     const products=activePlateletTrackingProducts();
     const productSummaries=products.map(ps=>{const weeks=plateletWeeklySummary(ym,ps.product_type);const complete=weeks.filter(x=>x.complete).length;return {product_type:ps.product_type,weeks,complete};});
@@ -1227,7 +1258,7 @@
         ${metric('เดือนนี้',month.length,'รายการทั้งหมด')}${metric('ครบ 4 สัปดาห์',`${typesComplete}/${products.length||0}`,'แยกตามชนิดผลิตภัณฑ์')}${metric('QC จริง',qc,'รายการที่ใช้เป็น QC')}${metric('ไม่มีผลิตภัณฑ์',noPool,'สัปดาห์ที่มีหลักฐาน')}${metric('รอแพทย์ทบทวน',submitted,'เฉพาะ Platelet QC')}
       </div>
       <div class="panel qc-tracking-panel"><div class="section-title-row"><div><h2>ติดตาม Platelet QC รายเดือน แยกชนิด</h2><p class="muted small">แต่ละชนิดติดตาม 4 สัปดาห์ต่อเดือน · คลิกการ์ดเพื่อดูสถานะแต่ละสัปดาห์</p></div></div><div class="platelet-progress-grid">${productCards||'<div class="empty">ยังไม่มีชนิดผลิตภัณฑ์ที่เปิดใช้งาน</div>'}</div></div>
-      ${wait?`<div class="notice info small"><strong>รอ pH ${wait} รายการ</strong> สามารถกลับมาเติมผลภายหลังได้</div>`:''}
+      ${plateletReminderPanel(rec)}
       <div class="panel"><h2>รายการล่าสุด</h2>${recordsTable(rec.slice(0,12))}</div>`;
     $('#plateletDashMonth').onchange=e=>{state.plateletDashboardMonth=e.target.value||plateletMonthKey();renderDashboard();};
     if($('#plateletNoPoolBtn'))$('#plateletNoPoolBtn').onclick=openPlateletNoPoolDialog;
@@ -1304,8 +1335,8 @@
   function metric(label,value,sub){ return `<div class="card metric"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`; }
   function recordsTable(rows){
     if(!rows.length) return '<div class="empty">ยังไม่มีข้อมูล</div>';
-    const table=`<div class="table-wrap"><table class="data-table"><thead><tr><th>Product No.</th><th>ผลิตภัณฑ์</th><th>ประเภท</th><th>วันเจาะ</th><th>Group</th><th>Yield</th><th>Pool / ฉลาก</th><th>ผล QC</th><th>สถานะ</th><th>ผู้บันทึก</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.deleted_at?'deleted-row':''}"><td><button class="link-btn record-link" data-id="${r.id}">${esc(r.product_no)}</button></td><td>${esc(r.product_type)}</td><td>${purposeBadge(r.record_purpose)} ${deletedBadge(r)}</td><td class="nowrap">${dateTH(r.collection_at,false)}</td><td>${esc(r.blood_group||'–')}</td><td>${fmt(r.platelet_yield,2)}</td><td>${poolReleaseBadge(r.pool_release_status)}</td><td>${r.record_purpose==='qc'?qcBadge(r.qc_status):'<span class="muted">–</span>'}</td><td>${statusBadge(r.status)}</td><td>${esc(profileName(r.created_by))}</td></tr>`).join('')}</tbody></table></div>`;
-    const cards=rows.map(r=>`<article class="mobile-data-card ${r.deleted_at?'deleted-row':''}"><div class="mobile-data-card-head"><button class="link-btn record-link" data-id="${r.id}">${esc(r.product_no)}</button>${r.deleted_at?'<span class="badge deleted">ลบแล้ว</span>':''}</div><div class="mobile-data-card-body">${mobilePair('ผลิตภัณฑ์',esc(r.product_type))}${mobilePair('ประเภท',`${purposeBadge(r.record_purpose)} ${deletedBadge(r)}`)}${mobilePair('วันเจาะ',esc(dateTH(r.collection_at,false)))}${mobilePair('Group',esc(r.blood_group||'–'))}${mobilePair('Yield',fmt(r.platelet_yield,2))}${mobilePair('Pool / ฉลาก',poolReleaseBadge(r.pool_release_status))}${mobilePair('ผล QC',r.record_purpose==='qc'?qcBadge(r.qc_status):'<span class="muted">–</span>')}${mobilePair('สถานะ',statusBadge(r.status))}${mobilePair('ผู้บันทึก',esc(profileName(r.created_by)))}</div></article>`).join('');
+    const table=`<div class="table-wrap"><table class="data-table"><thead><tr><th>Product No.</th><th>ผลิตภัณฑ์</th><th>ประเภท</th><th>วันเจาะ</th><th>Group</th><th>Yield</th><th>Pool / ฉลาก</th><th>ผล QC</th><th>งานที่ยังขาด</th><th>สถานะ</th><th>ผู้บันทึก</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.deleted_at?'deleted-row':''}"><td><button class="link-btn record-link" data-id="${r.id}">${esc(r.product_no)}</button></td><td>${esc(r.product_type)}</td><td>${purposeBadge(r.record_purpose)} ${deletedBadge(r)}</td><td class="nowrap">${dateTH(r.collection_at,false)}</td><td>${esc(r.blood_group||'–')}</td><td>${fmt(r.platelet_yield,2)}</td><td>${poolReleaseBadge(r.pool_release_status)}</td><td>${r.record_purpose==='qc'?qcBadge(r.qc_status):'<span class="muted">–</span>'}</td><td>${r.record_purpose==='qc'?plateletTaskSummaryBadge(r):'<span class="muted">–</span>'}</td><td>${statusBadge(r.status)}</td><td>${esc(profileName(r.created_by))}</td></tr>`).join('')}</tbody></table></div>`;
+    const cards=rows.map(r=>`<article class="mobile-data-card ${r.deleted_at?'deleted-row':''}"><div class="mobile-data-card-head"><button class="link-btn record-link" data-id="${r.id}">${esc(r.product_no)}</button>${r.deleted_at?'<span class="badge deleted">ลบแล้ว</span>':''}</div><div class="mobile-data-card-body">${mobilePair('ผลิตภัณฑ์',esc(r.product_type))}${mobilePair('ประเภท',`${purposeBadge(r.record_purpose)} ${deletedBadge(r)}`)}${mobilePair('วันเจาะ',esc(dateTH(r.collection_at,false)))}${mobilePair('Group',esc(r.blood_group||'–'))}${mobilePair('Yield',fmt(r.platelet_yield,2))}${mobilePair('Pool / ฉลาก',poolReleaseBadge(r.pool_release_status))}${mobilePair('ผล QC',r.record_purpose==='qc'?qcBadge(r.qc_status):'<span class="muted">–</span>')}${mobilePair('งานที่ยังขาด',r.record_purpose==='qc'?plateletTaskSummaryBadge(r):'<span class="muted">–</span>')}${mobilePair('สถานะ',statusBadge(r.status))}${mobilePair('ผู้บันทึก',esc(profileName(r.created_by)))}</div></article>`).join('');
     return responsiveDataTable(table,cards);
   }
 
@@ -2305,8 +2336,8 @@ function printPlasmaOutlabBatch(batchId){
   }
   function rbcRecordsTable(rows){
     if(!rows.length)return '<div class="empty">ยังไม่มีข้อมูล</div>';
-    const table=`<div class="table-wrap"><table class="data-table rbc-records-table"><thead><tr><th>Product No.</th><th>ชนิด RBC</th><th>วันที่ผลิต</th><th>ก่อน</th><th>หลัง</th><th>Residual WBC</th><th>RBC Recovery</th><th>QC</th><th>สถานะ</th><th>ผู้สร้าง</th></tr></thead><tbody>${rows.map(r=>{const ps=rbcProductSetting(r.product_type),res=rbcEffectiveResidual(r,1),rec=rbcEffectiveRecovery(r,1);return `<tr class="${r.deleted_at?'deleted-row':''}"><td><button class="link-btn rbc-record-link" data-id="${r.id}">${esc(r.product_no)}</button>${r.deleted_at?' <span class="badge deleted">ลบแล้ว</span>':''}</td><td>${esc(r.product_type)}</td><td class="nowrap">${esc(r.manufactured_on||'–')}</td><td>${r.source_volume_ml==null?'–':fmt(r.source_volume_ml,2)+' mL'}</td><td>${r.final_volume_ml==null?'–':fmt(r.final_volume_ml,2)+' mL'}</td><td>${res==null?'–':fmt(res,3)+' ×10'+(ps?.product_class==='ldprc'?'⁶':'⁹')}</td><td>${rbcRecoveryDisplay(rec)}</td><td>${rbcRecordDecisionBadge(r)}</td><td>${statusBadge(r.status)}</td><td>${esc(profileName(r.created_by))}</td></tr>`}).join('')}</tbody></table></div>`;
-    const cards=rows.map(r=>{const ps=rbcProductSetting(r.product_type),res=rbcEffectiveResidual(r,1),rec=rbcEffectiveRecovery(r,1);return `<article class="mobile-data-card ${r.deleted_at?'deleted-row':''}"><div class="mobile-data-card-head"><button class="link-btn rbc-record-link" data-id="${r.id}">${esc(r.product_no)}</button>${r.deleted_at?'<span class="badge deleted">ลบแล้ว</span>':''}</div><div class="mobile-data-card-body">${mobilePair('ชนิด RBC',esc(r.product_type))}${mobilePair('วันที่ผลิต',esc(r.manufactured_on||'–'))}${mobilePair('ก่อน',r.source_volume_ml==null?'–':fmt(r.source_volume_ml,2)+' mL')}${mobilePair('หลัง',r.final_volume_ml==null?'–':fmt(r.final_volume_ml,2)+' mL')}${mobilePair('Residual WBC',res==null?'–':fmt(res,3)+' ×10'+(ps?.product_class==='ldprc'?'⁶':'⁹'))}${mobilePair('RBC Recovery',rbcRecoveryDisplay(rec))}${mobilePair('QC',rbcRecordDecisionBadge(r))}${mobilePair('สถานะ',statusBadge(r.status))}${mobilePair('ผู้สร้าง',esc(profileName(r.created_by)))}</div></article>`;}).join('');
+    const table=`<div class="table-wrap"><table class="data-table rbc-records-table"><thead><tr><th>Product No.</th><th>ชนิด RBC</th><th>วันที่ผลิต</th><th>ก่อน</th><th>หลัง</th><th>Residual WBC</th><th>QC</th><th>สถานะ</th><th>ผู้สร้าง</th></tr></thead><tbody>${rows.map(r=>{const ps=rbcProductSetting(r.product_type),res=rbcEffectiveResidual(r,1);return `<tr class="${r.deleted_at?'deleted-row':''}"><td><button class="link-btn rbc-record-link" data-id="${r.id}">${esc(r.product_no)}</button>${r.deleted_at?' <span class="badge deleted">ลบแล้ว</span>':''}</td><td>${esc(r.product_type)}</td><td class="nowrap">${esc(r.manufactured_on||'–')}</td><td>${r.source_volume_ml==null?'–':fmt(r.source_volume_ml,2)+' mL'}</td><td>${r.final_volume_ml==null?'–':fmt(r.final_volume_ml,2)+' mL'}</td><td>${res==null?'–':fmt(res,3)+' ×10'+(ps?.product_class==='ldprc'?'⁶':'⁹')}</td><td>${rbcRecordDecisionBadge(r)}</td><td>${statusBadge(r.status)}</td><td>${esc(profileName(r.created_by))}</td></tr>`}).join('')}</tbody></table></div>`;
+    const cards=rows.map(r=>{const ps=rbcProductSetting(r.product_type),res=rbcEffectiveResidual(r,1);return `<article class="mobile-data-card ${r.deleted_at?'deleted-row':''}"><div class="mobile-data-card-head"><button class="link-btn rbc-record-link" data-id="${r.id}">${esc(r.product_no)}</button>${r.deleted_at?'<span class="badge deleted">ลบแล้ว</span>':''}</div><div class="mobile-data-card-body">${mobilePair('ชนิด RBC',esc(r.product_type))}${mobilePair('วันที่ผลิต',esc(r.manufactured_on||'–'))}${mobilePair('ก่อน',r.source_volume_ml==null?'–':fmt(r.source_volume_ml,2)+' mL')}${mobilePair('หลัง',r.final_volume_ml==null?'–':fmt(r.final_volume_ml,2)+' mL')}${mobilePair('Residual WBC',res==null?'–':fmt(res,3)+' ×10'+(ps?.product_class==='ldprc'?'⁶':'⁹'))}${mobilePair('QC',rbcRecordDecisionBadge(r))}${mobilePair('สถานะ',statusBadge(r.status))}${mobilePair('ผู้สร้าง',esc(profileName(r.created_by)))}</div></article>`;}).join('');
     return responsiveDataTable(table,cards);
   }
   function bindRbcRecordLinks(root=document){ $$('.rbc-record-link',root).forEach(b=>b.onclick=()=>openRbcDetail(b.dataset.id)); }
@@ -2322,8 +2353,8 @@ function printPlasmaOutlabBatch(batchId){
     bindRouteButtons($('#view-module'));render();
   }
   function exportRbcCsv(){
-    const rows=state.rbcRecords.filter(r=>!r.deleted_at),heads=['Product No.','Product Type','Manufactured On','Source Volume mL','Final Volume mL','Pre1 Hct','Pre1 WBC','Pre1 RBC','Pre1 PLT','Pre2 Hct','Pre2 WBC','Pre2 RBC','Pre2 PLT','Post1 Hct','Post1 WBC CBC','Post1 RBC','Post1 PLT','Post2 Hct','Post2 WBC CBC','Post2 RBC','Post2 PLT','Post ADAM WBC /uL','Post ADAM measured at','Run1 WBC Removal %','Run1 RBC Recovery %','Run2 WBC Removal %','Run2 RBC Recovery %','QC','Status'];
-    const vals=rows.map(r=>[r.product_no,r.product_type,r.manufactured_on,r.source_volume_ml,r.final_volume_ml,r.pre1_hct_pct,r.pre1_wbc,r.pre1_rbc,r.pre1_plt,r.pre2_hct_pct,r.pre2_wbc,r.pre2_rbc,r.pre2_plt,r.post1_hct_pct,r.post1_wbc,r.post1_rbc,r.post1_plt,r.post2_hct_pct,r.post2_wbc,r.post2_rbc,r.post2_plt,r.post_adam_wbc,r.post_adam_measured_at,r.run1_wbc_removal_pct,rbcEffectiveRecovery(r,1),r.run2_wbc_removal_pct,rbcEffectiveRecovery(r,2),r.qc_status,r.status]);
+    const rows=state.rbcRecords.filter(r=>!r.deleted_at),heads=['Product No.','Product Type','Manufactured On','Source Volume mL','Final Volume mL','Pre1 Hct','Pre1 WBC','Pre1 RBC','Pre1 PLT','Pre2 Hct','Pre2 WBC','Pre2 RBC','Pre2 PLT','Post1 Hct','Post1 WBC CBC','Post1 RBC','Post1 PLT','Post2 Hct','Post2 WBC CBC','Post2 RBC','Post2 PLT','Post ADAM WBC /uL','Post ADAM measured at','Run1 WBC Removal %','Run2 WBC Removal %','QC','Status'];
+    const vals=rows.map(r=>[r.product_no,r.product_type,r.manufactured_on,r.source_volume_ml,r.final_volume_ml,r.pre1_hct_pct,r.pre1_wbc,r.pre1_rbc,r.pre1_plt,r.pre2_hct_pct,r.pre2_wbc,r.pre2_rbc,r.pre2_plt,r.post1_hct_pct,r.post1_wbc,r.post1_rbc,r.post1_plt,r.post2_hct_pct,r.post2_wbc,r.post2_rbc,r.post2_plt,r.post_adam_wbc,r.post_adam_measured_at,r.run1_wbc_removal_pct,r.run2_wbc_removal_pct,r.qc_status,r.status]);
     const csv=[heads,...vals].map(row=>row.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\r\n'); const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`RBC_QC_${rbcMonthKey()}.csv`;a.click();URL.revokeObjectURL(a.href);logActivity('export_csv','report',null,{module:'rbc',rows:rows.length}).catch(()=>{});
   }
   function rbcField(label,id,value,type='text',readonly=false,required=false,step=''){
@@ -2350,22 +2381,12 @@ function printPlasmaOutlabBatch(batchId){
     if(ps.source_input_mode==='direct_volume')sourceVol=num($('#rbc_source_volume_direct')?.value);
     else {const gross=num($('#rbc_source_gross')?.value);if(gross!=null&&gross>=Number(ps.source_tare_weight_g))sourceVol=(gross-Number(ps.source_tare_weight_g))/Number(ps.source_density);}
     const finalGross=num($('#rbc_final_gross')?.value);let finalVol=null;if(finalGross!=null&&finalGross>=Number(ps.final_tare_weight_g))finalVol=(finalGross-Number(ps.final_tare_weight_g))/Number(ps.final_density);
-    const run=i=>{const preW=num($(`#rbc_pre${i}_wbc`)?.value),preR=num($(`#rbc_pre${i}_rbc`)?.value),postW=ps.product_class==='ldprc'?num($('#rbc_post_adam_wbc')?.value):num($(`#rbc_post${i}_wbc`)?.value),postR=num($(`#rbc_post${i}_rbc`)?.value),postH=num($(`#rbc_post${i}_hct`)?.value);let preWT=null,preRT=null,postWT=null,postRT=null,wrem=null,rrec=null;if(sourceVol!=null&&preW!=null)preWT=preW*sourceVol/1000;if(sourceVol!=null&&preR!=null)preRT=preR*sourceVol/1000;if(finalVol!=null&&postW!=null)postWT=postW*finalVol/1000;if(finalVol!=null&&postR!=null)postRT=postR*finalVol/1000;if(preWT>0&&postWT!=null)wrem=ps.product_class==='ldprc'?((preWT*1000-postWT)/(preWT*1000))*100:((preWT-postWT)/preWT)*100;if(preRT>0&&postRT!=null)rrec=postRT/preRT*100;let pass=null;if(postWT!=null&&postH!=null){pass=(postWT<Number(ps.product_class==='ldprc'?state.rbcSettings.ldprc_residual_wbc_max_x10e6:state.rbcSettings.lprc_residual_wbc_max_x10e9)&&postH>=Number(state.rbcSettings.hct_min_pct)&&postH<=Number(state.rbcSettings.hct_max_pct));}return {preWT,postWT,wrem,rrec,postH,pass};};
+    const run=i=>{const preW=num($(`#rbc_pre${i}_wbc`)?.value),preR=num($(`#rbc_pre${i}_rbc`)?.value),postW=ps.product_class==='ldprc'?num($('#rbc_post_adam_wbc')?.value):num($(`#rbc_post${i}_wbc`)?.value),postR=num($(`#rbc_post${i}_rbc`)?.value),postH=num($(`#rbc_post${i}_hct`)?.value);let preWT=null,postWT=null,wrem=null;if(sourceVol!=null&&preW!=null)preWT=preW*sourceVol/1000;if(finalVol!=null&&postW!=null)postWT=postW*finalVol/1000;if(preWT>0&&postWT!=null)wrem=ps.product_class==='ldprc'?((preWT*1000-postWT)/(preWT*1000))*100:((preWT-postWT)/preWT)*100;let pass=null;if(postWT!=null&&postH!=null){pass=(postWT<Number(ps.product_class==='ldprc'?state.rbcSettings.ldprc_residual_wbc_max_x10e6:state.rbcSettings.lprc_residual_wbc_max_x10e9)&&postH>=Number(state.rbcSettings.hct_min_pct)&&postH<=Number(state.rbcSettings.hct_max_pct));}return {preWT,postWT,wrem,postH,pass};};
     return {ps,sourceVol,finalVol,r1:run(1),r2:run(2)};
   }
   // LDPRC ADAM results are stored as cells/µL, while the final unit is reported
   // as ×10^6 cells/unit. Recalculate when the database-derived field is absent.
   // This also repairs the display of previously saved records without editing evidence.
-  // RBC Recovery is the ratio of total red-cell counts (RBC concentration × volume).
-  // Values above 100% are retained as measured, but flagged as implausible and cannot pass QC.
-  function rbcRecoveryOutOfRange(value){const x=num(value);return x!==null&&(x>100||x<0);}
-  function rbcRecoveryDisplay(value){const x=num(value);return x===null?'–':`${fmt(x,2)}%${rbcRecoveryOutOfRange(x)?' <span class="badge review" title="ค่ามากกว่า 100% ต้องตรวจสอบผล CBC และปริมาตร">ต้องตรวจสอบ</span>':''}`;}
-  function rbcEffectiveRecovery(r,i){
-    const pre=num(r?.[`pre${i}_rbc`]),post=num(r?.[`post${i}_rbc`]);
-    const before=num(r?.source_volume_ml),after=num(r?.final_volume_ml);
-    if(pre!==null&&pre>0&&post!==null&&before!==null&&before>0&&after!==null&&after>0)return post*after/(pre*before)*100;
-    return num(r?.[`run${i}_rbc_recovery_pct`]);
-  }
   function rbcEffectiveResidual(r,i){
     const ps=rbcProductSetting(r?.product_type);
     if(ps?.product_class==='ldprc'){
@@ -2389,7 +2410,7 @@ function printPlasmaOutlabBatch(batchId){
   function rbcStoredMachinePass(r,i){
     const ps=rbcProductSetting(r?.product_type),s=state.rbcSettings||{},cls=ps?.product_class||'lprc';if(!r||!ps)return null;
     const postWT=rbcEffectiveResidual(r,i),postH=num(r[`post${i}_hct_pct`]);if(postWT===null||postH===null)return null;
-    const maxW=Number(cls==='ldprc'?s.ldprc_residual_wbc_max_x10e6:s.lprc_residual_wbc_max_x10e9),minRec=Number(cls==='ldprc'?s.ldprc_rbc_recovery_min_pct:s.lprc_rbc_recovery_min_pct),minH=Number(s.hct_min_pct),maxH=Number(s.hct_max_pct);
+    const maxW=Number(cls==='ldprc'?s.ldprc_residual_wbc_max_x10e6:s.lprc_residual_wbc_max_x10e9),minH=Number(s.hct_min_pct),maxH=Number(s.hct_max_pct);
     return postWT<maxW&&postH>=minH&&postH<=maxH;
   }
   function rbcRecordAnyMachineFail(r){return [1,2].some(i=>rbcStoredMachinePass(r,i)===false);}
@@ -2424,7 +2445,7 @@ function printPlasmaOutlabBatch(batchId){
     if($('#rbc_source_volume_preview'))$('#rbc_source_volume_preview').value=p.sourceVol==null?'':p.sourceVol.toFixed(2);
     if($('#rbcFinalVolume'))$('#rbcFinalVolume').value=p.finalVol==null?'':p.finalVol.toFixed(2);
     const unit=p.ps.product_class==='ldprc'?'×10⁶ cells/unit':'×10⁹ cells/unit';
-    [1,2].forEach(i=>{const x=p['r'+i];if($('#rbcCalc'+i))$('#rbcCalc'+i).innerHTML=`<td><strong>เครื่องที่ ${i}</strong></td><td>${x.postWT==null?'–':fmt(x.postWT,3)} <small>${unit}</small></td><td>${x.wrem==null?'–':fmt(x.wrem,2)+'%'}</td><td>${rbcRecoveryDisplay(x.rrec)}</td><td>${x.postH==null?'–':fmt(x.postH,2)+'%'}</td><td>${x.pass==null?'<span class="muted">–</span>':x.pass?'<span class="badge pass">ผ่าน</span>':'<span class="badge review">ไม่ผ่าน</span>'}</td>`;});
+    [1,2].forEach(i=>{const x=p['r'+i];if($('#rbcCalc'+i))$('#rbcCalc'+i).innerHTML=`<td><strong>เครื่องที่ ${i}</strong></td><td>${x.postWT==null?'–':fmt(x.postWT,3)} <small>${unit}</small></td><td>${x.wrem==null?'–':fmt(x.wrem,2)+'%'}</td><td>${x.postH==null?'–':fmt(x.postH,2)+'%'}</td><td>${x.pass==null?'<span class="muted">–</span>':x.pass?'<span class="badge pass">ผ่าน</span>':'<span class="badge review">ไม่ผ่าน</span>'}</td>`;});
     if($('#rbcQcDecision'))$('#rbcQcDecision').innerHTML=rbcQcDecisionHtml(p);
   }
   async function renderRbcRecordForm(){
@@ -2444,7 +2465,7 @@ function printPlasmaOutlabBatch(batchId){
       <div class="panel"><h2 id="rbcFinalTitle">4. หลังผลิต/กรอง</h2><div class="form-grid">${rbcField('น้ำหนักที่ชั่งได้ (g)','rbc_final_gross',r?.final_gross_weight_g||'', 'number',!editable,true,'0.01')}${rbcField('น้ำหนักถุงเปล่า (g)','rbcFinalTare',ps?.final_tare_weight_g||'', 'number',true)}${rbcField('Density','rbcFinalDensity',ps?.final_density||'', 'number',true)}${rbcField('Volume หลังผลิต/กรอง (mL)','rbcFinalVolume',r?.final_volume_ml||'', 'text',true)}</div>${r?.final_weight_recorded_by?`<div class="entry-attribution">ผู้กรอกน้ำหนัก ${esc(profileName(r.final_weight_recorded_by))} · ${esc(dateTH(r.final_weight_recorded_at))}</div>`:''}</div>
       <div class="panel measurement-entry-panel"><div class="section-title-row"><h2>5. CBC หลังผลิต/กรอง</h2><span class="section-badge">หลัง</span></div><div class="form-grid">${rbcField('วัน-เวลาที่ตรวจ CBC','rbc_post_measured_at',inputFromISO(r?.post_measured_at),'datetime-local',!editable,true)}<div class="field"><label>เครื่อง CBC</label><select id="rbc_post_instrument" ${!editable?'disabled':''}><option ${(!r?.post_cbc_instrument||r.post_cbc_instrument==='Mindray')?'selected':''}>Mindray</option><option ${r?.post_cbc_instrument==='Sysmex'?'selected':''}>Sysmex</option></select></div></div><div class="table-wrap"><table class="data-table rbc-repeat-table"><thead><tr><th></th><th>Hct (%)</th><th class="rbc-post-cbc-wbc ${ps?.product_class==='ldprc'?'hidden':''}">WBC (K/µL)</th><th>RBC (M/µL)</th><th>PLT (K/µL)</th></tr></thead><tbody>${[1,2].map(i=>`<tr><th>เครื่องที่ ${i}</th><td><input id="rbc_post${i}_hct" type="number" step="0.01" value="${esc(r?.[`post${i}_hct_pct`]??'')}" ${!editable?'disabled':''}></td><td class="rbc-post-cbc-wbc ${ps?.product_class==='ldprc'?'hidden':''}"><input id="rbc_post${i}_wbc" type="number" step="0.0001" value="${esc(r?.[`post${i}_wbc`]??'')}" ${!editable||ps?.product_class==='ldprc'?'disabled':''}></td><td><input id="rbc_post${i}_rbc" type="number" step="0.0001" value="${esc(r?.[`post${i}_rbc`]??'')}" ${!editable?'disabled':''}></td><td><input id="rbc_post${i}_plt" type="number" step="0.01" value="${esc(r?.[`post${i}_plt`]??'')}" ${!editable?'disabled':''}></td></tr>`).join('')}</tbody></table></div>${r?.post_recorded_by?`<div class="entry-attribution">ผู้กรอกผล CBC ${esc(profileName(r.post_recorded_by))} · ${esc(dateTH(r.post_recorded_at))}</div>`:''}${rbcEvidenceBox('post_cbc','หลักฐาน CBC หลังผลิต/กรอง',editable,locked)}</div>
       <div id="rbcPostAdamPanel" class="panel measurement-entry-panel ${ps?.product_class==='ldprc'?'':'hidden'}"><div class="section-title-row"><h2>6. WBC หลังผลิต/กรองจาก ADAM</h2><span class="section-badge">LDPRC</span></div><div class="form-grid">${rbcField('WBC (/µL)','rbc_post_adam_wbc',r?.post_adam_wbc??'', 'number',!editable,true,'0.0001')}${rbcField('วัน-เวลาที่วัด ADAM','rbc_post_adam_measured_at',inputFromISO(r?.post_adam_measured_at),'datetime-local',!editable,true)}</div>${r?.post_adam_recorded_by?`<div class="entry-attribution">ผู้กรอกผล ADAM ${esc(profileName(r.post_adam_recorded_by))} · ${esc(dateTH(r.post_adam_recorded_at))}</div>`:''}${rbcEvidenceBox('post_adam','หลักฐาน ADAM / WBC หลังผลิต/กรอง',editable,locked)}</div>
-      <div class="panel"><div class="section-title-row"><h2 id="rbcCalcSectionTitle">${ps?.product_class==='ldprc'?'7':'6'}. ผลคำนวณ QC</h2>${r?rbcRecordDecisionBadge(r):''}</div><div class="table-wrap"><table class="data-table rbc-calc-table"><thead><tr><th></th><th>Residual WBC</th><th>WBC Removal</th><th>RBC Recovery</th><th>Hct หลัง</th><th>ผล</th></tr></thead><tbody><tr id="rbcCalc1"></tr><tr id="rbcCalc2"></tr></tbody></table></div><div id="rbcQcDecision" style="margin-top:12px"></div></div>
+      <div class="panel"><div class="section-title-row"><h2 id="rbcCalcSectionTitle">${ps?.product_class==='ldprc'?'7':'6'}. ผลคำนวณ QC</h2>${r?rbcRecordDecisionBadge(r):''}</div><div class="table-wrap"><table class="data-table rbc-calc-table"><thead><tr><th></th><th>Residual WBC</th><th>WBC Removal</th><th>Hct หลัง</th><th>ผล</th></tr></thead><tbody><tr id="rbcCalc1"></tr><tr id="rbcCalc2"></tr></tbody></table></div><div id="rbcQcDecision" style="margin-top:12px"></div></div>
       <div class="panel"><h2 id="rbcNotesSectionTitle">${ps?.product_class==='ldprc'?'8':'7'}. หมายเหตุ</h2><textarea id="rbc_notes" ${!editable?'disabled':''} placeholder="บันทึกเหตุการณ์หรือข้อมูลเพิ่มเติม">${esc(r?.notes||'')}</textarea></div>
       ${correction?`<div class="panel admin-correction-panel"><h2>การแก้ไขโดย Admin</h2><div class="field"><label>เหตุผลการแก้ไข</label><textarea id="rbc_admin_reason" placeholder="เช่น เจ้าหน้าที่แจ้งผลผิด ตรวจหลักฐานใหม่แล้วแก้ไข"></textarea></div></div>`:''}
       <div class="sticky-actions"><div><button class="btn" id="rbcBack">กลับรายการทั้งหมด</button></div><div class="right ${!r?'new-record-actions':''}">${!r&&editable?'<button class="btn clear-form-btn" id="rbcClear">ล้างฟอร์ม</button>':''}${locked&&adminUi()?'<button class="btn" id="rbcUnlock">ปลด LOCK</button>':''}${editable?'<button class="btn primary" id="rbcSave">บันทึกข้อมูล</button>':''}${r&&r.status==='draft'&&staffWriteUi()?'<div class="review-submit-group"><small>ขั้นตอนสุดท้าย · ส่งเมื่อข้อมูลครบแล้ว</small><button class="btn review-submit-btn" id="rbcSubmit">ส่งให้แพทย์ทบทวน</button></div>':''}</div></div>`;
@@ -2485,10 +2506,10 @@ function printPlasmaOutlabBatch(batchId){
   }
   function rbcQcDecisionHtml(p){
     if(!p)return '<div class="notice warning"><strong>การตัดสิน QC</strong><br>กรอกผล CBC ให้ครบในแต่ละเครื่อง แล้วระบบจะบอกว่าเครื่องใดผ่าน/ไม่ผ่าน</div>';
-    const rows=[1,2].map(i=>{const x=p['r'+i],hasAny=['postH','postWT','rrec'].some(k=>x[k]!==null),txt=x.pass===true?'ผ่าน':x.pass===false?'ไม่ผ่าน':hasAny?'ข้อมูลยังไม่ครบ':'ยังไม่กรอก';const cls=x.pass===true?'pass':x.pass===false?'review':'incomplete';return `<span class="badge ${cls}">เครื่องที่ ${i}: ${txt}</span>`;});
+    const rows=[1,2].map(i=>{const x=p['r'+i],hasAny=['postH','postWT'].some(k=>x[k]!==null),txt=x.pass===true?'ผ่าน':x.pass===false?'ไม่ผ่าน':hasAny?'ข้อมูลยังไม่ครบ':'ยังไม่กรอก';const cls=x.pass===true?'pass':x.pass===false?'review':'incomplete';return `<span class="badge ${cls}">เครื่องที่ ${i}: ${txt}</span>`;});
     const completed=[p.r1,p.r2].filter(x=>x.pass!==null),anyFail=completed.some(x=>x.pass===false),allPass=completed.length&&completed.every(x=>x.pass===true);
     const summary=anyFail?'<strong>ต้องทำ Corrective Action</strong> — มีอย่างน้อย 1 เครื่องไม่ผ่าน แม้อีกเครื่องจะผ่าน':allPass?'<strong>ผ่านเกณฑ์ QC</strong> — เครื่องที่มีผลครบผ่านทั้งหมด':'<strong>ยังตัดสิน QC ไม่ได้</strong> — ต้องกรอกข้อมูลของเครื่องที่เริ่มกรอกให้ครบ';
-    return `<div class="notice ${anyFail?'warning':allPass?'good':'warning'}"><strong>เครื่องที่ใช้ตัดสิน QC</strong><div class="status-line" style="margin-top:8px">${rows.join(' ')}</div><div style="margin-top:8px">${summary}</div><small>เกณฑ์ประเมินเบื้องต้น: Residual WBC และ Hct จากข้อมูลล่าสุด · RBC Count และ RBC Recovery แสดงเพื่อวิเคราะห์ ไม่ใช้ตัดสินผ่าน/ไม่ผ่าน QC · ต้องตรวจ Hb และรายการอื่นตามมาตรฐานก่อนสรุป QC ทั้งหมด</small></div>`;
+    return `<div class="notice ${anyFail?'warning':allPass?'good':'warning'}"><strong>เครื่องที่ใช้ตัดสิน QC</strong><div class="status-line" style="margin-top:8px">${rows.join(' ')}</div><div style="margin-top:8px">${summary}</div><small>เกณฑ์ประเมินเบื้องต้น: Residual WBC และ Hct จากข้อมูลล่าสุด · ไม่ใช้ RBC Count เป็นเกณฑ์ตัดสินผ่าน/ไม่ผ่าน QC · ต้องตรวจ Hb และรายการอื่นตามมาตรฐานก่อนสรุป QC ทั้งหมด</small></div>`;
   }
   function stripRbcResults(p){const x={...p,pre_measured_at:null,post_measured_at:null,post_adam_wbc:null,post_adam_measured_at:null};[1,2].forEach(i=>{['hct_pct','wbc','rbc','plt'].forEach(k=>x[`pre${i}_${k}`]=null);['hct_pct','wbc','rbc','plt'].forEach(k=>x[`post${i}_${k}`]=null);});return x;}
   async function saveRbcRecord(silent=false,autoEvidence=false){
@@ -2522,7 +2543,7 @@ function printPlasmaOutlabBatch(batchId){
   async function viewRbcEvidence(id){const e=state.currentRbcEvidence.find(x=>x.id===id);if(!e)return;const {data,error}=await state.sb.storage.from('bloodqc-evidence').createSignedUrl(e.storage_path,120);if(error)showToast(errText(error),'error');else window.open(data.signedUrl,'_blank','noopener');}
   async function deleteRbcEvidence(id){const e=state.currentRbcEvidence.find(x=>x.id===id);if(!e)return;if(!confirm(`ลบหลักฐาน ${e.original_name} ?`))return;try{const {error}=await state.sb.from('rbc_evidence_files').delete().eq('id',id);if(error)throw error;const {error:s}=await state.sb.storage.from('bloodqc-evidence').remove([e.storage_path]);if(s)console.warn('storage cleanup failed',s);state.currentRbcEvidence=state.currentRbcEvidence.filter(x=>x.id!==id);renderRbcEvidenceLists(true,false);showToast('ลบหลักฐานแล้ว');}catch(e2){showToast(errText(e2),'error');}}
   function rbcDetailEvidence(cat){const rows=state.currentRbcEvidence.filter(e=>e.category===cat);return rows.length?`<div class="detail-section-evidence"><div class="detail-evidence-title">หลักฐาน</div>${rows.map(e=>`<div class="evidence-item"><span class="name evidence-name"><strong>${esc(e.original_name)}</strong><small>ผู้แนบหลักฐาน ${esc(profileName(e.uploaded_by))} · ${esc(dateTH(e.created_at))}</small>${e.change_reason?`<small class="evidence-reason">Admin: ${esc(e.change_reason)}</small>`:''}</span><button class="btn small-btn rbc-detail-ev" data-id="${e.id}">ดู</button></div>`).join('')}</div>`:'<div class="measurement-evidence-empty">ยังไม่มีหลักฐาน</div>';}
-  function rbcCalcDetail(r,ps,i){const postWT=rbcEffectiveResidual(r,i),unit=ps.product_class==='ldprc'?'×10⁶ cells/unit':'×10⁹ cells/unit';return `<tr><th>เครื่องที่ ${i}</th><td>${postWT==null?'–':fmt(postWT,3)+' '+unit}</td><td>${rbcEffectiveRemoval(r,i)==null?'–':fmt(rbcEffectiveRemoval(r,i),2)+'%'}</td><td>${rbcRecoveryDisplay(rbcEffectiveRecovery(r,i))}</td><td>${r[`post${i}_hct_pct`]==null?'–':fmt(r[`post${i}_hct_pct`],2)+'%'}</td></tr>`;}
+  function rbcCalcDetail(r,ps,i){const postWT=rbcEffectiveResidual(r,i),unit=ps.product_class==='ldprc'?'×10⁶ cells/unit':'×10⁹ cells/unit';return `<tr><th>เครื่องที่ ${i}</th><td>${postWT==null?'–':fmt(postWT,3)+' '+unit}</td><td>${rbcEffectiveRemoval(r,i)==null?'–':fmt(rbcEffectiveRemoval(r,i),2)+'%'}</td><td>${r[`post${i}_hct_pct`]==null?'–':fmt(r[`post${i}_hct_pct`],2)+'%'}</td></tr>`;}
   async function openRbcDetail(id){
     const r=state.rbcRecords.find(x=>x.id===id);if(!r)return;state.currentRbcRecordId=id;await loadRbcEvidence(id);const ps=rbcProductSetting(r.product_type),direct=ps?.source_input_mode==='direct_volume';
     const sourceMeta=r.source_recorded_by?`<span class="detail-meta-chip"><b>ผู้กรอก${direct?' Volume':'น้ำหนัก'}</b> ${esc(profileName(r.source_recorded_by))}</span><span class="detail-meta-chip"><b>บันทึก</b> ${esc(dateTH(r.source_recorded_at))}</span>`:'';
@@ -2537,7 +2558,7 @@ function printPlasmaOutlabBatch(batchId){
       <section class="detail-section"><div class="detail-section-head"><div><h3>หลังผลิต/กรอง · ${esc(r.product_type)}</h3></div><div class="detail-section-meta">${finalMeta}</div></div><div class="detail-grid"><div><span>น้ำหนักที่ชั่งได้</span><strong>${r.final_gross_weight_g==null?'–':fmt(r.final_gross_weight_g,2)+' g'}</strong></div><div><span>น้ำหนักถุงเปล่า</span><strong>${fmt(r.final_tare_weight_g,2)} g</strong></div><div><span>Density</span><strong>${fmt(r.final_density,3)}</strong></div><div><span>Volume</span><strong>${r.final_volume_ml==null?'–':fmt(r.final_volume_ml,2)+' mL'}</strong></div></div></section>
       <section class="detail-section measurement-section"><div class="detail-section-head"><div><h3>CBC หลังผลิต/กรอง</h3><p>${r.post_measured_at?'วันที่ตรวจ '+dateTH(r.post_measured_at):'ยังไม่มีผล'}</p></div><div class="detail-section-meta">${postMeta}</div></div><div class="table-wrap"><table class="data-table rbc-repeat-table"><thead><tr><th></th><th>Hct</th>${ps?.product_class==='ldprc'?'':'<th>WBC K/µL</th>'}<th>RBC M/µL</th><th>PLT K/µL</th></tr></thead><tbody>${[1,2].map(i=>`<tr><th>เครื่องที่ ${i}</th><td>${fmt(r[`post${i}_hct_pct`],2)}</td>${ps?.product_class==='ldprc'?'':`<td>${fmt(r[`post${i}_wbc`],4)}</td>`}<td>${fmt(r[`post${i}_rbc`],4)}</td><td>${fmt(r[`post${i}_plt`],2)}</td></tr>`).join('')}</tbody></table></div>${rbcDetailEvidence('post_cbc')}</section>
       ${ps?.product_class==='ldprc'?`<section class="detail-section measurement-section"><div class="detail-section-head"><div><h3>ADAM / WBC หลังผลิต/กรอง</h3><p>${r.post_adam_measured_at?'วันที่วัด '+dateTH(r.post_adam_measured_at):'ยังไม่มีผล'}</p></div><div class="detail-section-meta">${r.post_adam_recorded_by?`<span class="detail-meta-chip"><strong>ผู้กรอกผล</strong> ${esc(profileName(r.post_adam_recorded_by))}</span><span class="detail-meta-chip"><strong>บันทึกล่าสุด</strong> ${esc(dateTH(r.post_adam_recorded_at))}</span>`:'<span class="detail-meta-chip muted-chip">ยังไม่มีผล</span>'}</div></div><div class="detail-grid">${dcell('WBC ADAM',r.post_adam_wbc==null?'–':fmt(r.post_adam_wbc,2)+' /µL')}${dcell('Residual WBC',rbcEffectiveResidual(r,1)==null?'–':fmt(rbcEffectiveResidual(r,1),3)+' ×10⁶ cells/unit')}</div>${rbcDetailEvidence('post_adam')}</section>`:''}
-      <section class="detail-section"><div class="detail-section-head"><div><h3>ผลคำนวณ QC</h3><p>${ps?.product_class==='ldprc'?'LDPRC':'LPRC'}</p></div><div>${rbcRecordDecisionBadge(r)}</div></div><div class="table-wrap"><table class="data-table"><thead><tr><th></th><th>Residual WBC</th><th>WBC Removal</th><th>RBC Recovery</th><th>Hct หลัง</th></tr></thead><tbody>${rbcCalcDetail(r,ps,1)}${rbcCalcDetail(r,ps,2)}</tbody></table></div></section>
+      <section class="detail-section"><div class="detail-section-head"><div><h3>ผลคำนวณ QC</h3><p>${ps?.product_class==='ldprc'?'LDPRC':'LPRC'}</p></div><div>${rbcRecordDecisionBadge(r)}</div></div><div class="table-wrap"><table class="data-table"><thead><tr><th></th><th>Residual WBC</th><th>WBC Removal</th><th>Hct หลัง</th></tr></thead><tbody>${rbcCalcDetail(r,ps,1)}${rbcCalcDetail(r,ps,2)}</tbody></table></div></section>
       ${r.notes?`<section class="detail-section"><h3>หมายเหตุ</h3><div class="detail-note">${esc(r.notes)}</div></section>`:''}
       <section class="detail-section"><h3>ลำดับการบันทึก</h3><div class="workflow-grid"><div class="workflow-step done"><span class="workflow-dot"></span><div><strong>สร้างรายการ</strong><small>${esc(profileName(r.created_by))} · ${esc(dateTH(r.created_at))}</small></div></div><div class="workflow-step ${r.submitted_at?'done':''}"><span class="workflow-dot"></span><div><strong>ส่งตรวจทวน</strong><small>${r.submitted_at?esc(profileName(r.submitted_by))+' · '+esc(dateTH(r.submitted_at)):'–'}</small></div></div><div class="workflow-step ${r.locked_at?'done':''}"><span class="workflow-dot"></span><div><strong>แพทย์ทบทวน / LOCK</strong><small>${r.locked_at?esc(profileName(r.locked_by))+' · '+esc(dateTH(r.locked_at)):'–'}</small></div></div></div></section>
       ${reviewerUi()&&r.status==='submitted'?`<section class="detail-section reviewer-action-panel"><h3>แพทย์ทบทวน</h3><textarea id="rbc_review_note" placeholder="หมายเหตุ (จำเป็นเมื่อส่งกลับแก้ไข)"></textarea><div class="actions"><button class="btn danger" id="rbcReturn">ส่งกลับแก้ไข</button><button class="btn good" id="rbcApprove">อนุมัติและ LOCK</button></div></section>`:''}
@@ -2561,7 +2582,7 @@ function printPlasmaOutlabBatch(batchId){
         <section class="guide-card"><div class="guide-no">5</div><div><h2>กรอก CBC ก่อนกระบวนการ</h2><p>กรอกผลเครื่องที่ 1 และเครื่องที่ 2: Hct, WBC, RBC และ PLT พร้อมวัน-เวลาที่ตรวจจริง</p><p><strong>ต้องแนบรูปหรือ PDF ของผล CBC ก่อนจึงบันทึกผลได้</strong></p></div></section>
         <section class="guide-card"><div class="guide-no">6</div><div><h2>ชั่งหลังผลิต/กรอง</h2><div class="guide-rule-row"><span class="guide-rule good">LPRC T&B 36.2 g</span><span class="guide-rule good">LPRC NLR 39.2 g</span><span class="guide-rule good">LDPRC Pre 45.3 g</span><span class="guide-rule good">LDPRC Post 34.3 g</span></div><p>Density: LPRC = 1.06, LDPRC = 1.09 ระบบคำนวณ Volume หลังให้</p></div></section>
         <section class="guide-card"><div class="guide-no">7</div><div><h2>กรอกผลหลังผลิต/กรอง</h2><p><strong>LPRC:</strong> กรอก Hct, WBC, RBC และ PLT จาก CBC เครื่องที่ 1 และเครื่องที่ 2</p><p><strong>LDPRC:</strong> กรอก Hct, RBC และ PLT จาก CBC ส่วน WBC หลังกรองให้วัดจาก <strong>ADAM</strong> และกรอกในช่อง ADAM แยก</p><p>ผล CBC หลังและ ADAM ต้องมีหลักฐานของตัวเองก่อนบันทึก</p></div></section>
-        <section class="guide-card"><div class="guide-no">8</div><div><h2>ดูผล QC</h2><p>ระบบคำนวณ Total WBC, Total RBC, Total PLT, %WBC Removal และ %RBC Recovery จาก RBC Count × Volume เพื่อเฝ้าระวังเท่านั้น ไม่ใช้ค่า RBC Count หรือ RBC Recovery เป็นเกณฑ์ตัดสิน QC</p><div class="guide-callout"><strong>LPRC:</strong> Residual WBC &lt; ${fmt(s.lprc_residual_wbc_max_x10e9,1)} ×10⁹, Hct ${fmt(s.hct_min_pct,0)}–${fmt(s.hct_max_pct,0)}%<br><strong>LDPRC:</strong> Residual WBC &lt; ${fmt(s.ldprc_residual_wbc_max_x10e6,1)} ×10⁶, Hct ${fmt(s.hct_min_pct,0)}–${fmt(s.hct_max_pct,0)}%</div></div></section>
+        <section class="guide-card"><div class="guide-no">8</div><div><h2>ดูผล QC</h2><p>ระบบคำนวณ Residual WBC และ %WBC Removal เพื่อช่วยติดตาม QC โดยไม่ใช้ RBC Count เป็นเกณฑ์ตัดสิน QC</p><div class="guide-callout"><strong>LPRC:</strong> Residual WBC &lt; ${fmt(s.lprc_residual_wbc_max_x10e9,1)} ×10⁹, Hct ${fmt(s.hct_min_pct,0)}–${fmt(s.hct_max_pct,0)}%<br><strong>LDPRC:</strong> Residual WBC &lt; ${fmt(s.ldprc_residual_wbc_max_x10e6,1)} ×10⁶, Hct ${fmt(s.hct_min_pct,0)}–${fmt(s.hct_max_pct,0)}%</div></div></section>
         <section class="guide-card"><div class="guide-no">9</div><div><h2>ใครทำส่วนไหน คนนั้นกรอกได้</h2><p>น้ำหนัก, CBC ก่อน, CBC หลัง และ ADAM สามารถทำต่างวันหรือต่างคนได้ หน้ารายละเอียดจะแสดงว่าใครกรอกส่วนไหนและเมื่อไร</p></div></section>
         <section class="guide-card"><div class="guide-no">10</div><div><h2>ส่งแพทย์ทบทวน</h2><p>เมื่อข้อมูลและหลักฐานครบ กด <strong>ส่งแพทย์ทบทวน</strong> แพทย์จะเลือก <strong>อนุมัติและ LOCK</strong> หรือ <strong>ส่งกลับแก้ไข</strong> พร้อมเหตุผล</p><p>ถ้าต้องแก้หลัง LOCK ให้แจ้ง Admin พร้อมหลักฐานที่ถูกต้อง ระบบจะเก็บประวัติการแก้ไว้ให้ตรวจย้อนหลัง</p></div></section>
       </div>`;

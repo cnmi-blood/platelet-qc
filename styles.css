@@ -576,7 +576,7 @@ input,select,textarea{border-color:#cfd6de;border-radius:11px;min-height:42px}in
 @media(max-width:390px){.page-head>.actions{grid-template-columns:1fr}.page-head>.actions .month-input,.page-head>.actions .btn.primary{grid-column:auto}.cards{grid-template-columns:1fr 1fr}}
 
 
-/* v5.3.27 — safer review submit + iOS-safe multi-evidence upload */
+/* v5.3.28 — safer review submit + iOS-safe multi-evidence upload */
 .evidence-multi-hint{display:block;margin-top:3px;color:#667085;font-size:11px;font-weight:650;line-height:1.35}
 .multi-file-label{font-size:11px;font-weight:700;opacity:.75;margin-left:4px}
 .review-submit-group{display:flex;align-items:center;gap:10px;margin-left:10px;padding-left:16px;border-left:1px solid #d9e1e7}
@@ -591,3 +591,179 @@ input,select,textarea{border-color:#cfd6de;border-radius:11px;min-height:42px}in
   .evidence-multi-hint{font-size:11px}
   .multi-file-label{display:block;margin:1px 0 0}
 }
+
+/* v5.3.28 — UI clarity pass: stronger hierarchy, calmer forms, safer final actions */
+:root{
+  --ui-bg:#f4f6f8;
+  --ui-surface:#ffffff;
+  --ui-soft:#f8fafb;
+  --ui-line:#e1e6ea;
+  --ui-text:#1f2937;
+  --ui-muted:#667085;
+  --ui-shadow:0 2px 10px rgba(16,24,40,.045);
+}
+body{background:var(--ui-bg);color:var(--ui-text)}
+.content-shell{background:var(--ui-bg)}
+.container{max-width:1380px}
+
+/* Page hierarchy */
+.page-head{padding:2px 2px 4px;margin-bottom:20px;align-items:center}
+.page-head h1{font-size:26px;line-height:1.25;letter-spacing:-.01em}
+.page-head p{margin-top:5px;line-height:1.5}
+.page-head>.actions{align-items:center}
+.breadcrumb{margin-bottom:10px}
+
+/* Calm surfaces: fewer competing boxes */
+.panel,.card,.module-card,.guide-card,.rbc-target-card,.mobile-data-card{
+  border-color:var(--ui-line);
+  box-shadow:var(--ui-shadow);
+}
+.panel{padding:20px;border-radius:18px;margin-bottom:18px}
+.panel>h2:first-child{font-size:18px;line-height:1.35;margin-bottom:16px}
+.section-title-row{padding-bottom:12px;border-bottom:1px solid #edf0f2;margin-bottom:16px}
+.section-title-row h2{font-size:18px;line-height:1.35}
+.section-note{line-height:1.55;margin-top:-6px}
+
+/* Inputs should feel like one clear work area */
+.form-grid{gap:16px 14px}
+.field{gap:7px}
+.field label{font-size:13px;color:#344054}
+input,select,textarea{min-height:44px;border-color:#cfd6dc;border-radius:11px;padding:10px 12px;background:#fff}
+textarea{min-height:96px;line-height:1.55}
+input:hover,select:hover,textarea:hover{border-color:#aeb8c2}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(139,30,45,.09)}
+.field .hint{line-height:1.45}
+
+/* Buttons: stronger visual priority */
+.btn{min-height:42px;border-radius:11px;padding:9px 14px;box-shadow:none}
+.btn:hover{transform:none}
+.btn.primary{box-shadow:0 2px 7px rgba(139,30,45,.13)}
+.clear-form-btn{background:#fff;color:#667085;border-style:dashed}
+.clear-form-btn:hover{background:#fff8f9}
+
+/* Dashboard metrics easier to scan */
+.cards{gap:14px}
+.card.metric{padding:17px 18px;border-radius:16px}
+.metric .label{font-size:12px;letter-spacing:.01em}
+.metric .value{font-size:29px;line-height:1.05;margin-top:8px}
+.metric .sub{line-height:1.4;margin-top:6px}
+
+/* Sidebar: quieter, clearer grouping */
+.sidebar{background:#fafbfc}
+.sidebar .tabs button{border:1px solid transparent}
+.sidebar .tabs button:hover{background:#f2f4f7}
+.sidebar .tabs button.active{background:#fff;border-color:#ead8dc;box-shadow:0 1px 4px rgba(16,24,40,.04),inset 3px 0 0 var(--primary)}
+.sidebar .tabs .nav-group-head{margin-top:3px}
+.sidebar .tabs .nav-submenu{margin:2px 0 6px 10px;padding-left:8px;border-left:1px solid #e4e7ec}
+.sidebar .tabs .nav-submenu button{border-radius:9px}
+
+/* Sticky action area: routine save and irreversible/final review are separate zones */
+.sticky-actions{
+  border-color:#d8dee4;
+  background:rgba(255,255,255,.985);
+  box-shadow:0 12px 32px rgba(16,24,40,.10);
+  padding:11px 12px;
+  gap:12px;
+}
+.sticky-actions .left,.sticky-actions .right{align-items:center}
+.review-submit-group{
+  margin-left:18px;
+  padding:8px 0 8px 20px;
+  border-left:2px solid #cbd5dc;
+  gap:12px;
+}
+.review-submit-group>small{max-width:205px;color:#596675;font-size:11.5px;line-height:1.45}
+.btn.review-submit-btn{
+  min-height:44px;
+  background:#0f766e;
+  border-color:#0f766e;
+  padding-inline:18px;
+  box-shadow:0 2px 8px rgba(15,118,110,.15)
+}
+
+/* Evidence: treat uploads as supporting content, not another primary card */
+.measurement-entry-panel .measurement-evidence{background:#fafbfc;border:1px solid #e7ebee;border-radius:12px;padding:12px 13px;margin-top:14px}
+.measurement-entry-panel .measurement-evidence{border-top:1px solid #e7ebee}
+.measurement-evidence-head{margin-bottom:8px}
+.evidence-item{background:#fff;border:1px solid #edf0f2}
+.evidence-box{background:#fafbfc;border-color:#cfd6dc}
+
+/* Tables and records */
+.table-wrap{border-color:#dfe4e8;background:#fff}
+.pool-table th,.data-table th{background:#f7f9fa;color:#596675}
+.pool-table td,.data-table td{padding-top:11px;padding-bottom:11px}
+.data-table tr:hover td{background:#fafbfc}
+
+/* Reduce noise from helper pills */
+.section-badge,.field-badge,.detail-meta-chip{box-shadow:none}
+.rule-chip{font-weight:750}
+
+/* Mobile: one task at a time */
+@media(max-width:760px){
+  body{font-size:14px}
+  .content-shell .container,.container{padding:14px 10px 86px}
+  .page-head{display:block;margin-bottom:16px;padding:0 2px}
+  .page-head h1{font-size:22px}
+  .page-head p{font-size:12.5px}
+  .page-head>.actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px;width:100%}
+  .page-head>.actions .btn{width:100%;min-width:0}
+  .page-head>.actions .btn:first-child:last-child{grid-column:1/-1}
+  .panel{padding:14px 12px;border-radius:15px;margin-bottom:12px}
+  .panel>h2:first-child{font-size:17px;margin-bottom:13px}
+  .section-title-row{padding-bottom:10px;margin-bottom:13px;gap:6px}
+  .section-title-row h2{font-size:17px}
+  .form-grid{gap:13px}
+  input,select,textarea{min-height:47px;font-size:16px} /* avoids iOS zoom and improves tap target */
+  textarea{min-height:100px}
+  .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .card.metric{padding:12px;border-radius:13px}
+  .metric .value{font-size:24px}
+  .metric .sub{font-size:11px}
+  .sticky-actions{position:sticky;bottom:8px;border-radius:14px;padding:8px;gap:7px}
+  .sticky-actions .left{order:2}
+  .sticky-actions .right{order:1;grid-template-columns:1fr!important}
+  .sticky-actions .right.new-record-actions{grid-template-columns:1fr 1fr!important}
+  .sticky-actions .right.new-record-actions .review-submit-group{grid-column:1/-1}
+  .sticky-actions .left .btn{min-height:44px;background:#f8fafb;color:#667085}
+  .sticky-actions .right .btn{min-height:50px}
+  .review-submit-group{
+    grid-column:1/-1;
+    display:grid;
+    grid-template-columns:1fr;
+    width:100%;
+    margin:10px 0 0;
+    padding:12px 0 0;
+    border-left:0;
+    border-top:2px solid #d6dde2;
+    gap:7px;
+  }
+  .review-submit-group>small{text-align:left;max-width:none;padding:0 2px;font-size:11.5px}
+  .review-submit-group .btn{min-height:54px}
+  .measurement-entry-panel .measurement-evidence{padding:10px;margin-top:11px}
+  .measurement-evidence .evidence-pick-actions{grid-template-columns:1fr 1fr}
+  .mobile-data-card{padding:12px;border-radius:13px}
+  .mobile-data-card-head .link-btn,.mobile-data-card-head strong{font-size:18px}
+  .mobile-data-pair{grid-template-columns:92px 1fr;gap:7px}
+  .mobile-data-label{font-size:11px}
+  .mobile-data-value{font-size:13px}
+  .sidebar .tabs button{font-size:16px;padding:13px 12px}
+  .sidebar .tabs .nav-group-head{font-size:17px}
+  .sidebar .tabs .nav-submenu{margin-left:8px}
+}
+
+@media(max-width:430px){
+  .page-head>.actions{grid-template-columns:1fr}
+  .cards{grid-template-columns:1fr 1fr}
+  .sticky-actions .right.new-record-actions{grid-template-columns:1fr!important}
+  .measurement-evidence .evidence-pick-actions{grid-template-columns:1fr}
+}
+
+/* v5.3.36 — Platelet QC pending-measurement reminders */
+.platelet-reminder-panel{margin-top:16px}
+.reminder-list{display:grid;gap:8px;margin-top:12px}
+.reminder-row{width:100%;display:grid;grid-template-columns:minmax(160px,220px) 1fr;gap:12px;align-items:center;text-align:left;border:1px solid var(--line,#dfe5ec);background:#fff;border-radius:12px;padding:11px 12px;cursor:pointer;color:inherit}
+.reminder-row:hover{background:#f8fafc}
+.reminder-product{display:flex;flex-direction:column;gap:2px}.reminder-product small{color:var(--muted,#64748b)}
+.reminder-tags{display:flex;flex-wrap:wrap;gap:6px}.reminder-tag{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:700;background:#f1f5f9;color:#475569}
+.reminder-tag.due{background:#fff3cd;color:#8a5a00}.reminder-tag.overdue{background:#fde8e8;color:#a11d2f}.reminder-tag.missing{background:#eef2ff;color:#3748a5}.reminder-tag.upcoming{background:#eaf7ff;color:#17658a}
+@media(max-width:720px){.reminder-row{grid-template-columns:1fr}.reminder-tags{margin-top:3px}}
