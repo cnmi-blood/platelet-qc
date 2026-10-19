@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.49 - centered popup system across the app */
+/* CNMI Blood Component QC v5.3.50 - compact direct-mL entry UI */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -89,10 +89,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.49 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.50 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.49 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.50 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -1453,7 +1453,7 @@
         ${qcVolumeChoice('plt_volume_unit','plt_volume_input_label','gross_weight_g',r,'volume_input_unit','volume_input_value','gross_weight_g','volume_ml',editable)}
         <div class="field"><label>น้ำหนักถุงเปล่า (g) <span class="field-badge">อัตโนมัติ</span></label><input id="bag_tare_weight_g" readonly value="${esc(r?.bag_tare_weight_g??'')}"></div>
         <div class="field"><label>Density <span class="field-badge">อัตโนมัติ</span></label><input id="density" readonly value="${esc(r?.density??'')}"></div>
-        <div class="field"><label>Volume (mL) <span class="field-badge">คำนวณอัตโนมัติ</span></label><input id="volume_ml" readonly value="${esc(r?.volume_ml??'')}"></div>
+        <div class="field"><label>Volume (mL) <span class="field-badge">จากน้ำหนัก</span></label><input id="volume_ml" readonly value="${esc(r?.volume_ml??'')}"></div>
         <div class="field"><label>วัน-เวลาหมดอายุ <span class="field-badge">อัตโนมัติ</span></label><input id="expiry_preview" readonly value="${esc(inputFromISO(r?.expiry_at))}"></div>
         <div class="field span2"><label>ผู้บันทึกครั้งแรก</label><input readonly value="${esc(r?dateTH(r.created_at)+' · '+profileName(r.created_by):(state.profile.display_name||state.profile.email))}"></div>
       </div></div>
@@ -1487,7 +1487,7 @@
     if(!r&&$('#collection_at')){$('#collection_at').addEventListener('change',()=>maybeAutoSelectPlateletQc());$('#collection_at').addEventListener('blur',()=>maybeAutoSelectPlateletQc());}
   }
 
-  // v5.3.49: g = gross bag+product mass; mL = net product volume already converted by device.
+  // v5.3.50: measured net mL is used directly for QC calculations. Only the legacy DB gross column uses a mathematically equivalent value.
   // Preserve input_unit/input_value in Supabase for audit; legacy calculation triggers still consume gross_weight_g.
   function qcVolumeUnit(unit){return unit==='mL'?'mL':'g';}
   function qcVolumeOriginal(record,unitColumn,valueColumn,grossColumn,volumeColumn){
@@ -1507,6 +1507,24 @@
     }
     return {unit,value,gross:value,volume:(tare!==null&&density!==null&&density>0&&value>=tare)?(value-tare)/density:null};
   }
+  // Staff-facing form: show weight conversion fields only when the instrument supplies grams.
+  // The calculation is preserved internally for backward-compatible persistence and QC results.
+  function syncQcVolumeFormFields(){
+    const pairs={
+      plt_volume_unit:['bag_tare_weight_g','density','volume_ml'],
+      plasma_volume_unit:['plasma_tare','plasma_density','plasma_volume'],
+      rbc_source_unit:['rbc_source_tare','rbc_source_density','rbc_source_volume_preview'],
+      rbc_final_unit:['rbcFinalTare','rbcFinalDensity','rbcFinalVolume']
+    };
+    Object.entries(pairs).forEach(([unitId,fieldIds])=>{
+      const select=$('#'+unitId);if(!select)return;
+      const direct=qcVolumeUnit(select.value)==='mL';
+      fieldIds.forEach(id=>{
+        const field=$('#'+id)?.closest('.field');
+        if(field)field.classList.toggle('hidden',direct);
+      });
+    });
+  }
   function qcVolumeSwitch(unitId,inputId,labelId,prevKey,tare,density,preview){
     const unit=$('#'+unitId),input=$('#'+inputId);if(!unit||!input)return;
     const last=qcVolumeUnit(unit.dataset[prevKey]||'g'),next=qcVolumeUnit(unit.value);
@@ -1514,15 +1532,15 @@
     // Clear entry on switching unit; staff re-enter the reading shown by the instrument.
     if(last!==next)input.value='';
     unit.dataset[prevKey]=next;
-    const label=$('#'+labelId);if(label)label.textContent=next==='mL'?'Volume สุทธิจากเครื่อง (mL)':'น้ำหนักรวมถุงที่ชั่งได้ (g)';
-    input.placeholder=next==='mL'?'กรอก Volume ที่เครื่องแสดง':'กรอกน้ำหนักรวมถุง';
+    const label=$('#'+labelId);if(label)label.textContent=next==='mL'?'ปริมาตรสุทธิ (mL)':'น้ำหนักรวมถุง (g)';
+    input.placeholder=next==='mL'?'กรอกปริมาตร (mL)':'กรอกน้ำหนัก (g)';
     if(last!==next&&typeof input.focus==='function')input.focus();
     if(typeof preview==='function')preview();
   }
   function qcVolumeChoice(unitId,labelId,entryId,record,unitColumn,valueColumn,grossColumn,volumeColumn,editable){
     const original=qcVolumeOriginal(record,unitColumn,valueColumn,grossColumn,volumeColumn);
     const unit=original.unit;
-    return `<div class="field qc-unit-picker"><label>หน่วยที่เครื่องแสดง</label><select id="${unitId}" data-volume-unit="${unit}" data-previous-unit="${unit}" ${editable?'':'disabled'}><option value="g" ${unit==='g'?'selected':''}>g · กรัม (รวมถุง)</option><option value="mL" ${unit==='mL'?'selected':''}>mL · ปริมาตรสุทธิ</option></select></div><div class="field"><label id="${labelId}">${unit==='mL'?'Volume สุทธิจากเครื่อง (mL)':'น้ำหนักรวมถุงที่ชั่งได้ (g)'}</label><input id="${entryId}" type="number" min="0" step="0.01" value="${esc(original.value??'')}" ${editable?'':'disabled'}><small class="muted">mL ต้องเป็นปริมาตรสุทธิของผลิตภัณฑ์ (ไม่ใช่น้ำหนักรวมถุง)</small></div>`;
+    return `<div class="field qc-unit-picker"><label>หน่วยที่เครื่องแสดง</label><select id="${unitId}" data-volume-unit="${unit}" data-previous-unit="${unit}" ${editable?'':'disabled'}><option value="g" ${unit==='g'?'selected':''}>g · กรัม</option><option value="mL" ${unit==='mL'?'selected':''}>mL · ปริมาตร</option></select></div><div class="field qc-unit-entry"><label id="${labelId}">${unit==='mL'?'ปริมาตรสุทธิ (mL)':'น้ำหนักรวมถุง (g)'}</label><input id="${entryId}" type="number" min="0" step="0.01" value="${esc(original.value??'')}" ${editable?'':'disabled'}></div>`;
   }
   function field(label,id,value,type='text',readonly=false,step='',required=''){ const disabled=readonly?'readonly':''; return `<div class="field"><label class="${required}">${label}</label><input id="${id}" type="${type}" value="${esc(value??'')}" ${step?`step="${step}"`:''} ${type==='number'?'min="0"':''} ${disabled}></div>`; }
   function setEditable(editable){ if(editable) return; $$('#recordForm input,#recordForm select,#recordForm textarea').forEach(el=>{if(!el.readOnly) el.disabled=true;}); }
@@ -1568,6 +1586,7 @@
     return {gross,tare,density,volume,p1,p2,used,y,eq,rw,diff,ph};
   }
   function updateCalcPreview(){
+    syncQcVolumeFormFields();
     const c=calcFrontend(); if($('#volume_ml')) $('#volume_ml').value=c.volume===null?'':Number(c.volume).toFixed(2); $('#cPlt').textContent=fmt(c.used,2);$('#cYield').textContent=fmt(c.y,3);$('#cEq').textContent=fmt(c.eq,2);$('#cWbc').textContent=fmt(c.rw,3); const col=$('#collection_at')?.value;if(col){const d=new Date(col+':00+07:00');d.setDate(d.getDate()+Number(state.settings.expiry_days));$('#expiry_preview').value=inputFromISO(d.toISOString());}
     const isQc=($('input[name="record_purpose"]:checked')?.value||'prepare')==='qc';
     const w=[]; if($('#plt_volume_unit')?.value==='g'&&c.gross!==null&&c.tare!==null&&c.gross<c.tare)w.push('น้ำหนักที่ชั่งได้น้อยกว่าน้ำหนักถุงเปล่า กรุณาตรวจสอบ'); if(num($('#gross_weight_g')?.value)!==null&&(c.tare===null||c.density===null))w.push('ยังไม่มีค่าน้ำหนักถุง/Density สำหรับผลิตภัณฑ์นี้');
@@ -2142,6 +2161,7 @@ async function adminDeletePlasmaBatch(batchId,reason){
     const cfg=plasmaProductSetting($('#plasma_product_type')?.value||''); const tare=cfg?Number(cfg.tare_weight_g):null,density=cfg?Number(cfg.density):null,entry=qcVolumeInput($('#plasma_volume_unit'),$('#plasma_gross_weight_g'),tare,density),volume=entry.volume; const pct=num($('#plasma_factor_viii_percent')?.value); const iuMl=pct==null?null:pct/100; const iuBag=pct!=null&&volume!=null?pct*volume/100:null; return {tare,density,volume,pct,iuMl,iuBag};
   }
   function updatePlasmaPreview(){
+    syncQcVolumeFormFields();
     const c=plasmaCalcPreview();if($('#plasma_tare'))$('#plasma_tare').value=c.tare==null?'':c.tare.toFixed(2);if($('#plasma_density'))$('#plasma_density').value=c.density==null?'':c.density.toFixed(3);if($('#plasma_volume'))$('#plasma_volume').value=c.volume==null?'':c.volume.toFixed(2);if($('#plasma_iu_ml'))$('#plasma_iu_ml').textContent=fmt(c.iuMl,3);if($('#plasma_iu_bag'))$('#plasma_iu_bag').textContent=fmt(c.iuBag,2);
     const m=$('#plasma_manufactured_on')?.value;if(m&&$('#plasma_expiry_on')){const d=new Date(`${m}T12:00:00+07:00`);d.setDate(d.getDate()+Number(state.plasmaSettings.expiry_days||365));$('#plasma_expiry_on').value=inputFromISO(d.toISOString()).slice(0,10);}
     if($('#plasma_qc_preview')){let text='ข้อมูลยังไม่ครบ',cls='incomplete';if(c.volume!=null&&c.iuMl!=null){if(c.volume>=Number(state.plasmaSettings.volume_min_ml)&&c.iuMl>=Number(state.plasmaSettings.factor_viii_min_iu_ml)){text='ผ่านเกณฑ์ QC';cls='pass';}else{text='ต้องตรวจสอบ';cls='review';}}$('#plasma_qc_preview').innerHTML=`<span class="badge ${cls}">${text}</span>`;}
@@ -2345,7 +2365,7 @@ function printPlasmaOutlabBatch(batchId){
   }
 
   function renderPlasmaSettings(){
-    if(!adminUi()){location.hash=ROUTES.plasma.dashboard;return;}const s=state.plasmaSettings;$('#view-module').innerHTML=`<div class="page-head"><div><h1>ตั้งค่า Plasma QC</h1><p class="muted">FFP · Factor VIII</p></div></div><div class="panel"><h2>เกณฑ์ QC FFP</h2><div class="form-grid">${plasmaField('Volume ขั้นต่ำ (mL)','ps_volume_min',s.volume_min_ml,'number',false,false,'0.01')}${plasmaField('Factor VIII ขั้นต่ำ (IU/mL)','ps_factor_min',s.factor_viii_min_iu_ml,'number',false,false,'0.01')}${plasmaField('อายุผลิตภัณฑ์ (วัน)','ps_expiry_days',s.expiry_days,'number')}<div class="field"><label>&nbsp;</label><label class="inline-check"><input id="ps_require_ev" type="checkbox" checked disabled> บังคับหลักฐาน Factor VIII</label></div></div></div><div class="panel"><h2>Outlab</h2><div class="form-grid">${plasmaField('รหัสบริการ','ps_service_code',s.outlab_service_code)}${plasmaField('ชื่อการทดสอบ','ps_test_name',s.outlab_test_name)}${plasmaField('รหัสแบบฟอร์ม','ps_form_code',s.outlab_form_code)}${plasmaField('เวลานำส่งเริ่มต้น','ps_send_time',plasmaTimeInput(s.default_send_time),'time')}<div class="field span2"><label>ข้อความวันบังคับใช้</label><input id="ps_form_effective" value="${esc(s.outlab_form_effective_text||'วันบังคับใช้ 15 มกราคม 2565')}"></div><div class="field span2"><label>E-mail รับผล</label><input id="ps_result_email" type="email" value="${esc(s.result_email||'transfusionbb_cnmi@mahidol.ac.th')}"></div><div class="field span4"><label>ปลายทาง</label><input id="ps_destination" value="${esc(s.outlab_destination)}"></div></div></div><div class="panel"><h2>น้ำหนักถุง / Density</h2><div class="table-wrap"><table class="data-table plasma-product-settings"><thead><tr><th>ชนิด FFP</th><th>น้ำหนักถุงเปล่า (g)</th><th>Density</th><th></th></tr></thead><tbody>${state.plasmaProductSettings.map(x=>`<tr data-type="${esc(x.product_type)}"><td><strong>${esc(x.product_type)}</strong></td><td><input class="pptare" type="number" step="0.01" value="${esc(x.tare_weight_g)}"></td><td><input class="ppdensity" type="number" step="0.001" value="${esc(x.density)}"></td><td><button class="btn small-btn ppsave">บันทึก</button></td></tr>`).join('')}</tbody></table></div></div><div class="actions"><button class="btn primary" id="savePlasmaSettings">บันทึกเกณฑ์/Outlab</button></div>`;$('#savePlasmaSettings').onclick=savePlasmaSettings;$$('.ppsave').forEach(b=>b.onclick=()=>savePlasmaProductSetting(b.closest('tr').dataset.type));
+    if(!adminUi()){location.hash=ROUTES.plasma.dashboard;return;}const s=state.plasmaSettings;$('#view-module').innerHTML=`<div class="page-head"><div><h1>ตั้งค่า Plasma QC</h1><p class="muted">FFP · Factor VIII</p></div></div><div class="panel"><h2>เกณฑ์ QC FFP</h2><div class="form-grid">${plasmaField('Volume ขั้นต่ำ (mL)','ps_volume_min',s.volume_min_ml,'number',false,false,'0.01')}${plasmaField('Factor VIII ขั้นต่ำ (IU/mL)','ps_factor_min',s.factor_viii_min_iu_ml,'number',false,false,'0.01')}${plasmaField('อายุผลิตภัณฑ์ (วัน)','ps_expiry_days',s.expiry_days,'number')}<div class="field"><label>&nbsp;</label><label class="inline-check"><input id="ps_require_ev" type="checkbox" checked disabled> บังคับหลักฐาน Factor VIII</label></div></div></div><div class="panel"><h2>Outlab</h2><div class="form-grid">${plasmaField('รหัสบริการ','ps_service_code',s.outlab_service_code)}${plasmaField('ชื่อการทดสอบ','ps_test_name',s.outlab_test_name)}${plasmaField('รหัสแบบฟอร์ม','ps_form_code',s.outlab_form_code)}${plasmaField('เวลานำส่งเริ่มต้น','ps_send_time',plasmaTimeInput(s.default_send_time),'time')}<div class="field span2"><label>ข้อความวันบังคับใช้</label><input id="ps_form_effective" value="${esc(s.outlab_form_effective_text||'วันบังคับใช้ 15 มกราคม 2565')}"></div><div class="field span2"><label>E-mail รับผล</label><input id="ps_result_email" type="email" value="${esc(s.result_email||'transfusionbb_cnmi@mahidol.ac.th')}"></div><div class="field span4"><label>ปลายทาง</label><input id="ps_destination" value="${esc(s.outlab_destination)}"></div></div></div><div class="panel"><h2>น้ำหนักถุง / Density</h2><p class="section-note">สำหรับตั้งค่าเมื่อกรอกเป็น g เท่านั้น · หากเครื่องแสดงปริมาตรสุทธิเป็น mL ให้ใช้ค่าที่อ่านได้โดยตรง ไม่หักน้ำหนักถุงหรือแปลงซ้ำ</p><div class="table-wrap"><table class="data-table plasma-product-settings"><thead><tr><th>ชนิด FFP</th><th>น้ำหนักถุงเปล่า (g)</th><th>Density</th><th></th></tr></thead><tbody>${state.plasmaProductSettings.map(x=>`<tr data-type="${esc(x.product_type)}"><td><strong>${esc(x.product_type)}</strong></td><td><input class="pptare" type="number" step="0.01" value="${esc(x.tare_weight_g)}"></td><td><input class="ppdensity" type="number" step="0.001" value="${esc(x.density)}"></td><td><button class="btn small-btn ppsave">บันทึก</button></td></tr>`).join('')}</tbody></table></div></div><div class="actions"><button class="btn primary" id="savePlasmaSettings">บันทึกเกณฑ์/Outlab</button></div>`;$('#savePlasmaSettings').onclick=savePlasmaSettings;$$('.ppsave').forEach(b=>b.onclick=()=>savePlasmaProductSetting(b.closest('tr').dataset.type));
   }
   async function savePlasmaSettings(){try{const payload={volume_min_ml:num($('#ps_volume_min').value),factor_viii_min_iu_ml:num($('#ps_factor_min').value),expiry_days:Number($('#ps_expiry_days').value),require_factor_evidence:true,outlab_service_code:$('#ps_service_code').value.trim(),outlab_test_name:$('#ps_test_name').value.trim(),outlab_form_code:$('#ps_form_code').value.trim(),outlab_form_effective_text:$('#ps_form_effective').value.trim(),result_email:$('#ps_result_email').value.trim(),outlab_destination:$('#ps_destination').value.trim(),default_send_time:$('#ps_send_time').value};const {error}=await state.sb.from('plasma_qc_settings').update(payload).eq('id',1);if(error)throw error;await loadPlasmaModuleData();showToast('บันทึก Plasma settings แล้ว','good');renderPlasmaSettings();}catch(e){showToast(errText(e),'error');}}
   async function savePlasmaProductSetting(type){try{const row=$$(`.plasma-product-settings tr`).find(x=>x.dataset.type===type),tare=num($('.pptare',row).value),density=num($('.ppdensity',row).value);if(tare==null||tare<0||density==null||density<=0)throw new Error('ตรวจน้ำหนักถุงและ Density');const {error}=await state.sb.from('plasma_product_settings').update({tare_weight_g:tare,density}).eq('product_type',type);if(error)throw error;await loadPlasmaModuleData();showToast(`บันทึก ${type} แล้ว`,'good');renderPlasmaSettings();}catch(e){showToast(errText(e),'error');}}
@@ -2552,6 +2572,7 @@ function printPlasmaOutlabBatch(batchId){
     updateRbcPreview();
   }
   function updateRbcPreview(){
+    syncQcVolumeFormFields();
     const p=rbcPreviewCalc();if(!p)return;
     if($('#rbc_source_volume_preview'))$('#rbc_source_volume_preview').value=p.sourceVol==null?'':p.sourceVol.toFixed(2);
     if($('#rbcFinalVolume'))$('#rbcFinalVolume').value=p.finalVol==null?'':p.finalVol.toFixed(2);
@@ -2794,7 +2815,7 @@ function printPlasmaOutlabBatch(batchId){
   function renderRbcSettings(){
     if(!adminUi()){location.hash=ROUTES.rbc.dashboard;return;}const s=state.rbcSettings;
     $('#view-module').innerHTML=`<div class="page-head"><div><h1>ตั้งค่า RBC QC</h1><p class="muted">LPRC / LDPRC</p></div></div><div class="panel"><h2>เกณฑ์ QC</h2><div class="form-grid">${rbcField('LPRC Residual WBC สูงสุด (×10⁹)','rs_lprc_wbc',s.lprc_residual_wbc_max_x10e9,'number',false,false,'0.1')}${rbcField('LDPRC Residual WBC สูงสุด (×10⁶)','rs_ldprc_wbc',s.ldprc_residual_wbc_max_x10e6,'number',false,false,'0.1')}${rbcField('Hct ขั้นต่ำ (%)','rs_hct_min',s.hct_min_pct,'number',false,false,'0.1')}${rbcField('Hct สูงสุด (%)','rs_hct_max',s.hct_max_pct,'number',false,false,'0.1')}<div class="field span2"><label>&nbsp;</label><label class="inline-check"><input id="rs_two" type="checkbox" ${s.require_two_measurements?'checked':''}> ต้องมีผลครบ 2 ครั้ง</label><label class="inline-check"><input id="rs_pre_ev" type="checkbox" checked disabled> บังคับหลักฐาน CBC ก่อน</label><label class="inline-check"><input id="rs_post_ev" type="checkbox" checked disabled> บังคับหลักฐาน CBC หลัง</label><label class="inline-check"><input id="rs_post_adam_ev" type="checkbox" checked disabled> บังคับหลักฐาน ADAM หลัง (LDPRC)</label></div></div><div class="actions"><button class="btn primary" id="saveRbcSettings">บันทึกเกณฑ์</button></div></div>
-      <div class="panel"><h2>น้ำหนักถุง / Density</h2><div class="table-wrap"><table class="data-table rbc-product-settings"><thead><tr><th>ผลิตภัณฑ์</th><th>ก่อนกระบวนการ</th><th>Tare ก่อน</th><th>Density ก่อน</th><th>Tare หลัง</th><th>Density หลัง</th><th></th></tr></thead><tbody>${state.rbcProductSettings.map(p=>`<tr data-type="${esc(p.product_type)}"><td><strong>${esc(p.product_type)}</strong><small>${esc(rbcProductClassTH(p.product_class))}</small></td><td>${esc(p.source_label)}${p.source_input_mode==='direct_volume'?'<br><span class="badge">Volume จาก LIS</span>':''}</td><td>${p.source_input_mode==='direct_volume'?'–':`<input class="rps-source-tare" type="number" step="0.01" value="${esc(p.source_tare_weight_g)}">`}</td><td>${p.source_input_mode==='direct_volume'?'–':`<input class="rps-source-density" type="number" step="0.001" value="${esc(p.source_density)}">`}</td><td><input class="rps-final-tare" type="number" step="0.01" value="${esc(p.final_tare_weight_g)}"></td><td><input class="rps-final-density" type="number" step="0.001" value="${esc(p.final_density)}"></td><td><button class="btn small-btn rps-save">บันทึก</button></td></tr>`).join('')}</tbody></table></div></div>`;
+      <div class="panel"><h2>น้ำหนักถุง / Density</h2><p class="section-note">ตั้งค่าแปลงน้ำหนักรวมถุง (g) เป็นปริมาตร · การกรอกปริมาตรสุทธิ (mL) ใช้ค่าที่เครื่องแสดงโดยตรง</p><div class="table-wrap"><table class="data-table rbc-product-settings"><thead><tr><th>ผลิตภัณฑ์</th><th>ก่อนกระบวนการ</th><th>Tare ก่อน</th><th>Density ก่อน</th><th>Tare หลัง</th><th>Density หลัง</th><th></th></tr></thead><tbody>${state.rbcProductSettings.map(p=>`<tr data-type="${esc(p.product_type)}"><td><strong>${esc(p.product_type)}</strong><small>${esc(rbcProductClassTH(p.product_class))}</small></td><td>${esc(p.source_label)}${p.source_input_mode==='direct_volume'?'<br><span class="badge">Volume จาก LIS</span>':''}</td><td>${p.source_input_mode==='direct_volume'?'–':`<input class="rps-source-tare" type="number" step="0.01" value="${esc(p.source_tare_weight_g)}">`}</td><td>${p.source_input_mode==='direct_volume'?'–':`<input class="rps-source-density" type="number" step="0.001" value="${esc(p.source_density)}">`}</td><td><input class="rps-final-tare" type="number" step="0.01" value="${esc(p.final_tare_weight_g)}"></td><td><input class="rps-final-density" type="number" step="0.001" value="${esc(p.final_density)}"></td><td><button class="btn small-btn rps-save">บันทึก</button></td></tr>`).join('')}</tbody></table></div></div>`;
     $('#saveRbcSettings').onclick=saveRbcSettings;$$('.rps-save').forEach(b=>b.onclick=()=>saveRbcProductSetting(b.closest('tr')));
   }
   async function saveRbcSettings(){

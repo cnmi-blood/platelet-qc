@@ -878,3 +878,9 @@ dialog.dialog .dialog-head{position:sticky;top:0;z-index:3}
 /* Non-blocking status popups also appear at viewport center. */
 .toast{position:fixed!important;top:50%!important;left:50%!important;right:auto!important;bottom:auto!important;width:max-content;max-width:min(440px,calc(100vw - 28px))!important;text-align:center;transform:translate(-50%,-45%)!important;z-index:2147483600!important;line-height:1.55}
 .toast.show{transform:translate(-50%,-50%)!important}
+
+/* v5.3.50: keep g/mL choice and measurement input the same height as other controls.
+   No explanatory line is rendered under the input: clinical instructions live in guides/admin settings. */
+.field.qc-unit-picker,.field.qc-unit-entry{align-content:start;grid-template-rows:auto 48px;min-width:0}
+.field.qc-unit-picker select,.field.qc-unit-entry input{height:48px!important;min-height:48px!important;max-height:48px!important;box-sizing:border-box;border-width:1px}
+.field.qc-unit-picker select:focus,.field.qc-unit-entry input:focus{border-width:1px;box-shadow:0 0 0 2px rgba(143,35,50,.09)}
