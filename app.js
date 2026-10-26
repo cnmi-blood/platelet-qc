@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.51 - platelet detail restore + every-bag pH entry */
+/* CNMI Blood Component QC v5.3.52 - assign Plasma/RBC monthly QC popup rows to actual production weeks */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -89,10 +89,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.51 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.52 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.51 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.52 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -459,6 +459,34 @@
     const slot=Math.floor((day-firstMonday)/7)+1;return Math.min(4,Math.max(1,slot));
   }
   function plateletWeekLabel(ym,slot){const [start,end]=plateletWeekRange(ym,slot);return start?`สัปดาห์ ${slot} · ${String(start).padStart(2,'0')}–${String(end).padStart(2,'0')}/${String(ym).slice(5,7)}`:`สัปดาห์ ${slot}`;}
+  // v5.3.52: month quotas (four bags) and actual QC weeks are different dimensions.
+  // Never equate the third bag entered with the third week of the month.
+  function qcRecordsByProductionWeek(ym,rows){
+    const weeks=[1,2,3,4].map(slot=>({slot,records:[]})),outside=[];
+    for(const r of rows){
+      const date=String(r?.manufactured_on||'').slice(0,10);
+      const slot=monthKeyFromDateString(date)===ym?plateletWeekSlot(date):null;
+      if(slot>=1&&slot<=4)weeks[slot-1].records.push(r);
+      else outside.push(r); // The first days before the first Monday are not a valid week slot.
+    }
+    return {weeks,outside};
+  }
+  function monthlyQcWeeklyPopupHtml(ym,productType,rows,module){
+    const {weeks,outside}=qcRecordsByProductionWeek(ym,rows);
+    const cssClass=module==='plasma'?'plasma-summary-open':'rbc-summary-open';
+    const describe=module==='plasma'
+      ? r=>plasmaOutlabState(r)
+      : r=>rbcRecordAnyMachineFail(r)?'ต้องตรวจสอบ QC · มีเครื่องไม่ผ่าน':rbcEffectiveQcStatus(r)==='pass'?'ผ่านเกณฑ์ที่มีข้อมูล':rbcEffectiveQcStatus(r)==='review'?'ต้องตรวจสอบ QC':'ข้อมูล QC ยังไม่ครบ';
+    const recordRow=r=>`<div class="qc-week-record"><div><strong>${esc(r.product_no||'–')}</strong><small>ผลิต ${esc(r.manufactured_on||'–')} · ${esc(describe(r))}</small></div><button type="button" class="btn tiny-btn ${cssClass}" data-id="${esc(r.id)}">ดูรายการ</button></div>`;
+    const slots=weeks.map(({slot,records})=>{
+      const owner=plannedOwnerText(ym,slot,module,productType);
+      const label=plateletWeekLabel(ym,slot);
+      if(!records.length)return `<div class="platelet-week-popup-row pending"><div><strong>${esc(label)}</strong><small>${esc(owner)} · ยังไม่มีรายการ QC ในสัปดาห์นี้</small></div><span class="badge incomplete">ยังไม่ได้เก็บ</span></div>`;
+      return `<div class="platelet-week-popup-row qc qc-week-group"><div class="qc-week-group-content"><strong>${esc(label)}</strong><small>${esc(owner)} · ${records.length} ถุง</small><div class="qc-week-record-list">${records.map(recordRow).join('')}</div></div><span class="badge pass">${records.length} ถุง</span></div>`;
+    }).join('');
+    const outsideHtml=outside.length?`<div class="product-popup-extra qc-outside-weeks"><strong>วันที่ผลิตก่อนสัปดาห์ที่ 1 หรือไม่อยู่ในรอบ 4 สัปดาห์ · ${outside.length} ถุง</strong><div class="qc-week-record-list">${outside.map(recordRow).join('')}</div></div>`:'';
+    return {html:`<div class="platelet-week-popup-list">${slots}</div>${outsideHtml}`,coveredWeeks:weeks.filter(w=>w.records.length).length};
+  }
   function weeklyEventHasEvidence(eventId){return state.plateletWeeklyEvidence.some(x=>x.event_id===eventId);}
   function activePlateletTrackingProducts(){return state.productSettings.filter(x=>x.is_active).sort((a,b)=>(a.sort_order??100)-(b.sort_order??100)||String(a.product_type).localeCompare(String(b.product_type)));}
   function plateletQcInSlot(ym,slot,excludeId=null,productType=''){return state.records.filter(r=>!r.deleted_at&&r.id!==excludeId&&r.record_purpose==='qc'&&(!productType||r.product_type===productType)).filter(r=>{const d=plateletDateFromRecord(r);return monthKeyFromDateString(d)===ym&&plateletWeekSlot(d)===slot;});}
@@ -2070,9 +2098,9 @@
     const target=4,done=rows.length;
     $('#detailTitle').textContent=`FFP QC · ${productType}`;
     $('#detailSubtitle').textContent=`${plateletMonthLabel(ym)} · ทำ QC แล้ว ${done}/${target} ถุง`;
-    const slots=Array.from({length:target},(_,i)=>{const r=rows[i];if(!r)return `<div class="platelet-week-popup-row pending"><div><strong>ถุงที่ ${i+1}</strong><small>ยังไม่มีรายการ QC ในเดือนนี้</small></div><span class="badge incomplete">ยังไม่ได้เก็บ</span></div>`;const slot=plateletWeekSlot(r.manufactured_on),owner=slot?plannedOwnerText(ym,slot,'plasma',productType):'';return `<div class="platelet-week-popup-row qc"><div><strong>ถุงที่ ${i+1}</strong><small>${esc(r.product_no)} · วันที่ผลิต ${esc(r.manufactured_on||'–')} · ${esc(plasmaOutlabState(r))}${owner?`<br>${esc(owner)}`:''}</small></div><button type="button" class="btn tiny-btn plasma-summary-open" data-id="${r.id}">ดูรายการ</button></div>`;}).join('');
-    const extra=rows.slice(target); const extraHtml=extra.length?`<div class="product-popup-extra"><strong>รายการเกินเป้าหมาย ${extra.length} ถุง</strong>${extra.map(r=>`<button type="button" class="btn small-btn plasma-summary-open" data-id="${r.id}">${esc(r.product_no)}</button>`).join('')}</div>`:'';
-    $('#detailBody').innerHTML=`${plannedOwnerSummaryHtml(ym,'plasma',productType)}<div class="platelet-week-popup-list">${slots}</div>${extraHtml}<div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="plasmaSummaryClose">ปิด</button></div>`;
+    const weekDisplay=monthlyQcWeeklyPopupHtml(ym,productType,rows,'plasma');
+    $('#detailSubtitle').textContent=`${plateletMonthLabel(ym)} · ทำ QC แล้ว ${done}/${target} ถุง · ครอบคลุม ${weekDisplay.coveredWeeks}/4 สัปดาห์`;
+    $('#detailBody').innerHTML=`${plannedOwnerSummaryHtml(ym,'plasma',productType)}${weekDisplay.html}<div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="plasmaSummaryClose">ปิด</button></div>`;
     $$('.plasma-summary-open',$('#detailBody')).forEach(b=>b.onclick=()=>{dlg.close();openPlasmaDetail(b.dataset.id);}); $('#plasmaSummaryClose').onclick=()=>dlg.close(); dlg.showModal();
   }
 
@@ -2469,9 +2497,9 @@ function printPlasmaOutlabBatch(batchId){
     const target=RBC_MONTHLY_TARGET_PER_PRODUCT,done=rows.length;
     $('#detailTitle').textContent=`RBC QC · ${productType}`;
     $('#detailSubtitle').textContent=`${plateletMonthLabel(ym)} · ทำ QC แล้ว ${done}/${target} ถุง`;
-    const slots=Array.from({length:target},(_,i)=>{const r=rows[i];if(!r)return `<div class="platelet-week-popup-row pending"><div><strong>ถุงที่ ${i+1}</strong><small>ยังไม่มีรายการ QC ในเดือนนี้</small></div><span class="badge incomplete">ยังไม่ได้เก็บ</span></div>`;const slot=plateletWeekSlot(r.manufactured_on),owner=slot?plannedOwnerText(ym,slot,'rbc',productType):'';return `<div class="platelet-week-popup-row qc"><div><strong>ถุงที่ ${i+1}</strong><small>${esc(r.product_no)} · วันที่ผลิต ${esc(r.manufactured_on||'–')} · ${rbcRecordAnyMachineFail(r)?'ต้องตรวจสอบ QC · มีเครื่องไม่ผ่าน':rbcEffectiveQcStatus(r)==='pass'?'ผ่านเกณฑ์ที่มีข้อมูล':rbcEffectiveQcStatus(r)==='review'?'ต้องตรวจสอบ QC':'ข้อมูล QC ยังไม่ครบ'}${owner?`<br>${esc(owner)}`:''}</small></div><button type="button" class="btn tiny-btn rbc-summary-open" data-id="${r.id}">ดูรายการ</button></div>`;}).join('');
-    const extra=rows.slice(target); const extraHtml=extra.length?`<div class="product-popup-extra"><strong>รายการเกินเป้าหมาย ${extra.length} ถุง</strong>${extra.map(r=>`<button type="button" class="btn small-btn rbc-summary-open" data-id="${r.id}">${esc(r.product_no)}</button>`).join('')}</div>`:'';
-    $('#detailBody').innerHTML=`${plannedOwnerSummaryHtml(ym,'rbc',productType)}<div class="platelet-week-popup-list">${slots}</div>${extraHtml}<div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="rbcSummaryClose">ปิด</button></div>`;
+    const weekDisplay=monthlyQcWeeklyPopupHtml(ym,productType,rows,'rbc');
+    $('#detailSubtitle').textContent=`${plateletMonthLabel(ym)} · ทำ QC แล้ว ${done}/${target} ถุง · ครอบคลุม ${weekDisplay.coveredWeeks}/4 สัปดาห์`;
+    $('#detailBody').innerHTML=`${plannedOwnerSummaryHtml(ym,'rbc',productType)}${weekDisplay.html}<div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="rbcSummaryClose">ปิด</button></div>`;
     $$('.rbc-summary-open',$('#detailBody')).forEach(b=>b.onclick=()=>{dlg.close();openRbcDetail(b.dataset.id);}); $('#rbcSummaryClose').onclick=()=>dlg.close(); dlg.showModal();
   }
   function rbcRecordsTable(rows){

@@ -884,3 +884,17 @@ dialog.dialog .dialog-head{position:sticky;top:0;z-index:3}
 .field.qc-unit-picker,.field.qc-unit-entry{align-content:start;grid-template-rows:auto 48px;min-width:0}
 .field.qc-unit-picker select,.field.qc-unit-entry input{height:48px!important;min-height:48px!important;max-height:48px!important;box-sizing:border-box;border-width:1px}
 .field.qc-unit-picker select:focus,.field.qc-unit-entry input:focus{border-width:1px;box-shadow:0 0 0 2px rgba(143,35,50,.09)}
+
+/* v5.3.52 — actual production-week grouping in Plasma/RBC popup */
+.qc-week-group{align-items:flex-start}
+.qc-week-group-content{flex:1;min-width:0}
+.qc-week-group>.badge{flex:none}
+.qc-week-record-list{display:grid;gap:7px;margin-top:9px}
+.qc-week-record{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid #dfe9e3;background:#fff;border-radius:10px;padding:8px 10px}
+.qc-week-record>div{min-width:0}
+.qc-week-record strong{font-size:12px;overflow-wrap:anywhere}
+.qc-week-record small{font-size:11px;line-height:1.45;color:var(--muted)}
+.qc-week-record .btn{flex:none}
+.qc-outside-weeks{display:block}
+.qc-outside-weeks>.qc-week-record-list{margin-top:10px}
+@media(max-width:650px){.qc-week-record{align-items:flex-start}.qc-week-record .btn{margin-top:1px}}
