@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.50 - compact direct-mL entry UI */
+/* CNMI Blood Component QC v5.3.51 - platelet detail restore + every-bag pH entry */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -89,10 +89,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.50 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.51 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.50 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.51 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -1333,7 +1333,7 @@
 
   function ensureDetailDialogShell(){
     const dlg=$('#detailDialog');
-    if(!$('#detailTitle',dlg)||!$('#detailBody',dlg)) dlg.innerHTML=`<div class="dialog-head"><div><h2 id="detailTitle">รายละเอียด</h2><p id="detailSubtitle" class="muted"></p></div><button class="icon-btn" id="closeDetailBtn" aria-label="ปิด">×</button></div><div id="detailBody"></div>`;
+    if(!$('#detailTitle',dlg)||!$('#detailSubtitle',dlg)||!$('#detailBody',dlg)) dlg.innerHTML=`<div class="dialog-head"><div><h2 id="detailTitle">รายละเอียด</h2><p id="detailSubtitle" class="muted"></p></div><button class="icon-btn" id="closeDetailBtn" aria-label="ปิด">×</button></div><div id="detailBody"></div>`;
     const close=$('#closeDetailBtn',dlg);if(close)close.onclick=()=>dlg.close();
     return dlg;
   }
@@ -1395,12 +1395,24 @@
   function metric(label,value,sub){ return `<div class="card metric"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`; }
   function recordsTable(rows){
     if(!rows.length) return '<div class="empty">ยังไม่มีข้อมูล</div>';
-    const table=`<div class="table-wrap"><table class="data-table"><thead><tr><th>Product No.</th><th>ผลิตภัณฑ์</th><th>ประเภท</th><th>วันเจาะ</th><th>Group</th><th>Yield</th><th>Residual WBC</th><th>Equivalent Units</th><th>ผลต่าง PLT 2 เครื่อง</th><th>Pool / ฉลาก</th><th>ผล QC</th><th>งานที่ยังขาด</th><th>สถานะ</th><th>ผู้บันทึก</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.deleted_at?'deleted-row':''}"><td><button class="link-btn record-link" data-id="${r.id}">${esc(r.product_no)}</button></td><td>${esc(r.product_type)}</td><td>${purposeBadge(r.record_purpose)} ${deletedBadge(r)}</td><td class="nowrap">${dateTH(r.collection_at,false)}</td><td>${esc(r.blood_group||'–')}</td><td>${fmt(r.platelet_yield,2)}</td><td>${r.residual_wbc==null?'–':fmt(r.residual_wbc,3)+' ×10⁶'}</td><td>${fmt(r.equivalent_units,2)}</td><td>${r.plt_repeat_diff_pct==null?'–':fmt(r.plt_repeat_diff_pct,1)+'%'}</td><td>${poolReleaseBadge(r.pool_release_status)}</td><td>${r.record_purpose==='qc'?plateletQcBadge(r):'<span class="muted">–</span>'}</td><td>${r.record_purpose==='qc'?plateletTaskSummaryBadge(r):'<span class="muted">–</span>'}</td><td>${statusBadge(r.status)}</td><td>${esc(profileName(r.created_by))}</td></tr>`).join('')}</tbody></table></div>`;
-    const cards=rows.map(r=>`<article class="mobile-data-card ${r.deleted_at?'deleted-row':''}"><div class="mobile-data-card-head"><button class="link-btn record-link" data-id="${r.id}">${esc(r.product_no)}</button>${r.deleted_at?'<span class="badge deleted">ลบแล้ว</span>':''}</div><div class="mobile-data-card-body">${mobilePair('ผลิตภัณฑ์',esc(r.product_type))}${mobilePair('ผล QC',r.record_purpose==='qc'?plateletQcBadge(r):purposeBadge(r.record_purpose))}${mobilePair('งานที่ยังขาด',r.record_purpose==='qc'?plateletTaskSummaryBadge(r):'<span class="muted">–</span>')}${mobilePair('สถานะ',statusBadge(r.status))}<details class="mobile-record-more"><summary>ข้อมูลเพิ่มเติม</summary><div class="mobile-record-extra">${mobilePair('ประเภท',`${purposeBadge(r.record_purpose)} ${deletedBadge(r)}`)}${mobilePair('วันเจาะ',esc(dateTH(r.collection_at,false)))}${mobilePair('Group',esc(r.blood_group||'–'))}${mobilePair('Yield',fmt(r.platelet_yield,2))}${mobilePair('Residual WBC',r.residual_wbc==null?'–':fmt(r.residual_wbc,3)+' ×10⁶ cells/unit')}${mobilePair('Equivalent Units',fmt(r.equivalent_units,2))}${mobilePair('ผลต่าง PLT 2 เครื่อง',r.plt_repeat_diff_pct==null?'–':fmt(r.plt_repeat_diff_pct,1)+'%')}${mobilePair('Pool / ฉลาก',poolReleaseBadge(r.pool_release_status))}${mobilePair('ผู้บันทึก',esc(profileName(r.created_by)))}</div></details></div></article>`).join('');
+    const table=`<div class="table-wrap"><table class="data-table"><thead><tr><th>Product No.</th><th>ผลิตภัณฑ์</th><th>ประเภท</th><th>วันเจาะ</th><th>Group</th><th>Yield</th><th>Residual WBC</th><th>Equivalent Units</th><th>ผลต่าง PLT 2 เครื่อง</th><th>Pool / ฉลาก</th><th>ผล QC</th><th>งานที่ยังขาด</th><th>สถานะ</th><th>ผู้บันทึก</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.deleted_at?'deleted-row':''}"><td><button class="link-btn record-link" data-id="${r.id}">${esc(r.product_no)}</button>${plateletPhQuickButton(r)}</td><td>${esc(r.product_type)}</td><td>${purposeBadge(r.record_purpose)} ${deletedBadge(r)}</td><td class="nowrap">${dateTH(r.collection_at,false)}</td><td>${esc(r.blood_group||'–')}</td><td>${fmt(r.platelet_yield,2)}</td><td>${r.residual_wbc==null?'–':fmt(r.residual_wbc,3)+' ×10⁶'}</td><td>${fmt(r.equivalent_units,2)}</td><td>${r.plt_repeat_diff_pct==null?'–':fmt(r.plt_repeat_diff_pct,1)+'%'}</td><td>${poolReleaseBadge(r.pool_release_status)}</td><td>${r.record_purpose==='qc'?plateletQcBadge(r):'<span class="muted">–</span>'}</td><td>${plateletTaskSummaryBadge(r)}</td><td>${statusBadge(r.status)}</td><td>${esc(profileName(r.created_by))}</td></tr>`).join('')}</tbody></table></div>`;
+    const cards=rows.map(r=>`<article class="mobile-data-card ${r.deleted_at?'deleted-row':''}"><div class="mobile-data-card-head"><button class="link-btn record-link" data-id="${r.id}">${esc(r.product_no)}</button>${plateletPhQuickButton(r)}${r.deleted_at?'<span class="badge deleted">ลบแล้ว</span>':''}</div><div class="mobile-data-card-body">${mobilePair('ผลิตภัณฑ์',esc(r.product_type))}${mobilePair('ผล QC',r.record_purpose==='qc'?plateletQcBadge(r):purposeBadge(r.record_purpose))}${mobilePair('งานที่ยังขาด',plateletTaskSummaryBadge(r))}${mobilePair('สถานะ',statusBadge(r.status))}<details class="mobile-record-more"><summary>ข้อมูลเพิ่มเติม</summary><div class="mobile-record-extra">${mobilePair('ประเภท',`${purposeBadge(r.record_purpose)} ${deletedBadge(r)}`)}${mobilePair('วันเจาะ',esc(dateTH(r.collection_at,false)))}${mobilePair('Group',esc(r.blood_group||'–'))}${mobilePair('Yield',fmt(r.platelet_yield,2))}${mobilePair('Residual WBC',r.residual_wbc==null?'–':fmt(r.residual_wbc,3)+' ×10⁶ cells/unit')}${mobilePair('Equivalent Units',fmt(r.equivalent_units,2))}${mobilePair('ผลต่าง PLT 2 เครื่อง',r.plt_repeat_diff_pct==null?'–':fmt(r.plt_repeat_diff_pct,1)+'%')}${mobilePair('Pool / ฉลาก',poolReleaseBadge(r.pool_release_status))}${mobilePair('ผู้บันทึก',esc(profileName(r.created_by)))}</div></details></div></article>`).join('');
     return responsiveDataTable(table,cards);
   }
 
-  function bindRecordLinks(root=document){ $$('.record-link',root).forEach(b=>b.onclick=()=>openDetail(b.dataset.id)); }
+  function plateletCanEnterPh(r){return !!(r&&!r.deleted_at&&r.ph_value==null&&staffWriteUi()&&(r.status==='draft'||adminUi()));}
+  function plateletPhQuickButton(r){return plateletCanEnterPh(r)?` <button type="button" class="btn tiny-btn platelet-ph-quick" data-id="${esc(r.id)}" aria-label="บันทึก pH ${esc(r.product_no)}">บันทึก pH</button>`:'';}
+  function openPlateletPhEntry(id){
+    const r=state.records.find(x=>x.id===id);
+    if(!plateletCanEnterPh(r)){openDetail(id);return;}
+    state.currentRecordId=id;
+    state.scrollToPlateletPh=true;
+    switchView('record');
+  }
+  function bindRecordLinks(root=document){
+    $$('.record-link',root).forEach(b=>b.onclick=()=>openDetail(b.dataset.id));
+    $$('.platelet-ph-quick',root).forEach(b=>b.onclick=()=>openPlateletPhEntry(b.dataset.id));
+  }
 
   function renderRecordsList(){
     const deletedControl=adminUi()?`<label class="inline-check"><input type="checkbox" id="fDeleted" ${state.showDeletedRecords?'checked':''}> แสดงรายการที่ลบแล้ว</label>`:'';
@@ -1438,7 +1450,7 @@
     $('#view-record').innerHTML=`
       <div class="page-head"><div><h1>${r?'แก้ไข / ตรวจรายการ Platelet':'บันทึก Platelet'}</h1></div><div class="page-head-tools">${!r&&staffWriteUi()?'<button type="button" class="btn small-btn" id="recordNoPoolBtn">ไม่มีผลิตภัณฑ์สัปดาห์นี้</button>':''}<button type="button" class="btn small-btn" id="recordGuideBtn">คู่มือ</button>${r?`<div class="status-line">${deletedBadge(r)}${statusBadge(r.status)}${pHBadge(r)}</div>`:''}</div></div>
       ${deleted?`<div class="notice bad"><strong>รายการนี้ถูกลบออกจากการใช้งานแล้ว</strong><br>เหตุผล: ${esc(r.delete_reason||'–')} · ${dateTH(r.deleted_at)} · โดย ${esc(profileName(r.deleted_by))}</div>`:''}
-      ${locked&&!adminUi()?'<div class="notice good"><strong>รายการนี้ LOCK แล้ว</strong> ข้อมูลถูกป้องกันการแก้ไข หากพบข้อผิดพลาดให้แจ้ง Admin พร้อมหลักฐาน</div>':''}
+      ${locked&&!adminUi()?'<div class="notice good"><strong>รายการนี้ทบทวนเสร็จสิ้นแล้ว</strong> ข้อมูลถูกป้องกันการแก้ไข หากยังขาด pH ให้แจ้ง Admin เพื่อดำเนินการตามสิทธิ์และเก็บ Audit</div>':''}
       ${locked&&adminUi()&&!deleted?'<div class="notice warning"><strong>Admin correction</strong> รายการนี้ LOCK แล้ว แต่ Admin สามารถแก้ไขได้โดยระบุเหตุผล ระบบจะเพิ่ม Revision และบันทึกค่าก่อน/หลังใน Audit Log</div>':''}
       ${r?.status==='draft'&&r?.returned_at&&r?.review_note?`<div class="notice warning"><strong>แพทย์ส่งกลับแก้ไข</strong><br>${esc(r.review_note)}<br><span class="small">${esc(profileName(r.returned_by))} · ${esc(dateTH(r.returned_at))}</span></div>`:''}
       ${r?.status==='submitted'&&r?.record_purpose==='qc'&&reviewerUi()?`<div class="panel reviewer-action-panel"><div class="section-title-row"><h2>การทบทวนโดยแพทย์</h2><span class="section-badge">Reviewer</span></div><div class="field"><label>หมายเหตุการทบทวน</label><textarea id="review_note" placeholder="ถ้าส่งกลับแก้ไข ต้องระบุเหตุผล; ถ้าอนุมัติจะใส่หมายเหตุหรือเว้นว่างก็ได้">${esc(r.review_note||'')}</textarea></div><div class="actions"><button type="button" class="btn danger" id="returnForCorrection">ส่งกลับแก้ไข</button><button type="button" class="btn good" id="approveAndLock">อนุมัติและ LOCK</button></div></div>`:''}
@@ -1471,7 +1483,7 @@
         ${measurementEvidenceBox('cbc','หลักฐาน CBC / PLT')}
       </div>
       <div class="panel measurement-entry-panel"><div class="section-title-row"><h2>5. WBC จาก ADAM</h2><span class="section-badge">ผล + หลักฐาน</span></div><div class="form-grid">${field('WBC (/µL)','wbc_adam',r?.wbc_adam,'number',false,'0.0001')}${field('วัน-เวลาที่วัด ADAM','wbc_measured_at',inputFromISO(r?.wbc_measured_at),'datetime-local')}</div>${measurementEvidenceBox('adam','หลักฐาน ADAM / WBC')}</div>
-      <div class="panel measurement-entry-panel"><div class="section-title-row"><h2>6. pH ณ วันหมดอายุ</h2><span class="section-badge">ผล + หลักฐาน</span></div><div class="form-grid">${field('pH','ph_value',r?.ph_value,'number',false,'0.001')}${field('วัน-เวลาที่วัด pH','ph_measured_at',inputFromISO(r?.ph_measured_at),'datetime-local')}<div class="field span2"><label>เหตุผลที่วัด pH ไม่ตรงกำหนด (ไม่ใช่ผล QC ไม่ผ่าน)</label><input id="ph_deviation_reason" value="${esc(r?.ph_deviation_reason||'')}" ${editable?'':'disabled'} placeholder="เช่น เครื่องขัดข้อง / วัดล่าช้า 2 วัน"></div></div><div class="notice info" style="margin-top:8px">หากค่า pH ผ่านเกณฑ์แต่วันที่ตรวจคลาดเคลื่อน ให้บันทึกเหตุผลการล่าช้าและทบทวนตาม SOP โดยไม่ถือว่าเป็นค่า pH ไม่ผ่านเกณฑ์อัตโนมัติ</div>${measurementEvidenceBox('ph','หลักฐาน pH')}</div>
+      <div class="panel measurement-entry-panel" id="plateletPhPanel"><div class="section-title-row"><h2>6. pH ณ วันหมดอายุ</h2><span class="section-badge">ผล + หลักฐาน</span></div><div class="form-grid">${field('pH','ph_value',r?.ph_value,'number',false,'0.001')}${field('วัน-เวลาที่วัด pH','ph_measured_at',inputFromISO(r?.ph_measured_at),'datetime-local')}<div class="field span2"><label>เหตุผลที่วัด pH ไม่ตรงกำหนด (ไม่ใช่ผล QC ไม่ผ่าน)</label><input id="ph_deviation_reason" value="${esc(r?.ph_deviation_reason||'')}" ${editable?'':'disabled'} placeholder="เช่น เครื่องขัดข้อง / วัดล่าช้า 2 วัน"></div></div><div class="notice info" style="margin-top:8px">หากค่า pH ผ่านเกณฑ์แต่วันที่ตรวจคลาดเคลื่อน ให้บันทึกเหตุผลการล่าช้าและทบทวนตาม SOP โดยไม่ถือว่าเป็นค่า pH ไม่ผ่านเกณฑ์อัตโนมัติ</div>${measurementEvidenceBox('ph','หลักฐาน pH')}</div>
       <div class="panel"><h2>7. ผลคำนวณอัตโนมัติ</h2><div class="calc-grid"><div class="calc-box"><span>PLT ที่ใช้</span><strong id="cPlt">${fmt(r?.plt_used,2)}</strong><small>K/µL</small></div><div class="calc-box"><span>Platelet yield</span><strong id="cYield">${fmt(r?.platelet_yield,3)}</strong><small>×10¹¹ cells/unit</small></div><div class="calc-box"><span>Equivalent Units</span><strong id="cEq">${fmt(r?.equivalent_units,2)}</strong><small>factor ${state.settings.equivalent_unit_factor}</small></div><div class="calc-box"><span>Residual WBC</span><strong id="cWbc">${fmt(r?.residual_wbc,3)}</strong><small>×10⁶ cells/unit</small></div></div><div id="calcWarnings" style="margin-top:12px"></div></div>
       <div class="panel"><h2>8. หมายเหตุ</h2><textarea id="notes" ${editable?'':'disabled'} placeholder="บันทึกเหตุการณ์หรือข้อมูลเพิ่มเติม">${esc(r?.notes||'')}</textarea></div>
       <div class="sticky-actions"><div class="left"><button type="button" class="btn" id="cancelEdit">กลับรายการทั้งหมด</button></div><div class="right ${!r?'new-record-actions':''}">${!r&&editable?'<button type="button" class="btn clear-form-btn" id="clearForm">ล้างฟอร์ม</button>':''}${editable?'<button type="button" class="btn primary" id="saveDraft">บันทึกข้อมูล</button>':''}${r&&r.status==='draft'&&r.record_purpose==='qc'&&editable?'<div class="review-submit-group"><small>ขั้นตอนสุดท้าย · ส่งเมื่อกรอกและแนบหลักฐานครบแล้ว</small><button type="button" class="btn review-submit-btn" id="submitReview">ส่งให้แพทย์ทบทวน</button></div>':''}${r&&r.status==='locked'&&adminUi()&&!deleted?'<button type="button" class="btn danger" id="unlockRecord">ปลดล็อกเป็น Draft</button>':''}</div></div>
@@ -1485,9 +1497,10 @@
     $$('.pool-pyi,.pool-unit').forEach(x=>x.addEventListener('input',updatePoolPreview));
     $('#recordGuideBtn').onclick=()=>switchView('guide'); if($('#recordNoPoolBtn')) $('#recordNoPoolBtn').onclick=openPlateletNoPoolDialog; $('#cancelEdit').onclick=()=>switchView('records'); if($('#clearForm')) $('#clearForm').onclick=clearNewRecordForm; if($('#saveDraft')) $('#saveDraft').onclick=()=>saveRecord(false); if($('#submitReview')) $('#submitReview').onclick=submitRecord; if($('#returnForCorrection')) $('#returnForCorrection').onclick=returnForCorrection; if($('#approveAndLock')) $('#approveAndLock').onclick=approveAndLock; if($('#unlockRecord')) $('#unlockRecord').onclick=unlockRecord;
     if(!r&&$('#collection_at')){$('#collection_at').addEventListener('change',()=>maybeAutoSelectPlateletQc());$('#collection_at').addEventListener('blur',()=>maybeAutoSelectPlateletQc());}
+    if(state.scrollToPlateletPh){state.scrollToPlateletPh=false;$('#plateletPhPanel')?.scrollIntoView({behavior:'smooth',block:'start'});if(editable)$('#ph_value')?.focus({preventScroll:true});}
   }
 
-  // v5.3.50: measured net mL is used directly for QC calculations. Only the legacy DB gross column uses a mathematically equivalent value.
+  // v5.3.51: measured net mL is used directly for QC calculations. Only the legacy DB gross column uses a mathematically equivalent value.
   // Preserve input_unit/input_value in Supabase for audit; legacy calculation triggers still consume gross_weight_g.
   function qcVolumeUnit(unit){return unit==='mL'?'mL':'g';}
   function qcVolumeOriginal(record,unitColumn,valueColumn,grossColumn,volumeColumn){
@@ -1822,6 +1835,7 @@
 
   async function openDetail(id){
     try{
+      ensureDetailDialogShell(); // RBC detail uses a different dialog layout; restore it before writing Platelet fields.
       const {data:r,error}=await state.sb.from('platelet_records').select('*').eq('id',id).single();if(error)throw error;
       const [{data:pool},{data:ev},{data:audit}]=await Promise.all([
         state.sb.from('pool_units').select('*').eq('record_id',id).order('position'),
@@ -1852,7 +1866,8 @@
         return `<div class="detail-section-evidence"><div class="detail-evidence-title">หลักฐาน</div>${rows.map(x=>`<div class="evidence-item"><span class="name evidence-name"><strong>${esc(x.original_name)}</strong><small>ผู้แนบหลักฐาน ${esc(profileName(x.uploaded_by))} · ${esc(dateTH(x.created_at))}</small>${x.change_reason?`<small class="evidence-reason">เหตุผล Admin: ${esc(x.change_reason)}</small>`:''}</span><button class="btn small-btn detail-evidence" data-path="${esc(x.storage_path)}">ดู</button></div>`).join('')}</div>`;
       };
       const poolRows=(pool||[]).map(x=>`<tr><td>${x.position}</td><td>${esc(x.unit_no)}</td><td>${fmt(x.pyi,2)}</td><td>${esc(profileName(x.updated_by||x.created_by))}</td><td class="nowrap">${esc(dateTH(x.updated_at||x.created_at))}</td></tr>`).join('');
-      $('#detailBody').innerHTML=`<div class="status-line">${purposeBadge(r.record_purpose)} ${deletedBadge(r)} ${statusBadge(r.status)} ${qcBadgeForRecord(r)} ${pHBadge(r)}</div>
+      $('#detailBody').innerHTML=`<div class="status-line">${purposeBadge(r.record_purpose)} ${deletedBadge(r)} ${statusBadge(r.status)} ${qcBadgeForRecord(r)} ${pHBadge(r)} ${plateletTaskSummaryBadge(r)}</div>
+      ${r.ph_value==null&&r.status!=='draft'&&!r.deleted_at?`<div class="notice warning">pH ยังไม่ได้บันทึก แต่รายการมีสถานะ ${esc(statusTH(r.status))} · ต้องให้แพทย์ส่งกลับแก้ไขหรือให้ Admin จัดการตามสิทธิ์ก่อนบันทึก pH</div>`:''}
       ${r.deleted_at?`<div class="notice bad"><strong>ลบออกจากรายการใช้งานแล้ว</strong><br>${esc(r.delete_reason||'–')} · ${dateTH(r.deleted_at)} · ${esc(profileName(r.deleted_by))}</div>`:''}
 
       <section class="detail-section">
@@ -1898,13 +1913,14 @@
       </section>
 
       ${adminUi()?`<div class="panel"><h3>Audit trail</h3><div class="timeline">${audit?.length?audit.map(a=>auditItem(a)).join(''):'<div class="muted">ยังไม่มีประวัติ</div>'}</div></div>`:''}
-      <div class="actions">${r.record_purpose==='qc'&&plateletEffectiveQcStatus(r)==='review'?ncActionButton('platelet',r.id):''}<button class="btn" id="detailClose">ปิด</button>${canReview?'<button class="btn danger" id="detailReturn">ส่งกลับแก้ไข</button><button class="btn good" id="detailApprove">อนุมัติและ LOCK</button>':''}${canEdit?'<button class="btn primary" id="detailEdit">เปิดแก้ไข</button>':''}${adminUi()&&!r.deleted_at?'<button class="btn danger" id="detailDelete">ลบรายการ</button>':''}${adminUi()&&r.deleted_at?'<button class="btn good" id="detailRestore">กู้คืนรายการ</button>':''}</div>`;
+      <div class="actions">${r.record_purpose==='qc'&&plateletEffectiveQcStatus(r)==='review'?ncActionButton('platelet',r.id):''}<button class="btn" id="detailClose">ปิด</button>${canReview?'<button class="btn danger" id="detailReturn">ส่งกลับแก้ไข</button><button class="btn good" id="detailApprove">อนุมัติและ LOCK</button>':''}${canEdit?`${r.ph_value==null?'<button class="btn good" id="detailPhEdit">บันทึก pH</button>':''}<button class="btn primary" id="detailEdit">เปิดแก้ไข</button>`:''}${adminUi()&&!r.deleted_at?'<button class="btn danger" id="detailDelete">ลบรายการ</button>':''}${adminUi()&&r.deleted_at?'<button class="btn good" id="detailRestore">กู้คืนรายการ</button>':''}</div>`;
       $$('.detail-evidence').forEach(b=>b.onclick=async()=>{const {data,error}=await state.sb.storage.from('platelet-evidence').createSignedUrl(b.dataset.path,120);if(error)showToast(errText(error),'error');else window.open(data.signedUrl,'_blank','noopener');});
       bindNcButtons($('#detailBody'));
       $('#detailClose').onclick=()=>$('#detailDialog').close();
       if($('#detailReturn')) $('#detailReturn').onclick=()=>returnForCorrection(id,$('#detail_review_note')?.value||'');
       if($('#detailApprove')) $('#detailApprove').onclick=()=>approveAndLock(id,$('#detail_review_note')?.value||'');
       if($('#detailEdit'))$('#detailEdit').onclick=()=>{$('#detailDialog').close();state.currentRecordId=id;switchView('record');};
+      if($('#detailPhEdit'))$('#detailPhEdit').onclick=()=>{$('#detailDialog').close();openPlateletPhEntry(id);};
       if($('#detailDelete'))$('#detailDelete').onclick=()=>adminDeleteRecord(id);
       if($('#detailRestore'))$('#detailRestore').onclick=()=>adminRestoreRecord(id);
       $('#detailDialog').showModal();
@@ -2222,6 +2238,7 @@ async function openPlasmaBatchBuilder(preselectId=null,editBatchId=null){
   const now=new Date(),today=inputFromISO(now.toISOString()).slice(0,10),defaultTime=String(state.plasmaSettings.default_send_time||'10:00').slice(0,5);
   const sentValue=editing?inputFromISO(batch.sent_at).slice(0,16):`${today}T${defaultTime}`;
   const ordered=[...candidates].sort((a,b)=>String(a.product_type).localeCompare(String(b.product_type),'th')||String(a.product_no).localeCompare(String(b.product_no)));
+  ensureDetailDialogShell();
   $('#detailTitle').textContent=editing?'แก้ไขชุดนำส่ง Factor VIII':'สร้างใบนำส่ง Factor VIII ใหม่';
   $('#detailSubtitle').textContent=editing?`${batch.batch_no} · แก้ Product No. แล้ว Export PDF ใหม่ได้`:'1 เที่ยวส่ง = 1 ใบนำส่ง · เลือกได้ตั้งแต่ 1 ถุงขึ้นไป';
   $('#detailBody').innerHTML=`<div class="form-grid"><div class="field span2"><label>วัน-เวลานำส่ง</label><input id="batch_sent_at" type="datetime-local" value="${esc(sentValue)}"></div><div class="field span2"><label>เจ้าหน้าที่ RFS ที่นำส่ง</label><input id="batch_rfs" placeholder="ถ้ามี" value="${esc(editing?(batch.rfs_staff_name||''):'')}"></div></div>
@@ -2320,7 +2337,7 @@ function printPlasmaOutlabBatch(batchId){
   logActivity('export_pdf','plasma_outlab_batch',batchId,{module:'plasma',batch_no:b.batch_no,records:rows.length,pages:pages.length}).catch(()=>{});
 }
   async function openPlasmaDetail(id){
-    try{const {data:r,error}=await state.sb.from('plasma_records').select('*').eq('id',id).single();if(error)throw error;const [{data:ev},{data:audit}]=await Promise.all([state.sb.from('plasma_evidence_files').select('*').eq('record_id',id).order('created_at'),adminUi()?state.sb.from('audit_logs').select('*').eq('module','plasma').eq('entity_id',id).order('created_at',{ascending:false}).limit(100):Promise.resolve({data:[]})]);const b=r.outlab_batch_id?plasmaBatchById(r.outlab_batch_id):null;state.currentPlasmaEvidence=ev||[];$('#detailTitle').textContent=r.product_no;$('#detailSubtitle').textContent=`${r.product_type} · Revision ${r.revision}`;const canEdit=!r.deleted_at&&(adminUi()||(r.status==='draft'&&staffWriteUi())),canReview=!r.deleted_at&&r.status==='submitted'&&reviewerUi();const evHtml=ev?.length?ev.map(x=>`<div class="evidence-item"><span class="name evidence-name"><strong>${esc(x.original_name)}</strong><small>ผู้แนบหลักฐาน ${esc(profileName(x.uploaded_by))} · ${esc(dateTH(x.created_at))}</small></span><button class="btn small-btn plasma-detail-ev" data-id="${x.id}">ดู</button></div>`).join(''):'<div class="muted small">ยังไม่มีหลักฐาน</div>';
+    try{ensureDetailDialogShell();const {data:r,error}=await state.sb.from('plasma_records').select('*').eq('id',id).single();if(error)throw error;const [{data:ev},{data:audit}]=await Promise.all([state.sb.from('plasma_evidence_files').select('*').eq('record_id',id).order('created_at'),adminUi()?state.sb.from('audit_logs').select('*').eq('module','plasma').eq('entity_id',id).order('created_at',{ascending:false}).limit(100):Promise.resolve({data:[]})]);const b=r.outlab_batch_id?plasmaBatchById(r.outlab_batch_id):null;state.currentPlasmaEvidence=ev||[];$('#detailTitle').textContent=r.product_no;$('#detailSubtitle').textContent=`${r.product_type} · Revision ${r.revision}`;const canEdit=!r.deleted_at&&(adminUi()||(r.status==='draft'&&staffWriteUi())),canReview=!r.deleted_at&&r.status==='submitted'&&reviewerUi();const evHtml=ev?.length?ev.map(x=>`<div class="evidence-item"><span class="name evidence-name"><strong>${esc(x.original_name)}</strong><small>ผู้แนบหลักฐาน ${esc(profileName(x.uploaded_by))} · ${esc(dateTH(x.created_at))}</small></span><button class="btn small-btn plasma-detail-ev" data-id="${x.id}">ดู</button></div>`).join(''):'<div class="muted small">ยังไม่มีหลักฐาน</div>';
       const batchRows=b?state.plasmaRecords.filter(x=>x.outlab_batch_id===b.id&&!x.deleted_at).sort((a,b)=>String(a.product_no).localeCompare(String(b.product_no))):[];
       const batchProducts=batchRows.length?batchRows.map(x=>`<span class="batch-product-chip ${x.id===r.id?'current':''}">${esc(x.product_no)} · ${esc(x.product_type)}</span>`).join(''):'';
       const prepState=r.weight_recorded_by?'<span class="step-state done">บันทึกน้ำหนักแล้ว</span>':'<span class="step-state pending">รอน้ำหนัก</span>';
