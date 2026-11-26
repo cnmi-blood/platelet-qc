@@ -907,3 +907,7 @@ dialog.dialog .dialog-head{position:sticky;top:0;z-index:3}
 .rbc-failure-summary strong{font-size:13px}.rbc-failure-summary div{display:flex;flex-wrap:wrap;gap:7px;align-items:center}.rbc-failure-summary div span{font-size:11px;color:#7a271a}
 .rbc-limit-settings input{min-width:80px;width:100%;max-width:138px}.rbc-limit-settings td:first-child{min-width:176px}.rbc-limit-settings td small{display:block;color:var(--muted);margin-top:4px}
 .rbc-table-fail-hint{font-size:10.5px;line-height:1.4;color:#b42318;margin-top:4px;max-width:240px}
+
+/* v5.3.55 — RBC Post-Storage filtration-date tracking */
+.rbc-date-warning{display:block;margin-top:8px;color:var(--warning-text,#9a6700);font-weight:600;}
+#rbcFilteredOnField label small{font-weight:500;color:var(--muted,#6b7280);}
