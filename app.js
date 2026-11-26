@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.61 — Balanced Dashboard & Smart Alerts */
+/* CNMI Blood Component QC v5.3.62 — Ai-LIS Document Evidence Fix */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -90,10 +90,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.61 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.62 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.61 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.62 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     document.body.dataset.qcPage=route.page||'';
@@ -1601,11 +1601,32 @@
   async function viewPlateletWeeklyEvidence(eventId){
     const rows=state.plateletWeeklyEvidence.filter(x=>x.event_id===eventId);if(!rows.length){showToast('ไม่พบหลักฐาน','error');return;}
     const event=state.plateletWeeklyEvents.find(e=>e.id===eventId);const dlg=ensureDetailDialogShell();$('#detailTitle').textContent='หลักฐานไม่มีผลิตภัณฑ์สัปดาห์นี้';$('#detailSubtitle').textContent=`${event?.event_date||''} · ${event?.product_type||''} · ${event?.note||''} · ${rows.length} ไฟล์`;
-    $('#detailBody').innerHTML=`<div class="evidence-list">${rows.map(e=>`<div class="evidence-item"><span class="name evidence-name"><strong>${esc(e.original_name)}</strong><small>${esc(profileName(e.uploaded_by))} · ${esc(dateTH(e.created_at))}</small></span><button type="button" class="btn small-btn weekly-evidence-file" data-id="${e.id}">ดู</button></div>`).join('')}</div><div class="actions platelet-week-popup-footer">${reviewerUi()&&!event?.reviewed_at?'<button type="button" class="btn primary" id="weeklyAcknowledge">แพทย์รับทราบ</button>':''}<button type="button" class="btn" id="weeklyEvidenceClose">ปิด</button></div>`;
-    $$('.weekly-evidence-file',$('#detailBody')).forEach(b=>b.onclick=async()=>{const e=rows.find(x=>x.id===b.dataset.id);if(!e)return;const {data,error}=await state.sb.storage.from('bloodqc-evidence').createSignedUrl(e.storage_path,120);if(error){showToast(errText(error),'error');return;}window.open(data.signedUrl,'_blank','noopener');});
+    $('#detailBody').innerHTML=`<div class="evidence-list">${rows.map(e=>`<div class="evidence-item"><span class="name evidence-name"><strong>${esc(e.original_name)}</strong><small>${esc(profileName(e.uploaded_by))} · ${esc(dateTH(e.created_at))}</small></span><button type="button" class="btn small-btn weekly-evidence-file" data-id="${e.id}">${/\.(xls|xlsx|csv)$/i.test(e.original_name)?'ดาวน์โหลด':'ดู'}</button></div>`).join('')}</div><div class="actions platelet-week-popup-footer">${reviewerUi()&&!event?.reviewed_at?'<button type="button" class="btn primary" id="weeklyAcknowledge">แพทย์รับทราบ</button>':''}<button type="button" class="btn" id="weeklyEvidenceClose">ปิด</button></div>`;
+    $$('.weekly-evidence-file',$('#detailBody')).forEach(b=>b.onclick=async()=>{const e=rows.find(x=>x.id===b.dataset.id);if(!e)return;const download=/\.(xls|xlsx|csv)$/i.test(e.original_name);const {data,error}=await state.sb.storage.from('bloodqc-evidence').createSignedUrl(e.storage_path,120,download?{download:e.original_name}:{});if(error){showToast(errText(error),'error');return;}if(download){const a=document.createElement('a');a.href=data.signedUrl;a.download=e.original_name;a.rel='noopener';a.click();}else window.open(data.signedUrl,'_blank','noopener');});
     $('#weeklyAcknowledge')?.addEventListener('click',async()=>{const {error}=await state.sb.rpc('qc_ack_weekly_event',{p_id:eventId});if(error){showToast(errText(error),'error');return;}await reloadPlateletWeeklyData();dlg.close();showToast('บันทึกแพทย์รับทราบแล้ว','good');if(state.currentView==='backlog')renderBacklog();else if(state.currentView==='home')renderHome();else if(reviewerUi())renderReviewQueue();else renderDashboard();});$('#weeklyEvidenceClose').onclick=()=>dlg.close();if(!dlg.open)dlg.showModal();
   }
 
+  // Weekly Ai-LIS evidence accepts original exported documents as alternatives to screenshots.
+  function weeklyEvidenceMime(file){
+    const ext=/\.([a-z0-9]+)$/i.exec(String(file?.name||''))?.[1].toLowerCase();
+    const types={pdf:'application/pdf',xls:'application/vnd.ms-excel',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',csv:'text/csv',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',heic:'image/heic',heif:'image/heif',gif:'image/gif',bmp:'image/bmp',tif:'image/tiff',tiff:'image/tiff'};
+    return Object.hasOwn(types,ext)?types[ext]:null;
+  }
+  function weeklyEvidenceFileError(file){
+    const name=String(file?.name||'ไฟล์');
+    if(!weeklyEvidenceMime(file))return `${name}: รองรับเฉพาะรูปภาพ, PDF, XLS, XLSX หรือ CSV`;
+    if(!(file.size>0))return `${name}: ไฟล์ไม่มีข้อมูล`;
+    if(file.size>10*1024*1024)return `${name}: ไฟล์ต้องไม่เกิน 10 MB`;
+    return null;
+  }
+  async function prepareWeeklyEvidenceFile(file){
+    const error=weeklyEvidenceFileError(file);if(error)throw new Error(error);
+    const mime=weeklyEvidenceMime(file);
+    // Some devices label .csv as Excel, or report no MIME at all. Use the supported extension.
+    const body=await stableUploadBody(file);
+    if(mime.startsWith('image/'))return optimizeEvidenceFile(new File([body],file.name,{type:mime,lastModified:file.lastModified}));
+    return {body:new Blob([body],{type:mime}),mime,uploadName:evidenceUploadName(file.name,mime),originalName:file.name,originalSize:file.size,optimized:false};
+  }
   async function openPlateletNoPoolDialog(rbcType=null,referenceDate=null,plateletType=null){
     if(!staffWriteUi()||!state.plateletWeeklyReady){showToast('กรุณา Run SQL v5.3.9 ก่อนใช้งานบันทึกไม่มีผลิตภัณฑ์สัปดาห์นี้','error');return;}
     let selectedFiles=[];
@@ -1613,30 +1634,31 @@
     const dlg=ensureDetailDialogShell();
     $('#detailTitle').textContent='บันทึกไม่มีผลิตภัณฑ์สัปดาห์นี้';
     $('#detailSubtitle').textContent='ใช้เมื่อสัปดาห์นั้นไม่มี Pool Platelet หรือไม่มี SDP และต้องมีหลักฐานจาก Ai-LIS';
-    $('#detailBody').innerHTML=`<div class="panel no-pool-dialog-panel"><div class="form-grid"><div class="field"><label class="required">วันที่อ้างอิงในสัปดาห์</label><input id="noPoolDate" type="date" value="${esc(referenceDate||today)}"></div><div class="field"><label class="required">ชนิดผลิตภัณฑ์</label><select id="noPoolProduct"><option value="">เลือก</option>${(rbcType?[{product_type:rbcType}]:activePlateletTrackingProducts()).map(x=>`<option value="${esc(x.product_type)}">${esc(x.product_type)}</option>`).join('')}</select></div><div class="field span2"><label>รายละเอียด / เหตุผล</label><input id="noPoolNote" placeholder="เช่น ไม่มี SDP / ไม่มีถุงให้ Pool Platelet"></div><div class="field span2"><small class="muted">ระบบจะจัดข้อมูลเข้า สัปดาห์ 1–4 ตามรอบวันจันทร์แรกของเดือน เพื่อให้ตรงกับ Staff Planner</small></div></div><div class="measurement-evidence"><div class="measurement-evidence-head"><div><strong>หลักฐานจาก Ai-LIS ว่าไม่มีผลิตภัณฑ์สัปดาห์นี้</strong><small class="evidence-multi-hint">แนบได้หลายไฟล์: รูปภาพ, PDF, XLS, XLSX หรือ CSV</small></div><span class="section-badge required-evidence">บังคับ</span></div><div class="muted small">ใช้ภาพแคปจาก Ai-LIS หรือไฟล์ที่ Export จาก Ai-LIS เพื่อยืนยันว่าไม่มี Pool Platelet / ไม่มี SDP ในสัปดาห์นั้น</div><input class="hidden-file-input" type="file" id="noPoolCamera" accept="image/*" capture="environment"><input class="hidden-file-input" type="file" id="noPoolFile" accept="image/*,application/pdf,.xls,.xlsx,.csv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple><div class="evidence-pick-actions"><button type="button" class="btn primary small-btn" id="noPoolCameraBtn">ถ่ายรูป</button><button type="button" class="btn small-btn" id="noPoolFileBtn">เลือกรูป / Excel / CSV <span class="multi-file-label">หลายไฟล์ได้</span></button></div><div id="noPoolSelected" class="muted small">ยังไม่ได้เลือกหลักฐาน</div></div></div><div class="actions platelet-week-popup-footer"><button class="btn" id="noPoolCancel">ยกเลิก</button><button class="btn primary" id="noPoolSave">บันทึกสถานะนี้</button></div>`;
+    $('#detailBody').innerHTML=`<div class="panel no-pool-dialog-panel"><div class="form-grid"><div class="field"><label class="required">วันที่อ้างอิงในสัปดาห์</label><input id="noPoolDate" type="date" value="${esc(referenceDate||today)}"></div><div class="field"><label class="required">ชนิดผลิตภัณฑ์</label><select id="noPoolProduct"><option value="">เลือก</option>${(rbcType?[{product_type:rbcType}]:activePlateletTrackingProducts()).map(x=>`<option value="${esc(x.product_type)}">${esc(x.product_type)}</option>`).join('')}</select></div><div class="field span2"><label>รายละเอียด / เหตุผล</label><input id="noPoolNote" placeholder="เช่น ไม่มี SDP / ไม่มีถุงให้ Pool Platelet"></div><div class="field span2"><small class="muted">ระบบจะจัดข้อมูลเข้า สัปดาห์ 1–4 ตามรอบวันจันทร์แรกของเดือน เพื่อให้ตรงกับ Staff Planner</small></div></div><div class="measurement-evidence"><div class="measurement-evidence-head"><div><strong>หลักฐานจาก Ai-LIS ว่าไม่มีผลิตภัณฑ์สัปดาห์นี้</strong><small class="evidence-multi-hint">แนบหลักฐานอย่างน้อย 1 ไฟล์: รูปภาพ, PDF, XLS, XLSX หรือ CSV</small></div><span class="section-badge required-evidence">บังคับ</span></div><div class="muted small">ใช้ภาพแคปหรือไฟล์ Export จาก Ai-LIS เพื่อยืนยันข้อมูลในสัปดาห์นั้น · ใช้ Excel / CSV / PDF อย่างเดียวได้ ไม่ต้องแนบรูปเพิ่ม · ไม่เกิน 10 MB ต่อไฟล์</div><input class="hidden-file-input" type="file" id="noPoolCamera" accept="image/*" capture="environment"><input class="hidden-file-input" type="file" id="noPoolImage" accept="image/*" multiple><input class="hidden-file-input" type="file" id="noPoolFile" accept=".pdf,.xls,.xlsx,.csv,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple><div class="evidence-pick-actions"><button type="button" class="btn primary small-btn" id="noPoolCameraBtn">ถ่ายรูป</button><button type="button" class="btn small-btn" id="noPoolImageBtn">เลือกรูป</button><button type="button" class="btn small-btn" id="noPoolFileBtn">เลือกไฟล์ Excel / CSV / PDF <span class="multi-file-label">หลายไฟล์ได้</span></button></div><div id="noPoolSelected" class="muted small">ยังไม่ได้เลือกหลักฐาน</div></div></div><div class="actions platelet-week-popup-footer"><button class="btn" id="noPoolCancel">ยกเลิก</button><button class="btn primary" id="noPoolSave">บันทึกสถานะนี้</button></div>`;
     dlg.showModal();
     if(plateletType){$('#noPoolProduct').value=plateletType;$('#noPoolProduct').disabled=true;}
     if(referenceDate)$('#noPoolDate').readOnly=true;
     if(rbcType){$('#noPoolNote').closest('.field').insertAdjacentHTML('beforebegin','<div class="field"><label>เหตุผลหลัก</label><select id="rbcNoReason"><option value="none">ไม่มีการกรอง</option><option value="old">กรองเลือดเกิน 7 วัน</option></select></div><div class="field"><label>Unit No. (บังคับเมื่อกรองเกิน 7 วัน)</label><input id="rbcNoUnit"></div>');$('#noPoolProduct').value=rbcType;$('#noPoolProduct').disabled=true;$('#detailSubtitle').textContent="ไม่มีการกรอง / ไม่มีเลือดอายุ 0–7 วันให้เก็บ QC · ระบุเลข Unit ถ้ามีการกรองเลือดเกิน 7 วัน";}
-    const setFiles=files=>{const incoming=Array.from(files||[]);for(const f of incoming){if(!selectedFiles.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified))selectedFiles.push(f);}$('#noPoolSelected').innerHTML=selectedFiles.length?`เลือกแล้ว ${selectedFiles.length} ไฟล์<br>${selectedFiles.map(f=>esc(f.name)).join('<br>')}`:'ยังไม่ได้เลือกหลักฐาน';};
-    $('#noPoolCameraBtn').onclick=()=>$('#noPoolCamera').click();$('#noPoolFileBtn').onclick=()=>$('#noPoolFile').click();
-    $('#noPoolCamera').onchange=e=>setFiles(e.target.files);$('#noPoolFile').onchange=e=>setFiles(e.target.files);
+    const renderSelected=()=>{const box=$('#noPoolSelected');box.innerHTML=selectedFiles.length?`<strong>เลือกแล้ว ${selectedFiles.length} ไฟล์</strong>${selectedFiles.map((f,i)=>`<div class="weekly-selected-file"><span>${esc(f.name)} · ${Math.max(1,Math.ceil(f.size/1024))} KB</span><button type="button" class="btn tiny-btn weekly-remove-file" data-index="${i}">เอาออก</button></div>`).join('')}`:'ยังไม่ได้เลือกหลักฐาน';$$('.weekly-remove-file',box).forEach(b=>b.onclick=()=>{selectedFiles.splice(Number(b.dataset.index),1);renderSelected();});};
+    const setFiles=files=>{for(const f of Array.from(files||[])){const error=weeklyEvidenceFileError(f);if(error){showToast(error,'error');continue;}if(!selectedFiles.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified))selectedFiles.push(f);}renderSelected();};
+    for(const id of ['noPoolCamera','noPoolImage','noPoolFile']){$('#'+id+'Btn').onclick=()=>$('#'+id).click();$('#'+id).onchange=e=>{setFiles(e.target.files);e.target.value='';};}
     $('#noPoolCancel').onclick=()=>dlg.close();
     $('#noPoolSave').onclick=async()=>{
       if(!qcDateGuard())return;const eventDate=$('#noPoolDate').value,productType=$('#noPoolProduct').value;let note=$('#noPoolNote').value.trim()||null;if(rbcType){const old=$('#rbcNoReason').value==='old',unit=$('#rbcNoUnit').value.trim();if(old&&!unit){showToast('ระบุ Unit No. ที่กรองเกิน 7 วัน','error');return;}if(note)note=(old?'กรองเลือดเกิน 7 วัน · Unit '+unit:'ไม่มีการกรอง')+' · '+note;}
-      if(!eventDate){showToast('กรุณาระบุวันที่อ้างอิงในสัปดาห์','error');return;}if(!productType){showToast('กรุณาเลือกชนิดผลิตภัณฑ์','error');return;}const eventSlot=rbcType?plateletWeekSlot(eventDate):plateletTrackingWeekSlot(eventDate);if(!eventSlot){const ym=eventDate.slice(0,7),[start]=plateletWeekRange(ym,1);showToast(`สัปดาห์ที่ 1 ของเดือนนี้เริ่มวันที่ ${start}/${ym.slice(5,7)} กรุณาเลือกวันที่ตั้งแต่สัปดาห์ที่ 1 เป็นต้นไป`,'error');return;}if(plateletNoPoolInSlot(eventDate.slice(0,7),eventSlot,productType).length){showToast('มีคำชี้แจงในสัปดาห์นี้แล้ว กรุณาเปิดหลักฐานเดิม','error');return;}if(!note){showToast('กรุณาระบุเหตุผล','error');return;}if(!selectedFiles.some(f=>f.type.startsWith('image/')||/\.(png|jpe?g|webp|heic|heif)$/i.test(f.name))){showToast('ต้องแนบภาพจาก Ai-LIS อย่างน้อย 1 รูป','error');return;}const tooBig=selectedFiles.find(f=>f.size>10*1024*1024);if(tooBig){showToast(`${tooBig.name}: ไฟล์ต้องไม่เกิน 10 MB`,'error');return;}
+      if(!eventDate){showToast('กรุณาระบุวันที่อ้างอิงในสัปดาห์','error');return;}if(!productType){showToast('กรุณาเลือกชนิดผลิตภัณฑ์','error');return;}const eventSlot=rbcType?plateletWeekSlot(eventDate):plateletTrackingWeekSlot(eventDate);if(!eventSlot){const ym=eventDate.slice(0,7),[start]=plateletWeekRange(ym,1);showToast(`สัปดาห์ที่ 1 ของเดือนนี้เริ่มวันที่ ${start}/${ym.slice(5,7)} กรุณาเลือกวันที่ตั้งแต่สัปดาห์ที่ 1 เป็นต้นไป`,'error');return;}if(plateletNoPoolInSlot(eventDate.slice(0,7),eventSlot,productType).length){showToast('มีคำชี้แจงในสัปดาห์นี้แล้ว กรุณาเปิดหลักฐานเดิม','error');return;}if(!note){showToast('กรุณาระบุเหตุผล','error');return;}if(!selectedFiles.length){showToast('ต้องแนบหลักฐานจาก Ai-LIS อย่างน้อย 1 ไฟล์ (รูป / Excel / CSV / PDF)','error');return;}const invalid=selectedFiles.map(weeklyEvidenceFileError).find(Boolean);if(invalid){showToast(invalid,'error');return;}
+      const saveButton=$('#noPoolSave');if(saveButton.disabled)return;saveButton.disabled=true;saveButton.textContent='กำลังบันทึก…';const filesToUpload=selectedFiles.slice();
       try{
         const {data:event,error:eventErr}=await state.sb.from('platelet_weekly_events').insert({event_date:eventDate,product_type:productType,event_type:'no_pool',note,created_by:state.user.id}).select('*').single();if(eventErr)throw eventErr;
         const uploadedPaths=[];
         try{
-          for(let i=0;i<selectedFiles.length;i++){
-            const file=selectedFiles[i],pf=await optimizeEvidenceFile(file),clean=pf.uploadName,path=`platelet_weekly/${event.id}/evidence/${Date.now()}_${i}_${clean}`;
-            const {error:u}=await state.sb.storage.from('bloodqc-evidence').upload(path,pf.body,{upsert:false,contentType:pf.mime||undefined});if(u)throw u;uploadedPaths.push(path);
-            const {error:ferr}=await state.sb.from('platelet_weekly_evidence_files').insert({event_id:event.id,storage_path:path,original_name:file.name,mime_type:pf.mime,file_size:pf.body.size,uploaded_by:state.user.id});if(ferr)throw ferr;
+          for(let i=0;i<filesToUpload.length;i++){
+            const file=filesToUpload[i],pf=await prepareWeeklyEvidenceFile(file),clean=pf.uploadName,path=`platelet_weekly/${event.id}/evidence/${Date.now()}_${i}_${clean}`;
+            const {error:u}=await state.sb.storage.from('bloodqc-evidence').upload(path,pf.body,{upsert:false,contentType:pf.mime||undefined});if(u)throw new Error(evidenceUploadErrorText(u,file.name));uploadedPaths.push(path);
+            const {error:ferr}=await state.sb.from('platelet_weekly_evidence_files').insert({event_id:event.id,storage_path:path,original_name:file.name,mime_type:pf.mime,file_size:pf.body.size,uploaded_by:state.user.id});if(ferr)throw new Error(evidenceUploadErrorText(ferr,file.name));
           }
         }catch(uploadErr){if(uploadedPaths.length)await state.sb.storage.from('bloodqc-evidence').remove(uploadedPaths);await state.sb.from('platelet_weekly_evidence_files').delete().eq('event_id',event.id);await state.sb.from('platelet_weekly_events').delete().eq('id',event.id);throw uploadErr;}
-        await reloadPlateletWeeklyData();dlg.close();showToast(`บันทึกไม่มีผลิตภัณฑ์สัปดาห์นี้พร้อมหลักฐาน ${selectedFiles.length} ไฟล์แล้ว`,'good');if(state.currentView==='backlog')renderBacklog();else if(state.currentView==='home')renderHome();else if(rbcType)renderRbcDashboard();else renderDashboard();
-      }catch(e){showToast(errText(e),'error');}
+        await reloadPlateletWeeklyData();dlg.close();showToast(`บันทึกไม่มีผลิตภัณฑ์สัปดาห์นี้พร้อมหลักฐาน ${filesToUpload.length} ไฟล์แล้ว`,'good');if(state.currentView==='backlog')renderBacklog();else if(state.currentView==='home')renderHome();else if(rbcType)renderRbcDashboard();else renderDashboard();
+      }catch(e){showToast(errText(e),'error');}finally{saveButton.disabled=false;saveButton.textContent='บันทึกสถานะนี้';}
     };
   }
 
