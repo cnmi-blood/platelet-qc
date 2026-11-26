@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.59 — Modern Dashboard & Icons */
+/* CNMI Blood Component QC v5.3.60 — Prominent pH Pending & Schedule */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -90,10 +90,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.59 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.60 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.59 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.60 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     document.body.dataset.qcPage=route.page||'';
@@ -813,10 +813,10 @@
   function deletedBadge(r){ return r?.deleted_at ? '<span class="badge deleted">ลบแล้ว</span>' : ''; }
   function pHBadge(r){ if(!r.ph_measured_at||!r.expiry_at) return ''; return sameBangkokDate(r.ph_measured_at,r.expiry_at)?'<span class="badge pass">pH ตรงวัน Exp.</span>':'<span class="badge late">ตรวจ pH ล่าช้า · Process deviation</span>'; }
   function waitingPH(r){ return r.status==='draft' && !r.ph_value && r.expiry_at; }
-  function bangkokTodayKey(){ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()); }
+  function bangkokTodayKey(){ return inputFromISO(new Date().toISOString()).slice(0,10); }
   // pH is required for EVERY Platelet product, not only weekly QC samples.
-  // Future pH is scheduled work, NOT overdue or incomplete QC.
-  function plateletMeasurementTasks(r){
+  // Future pH is pending scheduled work, NOT overdue.
+  function plateletMeasurementTasks(r,today=bangkokTodayKey()){
     if(!r||r.deleted_at)return [];
     const tasks=[];
     if(r.record_purpose==='qc'&&r.status!=='locked'){
@@ -824,40 +824,55 @@
       if(r.wbc_adam==null)tasks.push({key:'adam',label:'ยังขาด ADAM',level:'missing'});
     }
     if(r.ph_value==null){
-      const expiry=r.expiry_at?inputFromISO(r.expiry_at).slice(0,10):'';
-      const today=bangkokTodayKey();
+      const expiry=r.expiry_at&&Number.isFinite(Date.parse(r.expiry_at))?inputFromISO(r.expiry_at).slice(0,10):'';
       if(expiry){
         const dueLabel=dateTH(r.expiry_at,false);
         if(expiry<today)tasks.push({key:'ph',label:`pH เกินกำหนด · ${dueLabel}`,level:'overdue'});
         else if(expiry===today)tasks.push({key:'ph',label:'วัด pH วันนี้',level:'due'});
-        else tasks.push({key:'ph',label:`pH กำหนด ${dueLabel}`,level:'upcoming'});
+        else tasks.push({key:'ph',label:`รอวัด pH · ${dueLabel}`,level:'upcoming'});
       }else tasks.push({key:'ph',label:'ยังไม่ระบุวันหมดอายุ / pH',level:'missing'});
     }
     return tasks;
   }
-  function plateletPendingRows(records){
-    return (records||[]).map(r=>({r,tasks:plateletMeasurementTasks(r)}))
-      .filter(x=>x.tasks.some(t=>t.level!=='upcoming'))
+  function plateletPendingRows(records,today=bangkokTodayKey()){
+    return (records||[]).filter(r=>{
+      if(!r||r.deleted_at)return false;
+      const date=plateletDateFromRecord(r)||qcDateNormalize(String(r.created_at||r.manufactured_on||'')).slice(0,10);
+      return /^20\d\d-\d\d-\d\d$/.test(date)&&date>='2026-10-01'&&date<=today;
+    }).map(r=>({r,tasks:plateletMeasurementTasks(r,today)}))
+      .filter(x=>x.tasks.length>0)
       .sort((a,b)=>{
-        const rank=x=>x.tasks.some(t=>t.level==='overdue')?0:x.tasks.some(t=>t.level==='due')?1:2;
+        const rank=x=>x.tasks.some(t=>t.level==='overdue')?0:x.tasks.some(t=>t.level==='due')?1:x.tasks.some(t=>t.level==='missing')?2:3;
         return rank(a)-rank(b)||String(a.r.expiry_at||'').localeCompare(String(b.r.expiry_at||''));
       });
   }
-  function plateletTaskSummaryBadge(r){
-    const tasks=plateletMeasurementTasks(r),pending=tasks.filter(t=>t.level!=='upcoming');
-    if(pending.length)return `<span class="badge ${pending.some(t=>t.level==='overdue'||t.level==='due')?'review':'incomplete'}">ค้าง ${pending.length}</span>`;
-    if(tasks.length)return '<span class="badge draft">pH ตามกำหนด</span>';
-    return '<span class="badge pass">ครบ</span>';
+  function plateletPhSummary(rows){
+    const ph=rows.filter(x=>x.tasks.some(t=>t.key==='ph'));
+    const count=level=>ph.filter(x=>x.tasks.some(t=>t.key==='ph'&&t.level===level)).length;
+    return {rows:ph,total:ph.length,overdue:count('overdue'),due:count('due'),upcoming:count('upcoming'),missing:count('missing')};
   }
-  function plateletReminderPanel(records){
-    const rows=plateletPendingRows(records);
-    const scheduled=(records||[]).map(r=>({r,tasks:plateletMeasurementTasks(r)}))
-      .filter(x=>x.tasks.some(t=>t.level==='upcoming'))
-      .sort((a,b)=>String(a.r.expiry_at||'').localeCompare(String(b.r.expiry_at||'')));
-    const urgent=rows.filter(x=>x.tasks.some(t=>t.level==='overdue'||t.level==='due')).length;
-    return `<div class="panel platelet-reminder-panel" id="platelet-pending-work"><div class="section-title-row"><h2>งานค้าง <span class="pending-count">${rows.length} ถุง</span></h2><span class="badge ${urgent?'review':'draft'}">pH ถึงกำหนด ${urgent}</span></div>
-      ${rows.length?`<div class="reminder-list">${rows.slice(0,12).map(({r,tasks})=>`<button type="button" class="reminder-row record-link" data-id="${r.id}"><div class="reminder-product"><strong>${esc(r.product_no)}</strong><small>${esc(r.product_type)}</small></div><div class="reminder-tags">${tasks.filter(t=>t.level!=='upcoming').map(t=>`<span class="reminder-tag ${t.level}">${esc(t.label)}</span>`).join('')}</div></button>`).join('')}</div>${rows.length>12?`<p class="muted small">มีอีก ${rows.length-12} ถุง · เปิดดูที่รายการ</p>`:''}`:'<p class="muted small" style="margin-top:10px">ไม่มีงานค้างที่ถึงกำหนด</p>'}
-      ${scheduled.length?`<details class="ph-schedule"><summary>pH รอวันหมดอายุ ${scheduled.length} ถุง</summary><div class="reminder-list">${scheduled.slice(0,20).map(({r,tasks})=>`<button type="button" class="reminder-row record-link" data-id="${r.id}"><strong>${esc(r.product_no)}</strong><span class="reminder-tag upcoming">${esc(tasks.find(t=>t.level==='upcoming').label)}</span></button>`).join('')}</div></details>`:''}</div>`;
+  function plateletTaskSummaryBadge(r){
+    const tasks=plateletMeasurementTasks(r);
+    if(!tasks.length)return '<span class="badge pass">ครบ</span>';
+    const ph=tasks.find(t=>t.key==='ph');
+    if(ph&&tasks.length===1)return `<span class="reminder-tag ${ph.level}">${esc(ph.label)}</span>`;
+    return `<span class="badge ${tasks.some(t=>t.level==='overdue'||t.level==='due')?'review':'incomplete'}">ค้าง ${tasks.length} รายการ${ph?' · pH':''}</span>`;
+  }
+  function plateletReminderRow({r,tasks}){
+    const ph=tasks.find(t=>t.key==='ph');
+    const quick=ph&&plateletCanEnterPh(r);
+    return `<div class="qc60-reminder-row ${ph?'has-ph '+ph.level:''}"><button type="button" class="qc60-record record-link" data-id="${esc(r.id)}"><strong>${esc(r.product_no)}</strong><small>${esc(r.product_type)}</small></button><div class="reminder-tags">${tasks.map(t=>`<span class="reminder-tag ${t.level}">${esc(t.label)}</span>`).join('')}${ph&&r.status!=='draft'?`<small class="muted">${esc(statusTH(r.status))} · ${r.status==='submitted'?'ให้แพทย์ส่งกลับหรือ Admin แก้ไขตามสิทธิ์':'ให้ Admin ตรวจสอบและแก้ไขตามสิทธิ์'}</small>`:''}</div>${quick?`<button type="button" class="btn qc60-ph-action platelet-ph-quick" data-id="${esc(r.id)}">บันทึก pH</button>`:`<button type="button" class="btn record-link" data-id="${esc(r.id)}">ดูรายการ</button>`}</div>`;
+  }
+  function plateletReminderPanel(records,compact=false){
+    const rows=plateletPendingRows(records),ph=plateletPhSummary(rows);
+    if(compact&&!ph.total)return '';
+    const selected=compact?ph.rows.slice(0,4):rows;
+    const urgent=ph.overdue+ph.due;
+    return `<section class="panel qc60-ph-panel ${ph.total?'has-pending':''} ${urgent?'has-urgent':''}" id="${compact?'home-ph-pending':'platelet-pending-work'}" aria-label="ติดตามงาน Platelet และ pH"><div class="qc60-ph-head"><div class="qc60-ph-title"><span class="ui59-icon" data-ui-icon="clock" aria-hidden="true"></span><div><h2>รอวัด pH <b>${ph.total} ถุง</b></h2><p>ทุกผลิตภัณฑ์ Platelet · รวม Prepare และ QC · ติดตามตั้งแต่ ต.ค. 2569</p></div></div>${compact?'<button class="btn" data-go-route="#/platelet">ดูงาน Platelet ทั้งหมด</button>':`<span class="qc60-total">งานค้างผลตรวจ / pH ${rows.length} ถุง</span>`}</div>
+      <div class="qc60-ph-counts"><div class="overdue"><strong>${ph.overdue}</strong><span>เลยกำหนด</span></div><div class="due"><strong>${ph.due}</strong><span>ต้องวัดวันนี้</span></div><div class="upcoming"><strong>${ph.upcoming}</strong><span>รอวันวัด</span></div><div class="missing"><strong>${ph.missing}</strong><span>รอระบุวันหมดอายุ</span></div></div>
+      ${selected.length?`<div class="qc60-reminder-list">${selected.map(plateletReminderRow).join('')}</div>`:'<p class="muted small">ไม่มีถุงที่รอผลตรวจหรือ pH จากข้อมูลที่โหลด</p>'}
+      ${compact&&ph.total>selected.length?`<button class="btn" data-go-route="#/platelet">ดูอีก ${ph.total-selected.length} ถุง</button>`:''}
+      <p class="qc60-ph-note">รอวันวัด = งานที่ยังไม่เสร็จ แต่ยังไม่เลยกำหนด · ไม่ใช่ผล QC ไม่ผ่าน</p></section>`;
   }
 
   function bindRouteButtons(root=document){
@@ -1321,9 +1336,9 @@
       for(const r of live){
         const actual=backlogDate(module,r),date=actual||qcDateNormalize(String(r.created_at||r.manufactured_on||'')).slice(0,10),ym=date.slice(0,7);if(!/^20\d\d-\d\d$/.test(ym)||ym<floor||date>today)continue;
         const slot=actual?(module==='platelet'?plateletTrackingWeekSlot(date):plateletWeekSlot(date)):null,base={module,type:r.product_type,ym,slot,record:r,overdue:false};
-        if(r.status==='submitted'&&(module!=='platelet'||r.record_purpose==='qc')){jobs.push({...base,kind:'review',label:'รอแพทย์ตรวจทวน'});continue;}
+        if(r.status==='submitted'&&(module!=='platelet'||r.record_purpose==='qc')){jobs.push({...base,kind:'review',label:module==='platelet'&&r.ph_value==null?'รอแพทย์ตรวจทวน · ยังขาด pH (พิจารณาส่งกลับแก้ไข)':'รอแพทย์ตรวจทวน'});continue;}
         if(r.status!=='locked'&&module==='rbc'&&rbcUsesFilterDate(r.product_type)&&(!r.filtered_on||rbcAgeDays(r)==null||rbcAgeDays(r)<0)){jobs.push({...base,kind:'result',label:'รอตรวจสอบวันที่เจาะเก็บ / วันที่กรอง'});continue;}
-        if(module==='platelet'){const tasks=plateletMeasurementTasks(r).filter(t=>t.level!=='upcoming');if(tasks.length)jobs.push({...base,kind:'result',label:tasks.map(t=>t.label||t.title||'รอผลตรวจ/pH').join(' · ')});}
+        if(module==='platelet'){const tasks=plateletMeasurementTasks(r,today),ph=tasks.find(t=>t.key==='ph');if(tasks.length)jobs.push({...base,kind:ph?'ph':'result',overdue:ph?.level==='overdue',label:tasks.map(t=>t.label||'รอผลตรวจ/pH').join(' · ')});}
         else if(r.status!=='locked'&&module==='plasma'&&(!r.outlab_batch_id||r.factor_viii_percent==null||r.qc_status==='incomplete'))jobs.push({...base,kind:r.outlab_batch_id&&r.factor_viii_percent==null?'outlab':'result',label:!r.outlab_batch_id?'รอจัดชุดนำส่ง':r.factor_viii_percent==null?'รอผล Factor VIII':'ข้อมูล QC ยังไม่ครบ'});
         else if(r.status!=='locked'&&module==='rbc'&&rbcEligible(r)&&rbcEffectiveQcStatus(r)==='incomplete')jobs.push({...base,kind:'result',label:'ข้อมูล QC ยังไม่ครบ'});
         if(!jobs.some(j=>j.record?.id===r.id&&j.module===module&&j.kind!=='missing')&&r.status==='draft'&&(module==='platelet'?r.record_purpose==='qc'&&plateletMeasurementsComplete(r):module==='plasma'?r.factor_viii_percent!=null&&r.qc_status!=='incomplete':rbcEligible(r)&&rbcEffectiveQcStatus(r)!=='incomplete'))jobs.push({...base,kind:'submit',label:'รอส่งแพทย์ตรวจทวน'});
@@ -1350,7 +1365,7 @@
     return `<div class="ui59-month-grid">${Object.entries(counts).map(([ym,n])=>{const split=backlogSplit(jobs.filter(j=>j.ym===ym));return `<button type="button" class="ui59-month ${backlog?'backlog-month':''} ${selected===ym?'is-selected':''}" ${backlog?`data-month="${esc(ym)}" aria-pressed="${selected===ym}"`:`data-go-route="#/backlog" data-backlog-month="${esc(ym)}"`}><span class="ui59-month-head"><span class="ui59-icon" data-ui-icon="calendar" aria-hidden="true"></span><strong>${esc(plateletMonthLabel(ym))}</strong><b>${n}</b></span><span class="ui59-month-split"><span>เจ้าหน้าที่ <strong>${split.staff}</strong></span><span>แพทย์ <strong>${split.doctor}</strong></span></span><span class="ui59-month-bar" aria-hidden="true"><i style="width:${100*split.staff/n}%"></i></span></button>`;}).join('')||'<p class="muted small">ไม่พบงานค้างจากข้อมูลที่โหลด</p>'}</div>`;
   }
   function ui59TaskLinks(jobs){
-    const items=[['missing','alert','เก็บ QC / ชี้แจง'],['result','file','ผลตรวจ / ข้อมูลไม่ครบ'],['outlab','clock','รอผล Outlab'],['submit','doctor','รอส่งแพทย์']];
+    const items=[['ph','clock','รอวัด pH'],['missing','alert','เก็บ QC / ชี้แจง'],['result','file','ผลตรวจ / ข้อมูลไม่ครบ'],['outlab','clock','รอผล Outlab'],['submit','doctor','รอส่งแพทย์']];
     return `<div class="ui59-task-strip"><span>งานเจ้าหน้าที่</span>${items.map(([kind,icon,label])=>`<button type="button" class="ui59-task-link" data-go-route="#/backlog" data-backlog-party="staff" data-backlog-kind="${kind}"><span class="ui59-icon" data-ui-icon="${icon}" aria-hidden="true"></span>${label}<b>${jobs.filter(j=>j.party==='staff'&&j.kind===kind).length}</b></button>`).join('')}</div>`;
   }
   function backlogHomeHtml(jobs){return `<div class="panel ui59-history"><div class="section-title-row"><div><h2><span class="ui59-icon" data-ui-icon="calendar" aria-hidden="true"></span> งานค้างรายเดือน</h2><p class="muted small">รวมย้อนหลังตั้งแต่ 1 ตุลาคม 2569 · ไม่หายเมื่อเปลี่ยนเดือน</p></div><button class="btn" data-go-route="#/backlog">เปิดงานทั้งหมด</button></div>${ui59MonthButtons(jobs)}${!state.plateletWeeklyReady?'<p class="muted small">ไม่สามารถโหลดหลักฐานรายสัปดาห์</p>':''}</div>`;}
@@ -1364,9 +1379,9 @@
     const options=(arr,value)=>arr.map(([v,l])=>`<option value="${esc(v)}" ${v===value?'selected':''}>${esc(l)}</option>`).join('');
     const names=[...new Set(selection.map(owner).filter(Boolean))].sort();
     const visible=selection.filter(j=>!f.owner||owner(j)===f.owner);
-    host.innerHTML=`<div class="page-head"><div><h1>ติดตามงาน QC ค้างทั้งหมด</h1><p class="muted">${jobs.length} งาน · ${backlogSplitText(jobs)} · ${months.length} เดือน</p></div><div class="actions"><button class="btn" id="backlogRefresh">โหลดใหม่</button><button class="btn" data-go-route="#/nonconformance">Corrective Action</button></div></div><div class="panel"><h2>เดือนที่ยังไม่ครบ</h2>${ui59MonthButtons(jobs,true,f.month)}<p class="muted small">เริ่มติดตาม 1 ตุลาคม 2569 · ไม่สร้างงานสัปดาห์อนาคต · ${!state.plateletWeeklyReady?'คำเตือน: โหลดหลักฐานไม่ได้ · ':''}${!state.plasmaReady||!state.rbcReady?'คำเตือน: บางโมดูลโหลดไม่ได้ · ':''}ใช้รายการตามสิทธิ์ฐานข้อมูลของบัญชีนี้</p></div><div class="panel"><div class="form-grid"><div class="field"><label>ฝ่ายที่รับผิดชอบงาน</label><select id="blParty">${options([['','ทุกฝ่าย'],['staff','เจ้าหน้าที่'],['doctor','แพทย์']],f.party||'')}</select></div><div class="field"><label>เดือน</label><select id="blMonth">${options([['','ทุกเดือน'],...months.map(m=>[m,plateletMonthLabel(m)])],f.month)}</select></div><div class="field"><label>ผลิตภัณฑ์</label><select id="blModule">${options([['','ทุกกลุ่ม'],['platelet','Platelet'],['plasma','Plasma'],['rbc','RBC']],f.module)}</select></div><div class="field"><label>สถานะ</label><select id="blKind">${options([['','ทุกสถานะ'],['missing','ยังไม่ได้เก็บ'],['result','รอผล / ข้อมูล'],['outlab','รอผล Outlab'],['submit','รอส่งแพทย์'],['ack','รอแพทย์รับทราบ'],['review','รอแพทย์ตรวจทวน']],f.kind)}</select></div><div class="field"><label>ผู้รับผิดชอบตามแผน</label><select id="blOwner">${options([['','ทุกคน'],...names.map(n=>[n,n])],f.owner)}</select></div></div><p class="muted small">แสดง ${visible.length} งาน · ${selection.filter(j=>j.kind==='missing'&&j.overdue).length} งานเก็บ QC เลยกำหนด</p><div class="platelet-week-popup-list">${visible.map((j,i)=>`<div class="platelet-week-popup-row ui59-backlog-row ${j.party==='doctor'?'ui59-doctor-row':'ui59-staff-row'} ${j.kind==='missing'&&j.overdue?'pending':''}"><div><span class="ui59-party ${j.party}">${esc(backlogPartyLabel(j))}</span><strong>${esc(j.type)} · ${esc(plateletMonthLabel(j.ym))}</strong><small>${j.slot?esc(j.module==='platelet'?plateletTrackingWeekLabel(j.ym,j.slot):plateletWeekLabel(j.ym,j.slot)):'ไม่อยู่ในรอบสัปดาห์'} · ${esc(j.slot?plannedOwnerText(j.ym,j.slot,j.module,j.type):'รอตรวจสอบวันที่')}</small><small>${esc(j.label)}${esc(j.kind==='missing'&&!j.overdue?'':backlogAgeText(j))}${j.kind==='missing'?(j.overdue?' · เลยกำหนด':' · สัปดาห์นี้'):''}${j.record?' · '+esc(j.record.product_no)+' · ผู้สร้าง '+esc(profileName(j.record.created_by)):''}</small></div><div class="platelet-week-popup-actions">${j.event?`<button class="btn tiny-btn bl-action" data-i="${i}" data-action="evidence">ดูหลักฐาน</button>`:j.record?`<button class="btn tiny-btn bl-action" data-i="${i}" data-action="record">เปิดรายการ</button>`:staffWriteUi()?`<button class="btn tiny-btn bl-action" data-i="${i}" data-action="new">บันทึก QC</button>`:''}${j.kind==='missing'&&!j.record&&staffWriteUi()&&backlogCanExplain(j.module,j.type)?`<button class="btn tiny-btn bl-action" data-i="${i}" data-action="explain">ชี้แจง / แนบหลักฐาน</button>`:''}</div></div>`).join('')||'<div class="empty">ไม่มีงานตามตัวกรอง</div>'}</div></div>`;
+    host.innerHTML=`<div class="page-head"><div><h1>ติดตามงาน QC ค้างทั้งหมด</h1><p class="muted">${jobs.length} งาน · ${backlogSplitText(jobs)} · ${months.length} เดือน</p></div><div class="actions"><button class="btn" id="backlogRefresh">โหลดใหม่</button><button class="btn" data-go-route="#/nonconformance">Corrective Action</button></div></div><div class="panel"><h2>เดือนที่ยังไม่ครบ</h2>${ui59MonthButtons(jobs,true,f.month)}<p class="muted small">เริ่มติดตาม 1 ตุลาคม 2569 · ไม่สร้างงานสัปดาห์อนาคต · ${!state.plateletWeeklyReady?'คำเตือน: โหลดหลักฐานไม่ได้ · ':''}${!state.plasmaReady||!state.rbcReady?'คำเตือน: บางโมดูลโหลดไม่ได้ · ':''}ใช้รายการตามสิทธิ์ฐานข้อมูลของบัญชีนี้</p></div><div class="panel"><div class="form-grid"><div class="field"><label>ฝ่ายที่รับผิดชอบงาน</label><select id="blParty">${options([['','ทุกฝ่าย'],['staff','เจ้าหน้าที่'],['doctor','แพทย์']],f.party||'')}</select></div><div class="field"><label>เดือน</label><select id="blMonth">${options([['','ทุกเดือน'],...months.map(m=>[m,plateletMonthLabel(m)])],f.month)}</select></div><div class="field"><label>ผลิตภัณฑ์</label><select id="blModule">${options([['','ทุกกลุ่ม'],['platelet','Platelet'],['plasma','Plasma'],['rbc','RBC']],f.module)}</select></div><div class="field"><label>สถานะ</label><select id="blKind">${options([['','ทุกสถานะ'],['missing','ยังไม่ได้เก็บ'],['ph','รอวัด pH (รวมรอวันวัด)'],['result','รอผล / ข้อมูล'],['outlab','รอผล Outlab'],['submit','รอส่งแพทย์'],['ack','รอแพทย์รับทราบ'],['review','รอแพทย์ตรวจทวน']],f.kind)}</select></div><div class="field"><label>ผู้รับผิดชอบตามแผน</label><select id="blOwner">${options([['','ทุกคน'],...names.map(n=>[n,n])],f.owner)}</select></div></div><p class="muted small">แสดง ${visible.length} งาน · ${selection.filter(j=>j.kind==='missing'&&j.overdue).length} งานเก็บ QC เลยกำหนด</p><div class="platelet-week-popup-list">${visible.map((j,i)=>`<div class="platelet-week-popup-row ui59-backlog-row ${j.party==='doctor'?'ui59-doctor-row':'ui59-staff-row'} ${j.kind==='missing'&&j.overdue?'pending':''}"><div><span class="ui59-party ${j.party}">${esc(backlogPartyLabel(j))}</span><strong>${esc(j.type)} · ${esc(plateletMonthLabel(j.ym))}</strong><small>${j.slot?esc(j.module==='platelet'?plateletTrackingWeekLabel(j.ym,j.slot):plateletWeekLabel(j.ym,j.slot)):'ไม่อยู่ในรอบสัปดาห์'} · ${esc(j.slot?plannedOwnerText(j.ym,j.slot,j.module,j.type):'รอตรวจสอบวันที่')}</small><small>${esc(j.label)}${esc(j.kind==='missing'&&!j.overdue?'':backlogAgeText(j))}${j.kind==='missing'?(j.overdue?' · เลยกำหนด':' · สัปดาห์นี้'):''}${j.record?' · '+esc(j.record.product_no)+' · ผู้สร้าง '+esc(profileName(j.record.created_by)):''}</small></div><div class="platelet-week-popup-actions">${j.event?`<button class="btn tiny-btn bl-action" data-i="${i}" data-action="evidence">ดูหลักฐาน</button>`:j.record?`<button class="btn tiny-btn bl-action" data-i="${i}" data-action="record">${j.kind==='ph'&&plateletCanEnterPh(j.record)?'บันทึก pH':'เปิดรายการ'}</button>`:staffWriteUi()?`<button class="btn tiny-btn bl-action" data-i="${i}" data-action="new">บันทึก QC</button>`:''}${j.kind==='missing'&&!j.record&&staffWriteUi()&&backlogCanExplain(j.module,j.type)?`<button class="btn tiny-btn bl-action" data-i="${i}" data-action="explain">ชี้แจง / แนบหลักฐาน</button>`:''}</div></div>`).join('')||'<div class="empty">ไม่มีงานตามตัวกรอง</div>'}</div></div>`;
     $('#backlogRefresh').onclick=()=>{state.staffPlannerOwnersByMonth={};state.backlogPlannerLoading=new Set();renderBacklog(true);};for(const [id,key] of [['blParty','party'],['blMonth','month'],['blModule','module'],['blKind','kind'],['blOwner','owner']])$('#'+id).onchange=e=>{f[key]=e.target.value;if(key!=='owner')f.owner='';renderBacklog();};$$('.backlog-month',host).forEach(b=>b.onclick=()=>{f.month=b.dataset.month;f.owner='';renderBacklog();});
-    $$('.bl-action',host).forEach(b=>b.onclick=()=>{const j=visible[Number(b.dataset.i)],action=b.dataset.action;if(action==='evidence')return viewPlateletWeeklyEvidence(j.event.id);if(action==='explain')return openPlateletNoPoolDialog(j.module==='rbc'?j.type:null,backlogRefDate(j.ym,j.slot,j.module),j.module==='platelet'?j.type:null);if(action==='record'&&(j.kind==='review'||j.record.status!=='draft'||!staffWriteUi()))return j.module==='platelet'?openDetail(j.record.id):j.module==='plasma'?openPlasmaDetail(j.record.id):openRbcDetail(j.record.id);const key={platelet:'currentRecordId',plasma:'currentPlasmaRecordId',rbc:'currentRbcRecordId'}[j.module];state[key]=j.record?.id||null;state.backlogNewContext=j.record?null:j;location.hash=ROUTES[j.module].record;});
+    $$('.bl-action',host).forEach(b=>b.onclick=()=>{const j=visible[Number(b.dataset.i)],action=b.dataset.action;if(action==='evidence')return viewPlateletWeeklyEvidence(j.event.id);if(action==='record'&&j.kind==='ph'&&plateletCanEnterPh(j.record))return openPlateletPhEntry(j.record.id);if(action==='explain')return openPlateletNoPoolDialog(j.module==='rbc'?j.type:null,backlogRefDate(j.ym,j.slot,j.module),j.module==='platelet'?j.type:null);if(action==='record'&&(j.kind==='review'||j.record.status!=='draft'||!staffWriteUi()))return j.module==='platelet'?openDetail(j.record.id):j.module==='plasma'?openPlasmaDetail(j.record.id):openRbcDetail(j.record.id);const key={platelet:'currentRecordId',plasma:'currentPlasmaRecordId',rbc:'currentRbcRecordId'}[j.module];state[key]=j.record?.id||null;state.backlogNewContext=j.record?null:j;location.hash=ROUTES[j.module].record;});
     bindRouteButtons(host);updateBacklogBadge();const missing=[...new Set(selection.map(j=>j.ym))].filter(m=>!Array.isArray(state.staffPlannerOwnersByMonth[m])&&!state.backlogPlannerLoading?.has(m));if(missing.length){state.backlogPlannerLoading ||= new Set();for(const m of missing)state.backlogPlannerLoading.add(m);for(const m of missing)await loadStaffPlannerOwners(m);if(state.currentView==='backlog')renderBacklog();}
   }
 
@@ -1378,6 +1393,7 @@
     const homeJobs=buildBacklog().jobs;
     $('#view-home').innerHTML=`
       <div class="page-head"><div><h1>CNMI Blood Component QC</h1><p class="muted">ระบบบันทึกและควบคุมคุณภาพส่วนประกอบโลหิต</p></div></div>
+      ${plateletReminderPanel(rec,true)}
       ${homeSummaryHtml(homeJobs)}
       ${ui59TaskLinks(homeJobs)}
       ${backlogHomeHtml(homeJobs)}
@@ -1394,7 +1410,7 @@
 
       ${reviewerUi()?`<div class="panel review-home-panel"><div class="section-title-row"><h2>งานรอตรวจทวน</h2><span class="badge submitted">${pendingReviewRecords().length}</span></div><div class="actions left-actions"><button class="btn primary" data-go-route="#/review">เปิดงานรอตรวจทวน</button></div></div>`:''}
       ${adminUi()?`<div class="panel core-admin-panel"><h2>Admin</h2><div class="actions left-actions"><button class="btn" data-go-route="#/admin/users">ผู้ใช้งานระบบ</button><button class="btn" data-go-route="#/admin/audit">ประวัติการใช้งาน</button></div></div>`:''}`;
-    bindRouteButtons($('#view-home')); updateBacklogBadge();
+    bindRouteButtons($('#view-home')); bindRecordLinks($('#view-home')); updateBacklogBadge();
   }
 
   function futureModuleCard(module,label){
@@ -1514,10 +1530,10 @@
     $('#view-dashboard').innerHTML=`
       <div class="page-head"><div><h1>Platelet</h1></div><div class="actions"><input id="plateletDashMonth" class="month-input" type="month" value="${esc(ym)}"><button class="btn" data-go-route="#/platelet/guide">คู่มือ</button><button class="btn" data-go-route="#/platelet/split">แบ่งจ่าย</button>${staffWriteUi()?'<button class="btn" id="plateletNoPoolBtn">ไม่มีผลิตภัณฑ์</button><button class="btn primary" id="dashNew">+ บันทึก Platelet</button>':''}${reviewerUi()?'<button class="btn" data-go-route="#/review">งานรอตรวจทวน</button>':''}</div></div>
       <div class="grid cards">
-        ${metric('เดือนนี้',month.length,'ถุง')}${metric('ดำเนินการครบ 4 สัปดาห์',`${typesComplete}/${products.length||0}`,'ชนิด')}${metric('QC จริง',qc,'ถุง')}${metric('งานค้าง',plateletPendingRows(rec).length,'ถุง')}${metric('รอแพทย์',submitted,'ถุง')}
+        ${metric('เดือนนี้',month.length,'ถุง')}${metric('ดำเนินการครบ 4 สัปดาห์',`${typesComplete}/${products.length||0}`,'ชนิด')}${metric('QC จริง',qc,'ถุง')}${metric('งานค้างผลตรวจ / pH',plateletPendingRows(rec).length,'ถุง · รวมรอวันวัด')}${metric('รอแพทย์',submitted,'ถุง')}
       </div>
-      <div class="panel qc-tracking-panel"><div class="section-title-row"><div><h2>ความครบถ้วนรายสัปดาห์</h2></div></div><div class="platelet-progress-grid">${productCards||'<div class="empty">ยังไม่มีชนิดผลิตภัณฑ์ที่เปิดใช้งาน</div>'}</div></div>
       ${plateletReminderPanel(rec)}
+      <div class="panel qc-tracking-panel"><div class="section-title-row"><div><h2>ความครบถ้วนรายสัปดาห์</h2></div></div><div class="platelet-progress-grid">${productCards||'<div class="empty">ยังไม่มีชนิดผลิตภัณฑ์ที่เปิดใช้งาน</div>'}</div></div>
       <div class="panel"><h2>รายการล่าสุด</h2>${recordsTable(rec.slice(0,12))}</div>`;
     $('#plateletDashMonth').onchange=e=>{state.plateletDashboardMonth=e.target.value||plateletMonthKey();renderDashboard();};
     if($('#plateletNoPoolBtn'))$('#plateletNoPoolBtn').onclick=()=>openPlateletNoPoolDialog();
