@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.56 — Date validation, Post-Storage age and weekly evidence review */
+/* CNMI Blood Component QC v5.3.57 — Date validation, Post-Storage age and weekly evidence review */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -26,7 +26,7 @@
   const activeProducts = () => state.productSettings.filter(x=>x.is_active).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||a.product_type.localeCompare(b.product_type));
   const productOptions = selected => activeProducts().map(x=>`<option value="${esc(x.product_type)}" ${selected===x.product_type?'selected':''}>${esc(x.product_type)}</option>`).join('');
   const ROUTES = {
-    home:'#/',
+    home:'#/', backlog:'#/backlog',
     platelet:{dashboard:'#/platelet',record:'#/platelet/new',records:'#/platelet/records',guide:'#/platelet/guide',split:'#/platelet/split',settings:'#/platelet/qc_settings'},
     rbc:{dashboard:'#/rbc',record:'#/rbc/new',records:'#/rbc/records',guide:'#/rbc/guide',settings:'#/rbc/qc_settings'},
     plasma:{dashboard:'#/plasma',record:'#/plasma/new',records:'#/plasma/records',guide:'#/plasma/guide',settings:'#/plasma/qc_settings'},
@@ -52,7 +52,7 @@
     plasma:{label:'Plasma',title:'Plasma Preparation & QC',active:true}
   };
   function routeForView(v){
-    const m={home:ROUTES.home,dashboard:ROUTES.platelet.dashboard,record:ROUTES.platelet.record,records:ROUTES.platelet.records,guide:ROUTES.platelet.guide,settings:ROUTES.platelet.settings,review:ROUTES.review,nonconformance:ROUTES.nonconformance,users:ROUTES.users,audit:ROUTES.audit};
+    const m={home:ROUTES.home,backlog:ROUTES.backlog,dashboard:ROUTES.platelet.dashboard,record:ROUTES.platelet.record,records:ROUTES.platelet.records,guide:ROUTES.platelet.guide,settings:ROUTES.platelet.settings,review:ROUTES.review,nonconformance:ROUTES.nonconformance,users:ROUTES.users,audit:ROUTES.audit};
     return m[v] || ROUTES.home;
   }
   function cleanHash(){ return (location.hash||'').replace(/\/+$/,'') || '#/'; }
@@ -61,6 +61,7 @@
     const legacy={'#/platelet/admin':ROUTES.platelet.settings,'#/platelet/audit':ROUTES.audit};
     if(legacy[h]){ history.replaceState(null,'',location.pathname+location.search+legacy[h]); h=legacy[h]; }
     if(h==='#/' || h==='#') return {view:'home',module:null,page:'home',hash:ROUTES.home};
+    if(h===ROUTES.backlog) return {view:'backlog',module:null,page:'backlog',hash:h};
     if(h===ROUTES.review) return {view:'review',module:null,page:'review',hash:h,reviewerOnly:true};
     if(h===ROUTES.nonconformance) return {view:'nonconformance',module:null,page:'nonconformance',hash:h};
     if(h===ROUTES.users) return {view:'users',module:null,page:'users',hash:h,adminOnly:true};
@@ -89,10 +90,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.56 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.57 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.56 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.57 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     $$('#mainTabs button[data-route]').forEach(b=>b.classList.remove('active'));
@@ -145,7 +146,7 @@
       const rows=(data||[]).map(x=>({month_key:String(x.month_key||ym),week_slot:Number(x.week_slot),position_code:String(x.position_code||''),staff_nickname:String(x.staff_nickname||'').trim(),assignment_days:Number(x.assignment_days||0),first_work_date:x.first_work_date||null,last_work_date:x.last_work_date||null}));
       state.staffPlannerOwnersByMonth[ym]=rows;state.staffPlannerBridgeStatus='ready';return rows;
     }catch(e){
-      console.warn('Staff Planner bridge unavailable',e);state.staffPlannerBridgeStatus='error';state.staffPlannerBridgeError=errText(e);state.staffPlannerOwnersByMonth[ym]=[];return [];
+      console.warn('Staff Planner bridge unavailable',e);state.staffPlannerBridgeStatus='error';state.staffPlannerBridgeError=errText(e);delete state.staffPlannerOwnersByMonth[ym];return [];
     }
   }
   function qcOwnerPosition(module,productType=''){
@@ -155,16 +156,17 @@
     if(module==='platelet'&&/^LDPPC(?:\s|$)/i.test(type))return 'BB-Manual 4';
     return 'BB-Manual 3';
   }
+  function plannerPositionKey(v){return String(v||'').normalize('NFKC').toLowerCase().replace(/[^a-z0-9]/g,'');}
   function plannedOwnerRow(ym,slot,module,productType=''){
     const pos=qcOwnerPosition(module,productType),rows=state.staffPlannerOwnersByMonth[ym]||[];
-    return rows.find(x=>Number(x.week_slot)===Number(slot)&&x.position_code===pos)||null;
+    return rows.find(x=>Number(x.week_slot)===Number(slot)&&plannerPositionKey(x.position_code)===plannerPositionKey(pos))||null;
   }
   function plannedOwnerText(ym,slot,module,productType=''){
     const pos=qcOwnerPosition(module,productType),row=plannedOwnerRow(ym,slot,module,productType);
     if(row?.staff_nickname)return `ผู้รับผิดชอบ: ${row.staff_nickname} · ${pos}`;
     if(state.staffPlannerBridgeStatus==='unconfigured')return `ตำแหน่งผู้รับผิดชอบ: ${pos} · ยังไม่ได้ตั้งค่าการเชื่อม Staff Planner`;
     if(state.staffPlannerBridgeStatus==='error')return `ตำแหน่งผู้รับผิดชอบ: ${pos} · เชื่อม Staff Planner ไม่สำเร็จ`;
-    return `ตำแหน่งผู้รับผิดชอบ: ${pos} · ยังไม่พบผู้รับผิดชอบในสัปดาห์นี้`;
+    const available=[...new Set((state.staffPlannerOwnersByMonth[ym]||[]).filter(x=>x.week_slot===Number(slot)).map(x=>x.position_code))];return `ตำแหน่งผู้รับผิดชอบ: ${pos} · ยังไม่พบผู้รับผิดชอบ${available.length?' (รหัสที่ได้รับ: '+available.join(', ')+')':''}`;
   }
   function plannedOwnerSummaryHtml(ym,module,productType=''){
     const pos=qcOwnerPosition(module,productType),rows=[1,2,3,4].map(slot=>({slot,row:plannedOwnerRow(ym,slot,module,productType)}));
@@ -282,7 +284,8 @@
     if(!reviewerUi() && activeView()==='review'){ location.hash=ROUTES.home; return; }
     if(render){
       const v=activeView();
-      if(v==='home') renderHome(); else if(v==='dashboard') renderDashboard(); else if(v==='records') renderRecordsList(); else if(v==='record') renderRecordForm(); else if(v==='review'&&reviewerUi()) renderReviewQueue(); else if(v==='nonconformance') renderNonconformancePage(); else if(v==='settings'&&adminUi()) renderSettings(); else if(v==='users'&&adminUi()) renderUsers(); else if(v==='audit'&&adminUi()) renderAuditLog(); else if(v==='module') renderModulePlaceholder(state.currentModule,state.currentPage);
+      if(v==='home') renderHome();
+      else if(v==='backlog') renderBacklog(true); else if(v==='dashboard') renderDashboard(); else if(v==='records') renderRecordsList(); else if(v==='record') renderRecordForm(); else if(v==='review'&&reviewerUi()) renderReviewQueue(); else if(v==='nonconformance') renderNonconformancePage(); else if(v==='settings'&&adminUi()) renderSettings(); else if(v==='users'&&adminUi()) renderUsers(); else if(v==='audit'&&adminUi()) renderAuditLog(); else if(v==='module') renderModulePlaceholder(state.currentModule,state.currentPage);
     }
   }
   function setUiMode(mode){
@@ -436,15 +439,20 @@
 
   async function loadSettings(){ const {data,error}=await state.sb.from('qc_settings').select('*').eq('id',1).single(); if(error) throw error; state.settings=data; }
   async function loadProductSettings(){ const {data,error}=await state.sb.from('platelet_product_settings').select('*').order('sort_order').order('product_type'); if(error) throw error; state.productSettings=data||[]; }
+  async function qcAllRows(table,liveOnly=false){
+    const rows=[]; let cursor=null;
+    while(true){let q=state.sb.from(table).select('*').order('id').limit(500);if(liveOnly)q=q.is('deleted_at',null);if(cursor!==null)q=q.gt('id',cursor);const {data,error}=await q;if(error)return {data:null,error};if(!data?.length)break;rows.push(...data);const next=data[data.length-1].id;if(next==null||next===cursor)return {data:null,error:new Error('Pagination cursor invalid: '+table)};cursor=next;}
+    return {data:rows,error:null};
+  }
   async function loadRecords(){
-    const {data,error}=await state.sb.from('platelet_records').select('*').order('collection_at',{ascending:false}).limit(1000);
-    if(error) throw error; state.records=(data||[]).map(qcNormalizeRow); updateNcNavBadge();
+    const {data,error}=await qcAllRows('platelet_records');
+    if(error) throw error; state.records=(data||[]).map(qcNormalizeRow).sort((a,b)=>String(b.collection_at||'').localeCompare(String(a.collection_at||''))||String(b.created_at||'').localeCompare(String(a.created_at||''))); updateNcNavBadge();
   }
   async function loadPlateletWeeklyData(){
     try{
       const [evRes,fileRes]=await Promise.all([
-        state.sb.from('platelet_weekly_events').select('*').is('deleted_at',null).order('event_date',{ascending:false}).order('created_at',{ascending:false}).limit(300),
-        state.sb.from('platelet_weekly_evidence_files').select('*').order('created_at',{ascending:false}).limit(600)
+        qcAllRows('platelet_weekly_events',true),
+        qcAllRows('platelet_weekly_evidence_files')
       ]);
       if(evRes.error)throw evRes.error;if(fileRes.error)throw fileRes.error;
       state.plateletWeeklyEvents=(evRes.data||[]).map(qcNormalizeRow);state.plateletWeeklyEvidence=fileRes.data||[];state.plateletWeeklyReady=true;
@@ -598,14 +606,14 @@
       const [settingsRes,productsRes,recordsRes,batchesRes]=await Promise.all([
         state.sb.from('plasma_qc_settings').select('*').eq('id',1).single(),
         state.sb.from('plasma_product_settings').select('*').order('sort_order').order('product_type'),
-        state.sb.from('plasma_records').select('*').order('manufactured_on',{ascending:false}).limit(1000),
+        qcAllRows('plasma_records'),
         state.sb.from('plasma_outlab_batches').select('*').order('sent_at',{ascending:false}).limit(300)
       ]);
       const firstError=[settingsRes.error,productsRes.error,recordsRes.error,batchesRes.error].find(Boolean);
       if(firstError) throw firstError;
       state.plasmaSettings=settingsRes.data;
       state.plasmaProductSettings=productsRes.data||[];
-      state.plasmaRecords=(recordsRes.data||[]).map(qcNormalizeRow);
+      state.plasmaRecords=(recordsRes.data||[]).map(qcNormalizeRow).sort((a,b)=>String(b.manufactured_on||'').localeCompare(String(a.manufactured_on||''))||String(b.created_at||'').localeCompare(String(a.created_at||'')));
       state.plasmaBatches=batchesRes.data||[];
       state.plasmaReady=true;
     }catch(e){
@@ -613,7 +621,7 @@
       state.plasmaSettings=null; state.plasmaProductSettings=[]; state.plasmaRecords=[]; state.plasmaBatches=[]; state.plasmaReady=false;
     }
   }
-  async function reloadPlasmaRecords(){ if(!state.plasmaReady)return; const {data,error}=await state.sb.from('plasma_records').select('*').order('manufactured_on',{ascending:false}).limit(1000); if(error)throw error; state.plasmaRecords=(data||[]).map(qcNormalizeRow); updateNcNavBadge(); }
+  async function reloadPlasmaRecords(){ if(!state.plasmaReady)return; const {data,error}=await qcAllRows('plasma_records'); if(error)throw error; state.plasmaRecords=(data||[]).map(qcNormalizeRow).sort((a,b)=>String(b.manufactured_on||'').localeCompare(String(a.manufactured_on||''))||String(b.created_at||'').localeCompare(String(a.created_at||''))); updateNcNavBadge(); }
   async function reloadPlasmaBatches(){ if(!state.plasmaReady)return; const {data,error}=await state.sb.from('plasma_outlab_batches').select('*').order('sent_at',{ascending:false}).limit(300); if(error)throw error; state.plasmaBatches=data||[]; }
   const plasmaProductSetting = type => state.plasmaProductSettings.find(x=>x.product_type===type);
   const activePlasmaProducts = () => state.plasmaProductSettings.filter(x=>x.is_active).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||a.product_type.localeCompare(b.product_type));
@@ -754,6 +762,8 @@
     if(!host){ location.hash=ROUTES.home; return; }
     host.classList.remove('hidden');
     if(v==='home') renderHome();
+    if(v==='backlog') renderBacklog(true);
+    else updateBacklogBadge();
     if(v==='dashboard') renderDashboard();
     if(v==='records') renderRecordsList();
     if(v==='record') renderRecordForm();
@@ -852,6 +862,7 @@
   function bindRouteButtons(root=document){
     $$('[data-go-route]',root).forEach(b=>b.onclick=()=>{
       const route=b.dataset.goRoute;
+      if(route===ROUTES.backlog){state.backlogFilter={month:b.dataset.backlogMonth||'',module:'',kind:'',owner:''};}
       if(route===ROUTES.platelet.record) state.currentRecordId=null;
       if(route===ROUTES.plasma.record) state.currentPlasmaRecordId=null;
       if(route===ROUTES.rbc.record) state.currentRbcRecordId=null;
@@ -1276,6 +1287,69 @@
     $$('.review-open',$('#view-review')).forEach(b=>b.onclick=()=>b.dataset.module==='plasma'?openPlasmaDetail(b.dataset.id):b.dataset.module==='rbc'?openRbcDetail(b.dataset.id):openDetail(b.dataset.id));
   }
 
+  // Backlog is derived from persisted records, not a new mutable list.
+  function backlogRefDate(ym,slot,module){return ym+'-'+String(module==='platelet'&&slot===1?1:plateletWeekRange(ym,slot)[0]).padStart(2,'0');}
+  function backlogCanExplain(module,type){return module==='rbc'?rbcUsesFilterDate(type):module==='platelet'&&/^(LDPPC|SDP)(\s|$)/i.test(type);}
+  function backlogToday(){return inputFromISO(new Date().toISOString()).slice(0,10);}
+  function backlogMonths(start,end){const out=[];if(!/^20\d\d-(0[1-9]|1[0-2])$/.test(start||''))return out;let d=new Date(start+'-01T00:00:00Z');while(d.toISOString().slice(0,7)<=end){out.push(d.toISOString().slice(0,7));d.setUTCMonth(d.getUTCMonth()+1);}return out;}
+  function backlogSources(){return [{module:'platelet',rows:state.records,products:activePlateletTrackingProducts(),ready:true},{module:'plasma',rows:state.plasmaRecords,products:activePlasmaProducts(),ready:state.plasmaReady},{module:'rbc',rows:state.rbcRecords,products:activeRbcProducts(),ready:state.rbcReady}].filter(x=>x.ready);}
+  function backlogDate(module,r){return module==='platelet'?plateletDateFromRecord(r):qcRecordTrackingDate(module,r);}
+  function buildBacklog(today=backlogToday()){
+    const jobs=[],starts=[],end=today.slice(0,7);
+    for(const src of backlogSources()){
+      const {module,rows,products}=src,live=rows.filter(r=>!r.deleted_at);
+      for(const p of products){const type=p.product_type,typed=live.filter(r=>r.product_type===type),events=state.plateletWeeklyEvents.filter(e=>e.product_type===type&&backlogCanExplain(module,type));
+        const observed=[...typed.map(r=>backlogDate(module,r)||String(r.manufactured_on||'')).filter(Boolean),...events.map(e=>e.event_date)].map(x=>String(x).slice(0,7)).filter(x=>/^20\d\d-(0[1-9]|1[0-2])$/.test(x)&&x<=end).sort();
+        const configured=C.QC_BACKLOG_START_BY_PRODUCT?.[type]||C.QC_BACKLOG_START_MONTH;const start=configured||observed[0];if(!start)continue;starts.push(start);
+        for(const ym of backlogMonths(start,end)){
+          const monthRows=typed.filter(r=>monthKeyFromDateString(backlogDate(module,r))===ym);
+          for(let slot=1;slot<=4;slot++){
+            const ref=backlogRefDate(ym,slot,module);if(ref>today)continue;
+            const deadline=ym+'-'+String(plateletWeekRange(ym,slot)[1]).padStart(2,'0');
+            const wk=module==='platelet'?plateletWeeklySummary(ym,type)[slot-1]:null;
+            const qc=wk?wk.qc:qcRecordsByProductionWeek(ym,monthRows,module).weeks[slot-1].records;
+            const evidence=backlogCanExplain(module,type)?plateletNoPoolInSlot(ym,slot,type):[];
+            const base={module,type,ym,slot,deadline,overdue:today>deadline};
+            if(!qc.length&&!evidence.some(e=>e.reviewed_at)){
+              if(evidence.length)jobs.push({...base,kind:'ack',event:evidence[0],label:'รอแพทย์รับทราบคำชี้แจง'});
+              else jobs.push({...base,kind:'missing',record:wk?.first||null,label:wk?.first?'มีถุง แต่ยังไม่ได้เลือก QC':'ยังไม่ได้เก็บ QC'});
+            }
+          }
+        }
+      }
+      for(const r of live){
+        const date=backlogDate(module,r)||String(r.manufactured_on||r.created_at||'').slice(0,10),ym=date.slice(0,7);if(!/^20\d\d-\d\d$/.test(ym)||date>today)continue;
+        const slot=(module==='platelet'?plateletTrackingWeekSlot(date):plateletWeekSlot(date)),base={module,type:r.product_type,ym,slot,record:r,overdue:false};
+        if(module==='rbc'&&rbcUsesFilterDate(r.product_type)&&(!r.filtered_on||rbcAgeDays(r)==null||rbcAgeDays(r)<0)){jobs.push({...base,kind:'result',label:'รอตรวจสอบวันที่เจาะเก็บ / วันที่กรอง'});continue;}
+        if(module==='platelet'){const tasks=plateletMeasurementTasks(r).filter(t=>t.level!=='upcoming');if(tasks.length)jobs.push({...base,kind:'result',label:tasks.map(t=>t.label||t.title||'รอผลตรวจ/pH').join(' · ')});}
+        else if(module==='plasma'&&(!r.outlab_batch_id||r.factor_viii_percent==null||r.qc_status==='incomplete'))jobs.push({...base,kind:'result',label:!r.outlab_batch_id?'รอจัดชุดนำส่ง':r.factor_viii_percent==null?'รอผล Factor VIII':'ข้อมูล QC ยังไม่ครบ'});
+        else if(module==='rbc'&&rbcEligible(r)&&rbcEffectiveQcStatus(r)==='incomplete')jobs.push({...base,kind:'result',label:'ข้อมูล QC ยังไม่ครบ'});
+        if(r.status==='submitted'&&(module!=='platelet'||r.record_purpose==='qc'))jobs.push({...base,kind:'review',label:'รอแพทย์ตรวจทวน'});
+        else if(r.status==='draft'&&(module==='platelet'?r.record_purpose==='qc'&&plateletMeasurementsComplete(r):module==='plasma'?r.factor_viii_percent!=null&&r.qc_status!=='incomplete':rbcEligible(r)&&rbcEffectiveQcStatus(r)!=='incomplete'))jobs.push({...base,kind:'submit',label:'รอส่งแพทย์ตรวจทวน'});
+      }
+    }
+    return {jobs:jobs.sort((a,b)=>a.ym.localeCompare(b.ym)||(a.slot||0)-(b.slot||0)||a.type.localeCompare(b.type)),starts:starts.sort()};
+  }
+  function backlogApplyNewContext(module,host){const j=state.backlogNewContext;if(!j||j.module!==module)return;state.backlogNewContext=null;const id={platelet:'product_type',plasma:'plasma_product_type',rbc:'rbc_product_type'}[module],el=$('#'+id);if(el){el.value=j.type;el.dispatchEvent(new Event('change',{bubbles:true}));el.dispatchEvent(new Event('input',{bubbles:true}));}const dateEl=$('#'+({platelet:'collection_at',plasma:'plasma_manufactured_on',rbc:rbcUsesFilterDate(j.type)?'rbc_filtered_on':'rbc_manufactured_on'}[module]));if(dateEl){dateEl.value='';dateEl.dispatchEvent(new Event('change',{bubbles:true}));}if(module==='platelet'){const option=$('input[name="record_purpose"][value="qc"]');if(option){option.checked=true;option.dispatchEvent(new Event('change',{bubbles:true}));}}host.insertAdjacentHTML('afterbegin',`<div class="notice info">งานย้อนหลัง: ${esc(plateletMonthLabel(j.ym))} · ${esc(plateletWeekLabel(j.ym,j.slot))} · ${esc(j.type)} · กรุณากรอกวันที่จริงจากหลักฐาน ห้ามใช้วันที่สมมติ</div>`);}
+  function backlogMonthCounts(jobs){const counts={};for(const j of jobs)counts[j.ym]=(counts[j.ym]||0)+1;return counts;}
+  function updateBacklogBadge(){const el=$('#backlogCount');if(el){const n=buildBacklog().jobs.length;el.textContent=n||'';}}
+  function backlogHomeHtml(){const {jobs,starts}=buildBacklog(),counts=backlogMonthCounts(jobs);return `<div class="panel"><div class="section-title-row"><div><h2>ติดตามงาน QC ค้างทั้งหมด</h2><p class="muted small">รวมเดือนย้อนหลัง · ไม่หายเมื่อเปลี่ยนเดือน</p></div><span class="badge review">${jobs.length} งาน</span></div><div class="actions left-actions">${Object.entries(counts).map(([ym,n])=>`<button class="btn" data-go-route="#/backlog" data-backlog-month="${esc(ym)}">${esc(plateletMonthLabel(ym))} · ${n}</button>`).join('')}<button class="btn primary" data-go-route="#/backlog">เปิดงานทั้งหมด</button></div><p class="muted small">${starts.length?'เริ่มจากข้อมูลที่พบของแต่ละชนิด':'ยังไม่มีข้อมูลสำหรับกำหนดเดือนเริ่มต้น'}${!state.plateletWeeklyReady?' · ไม่สามารถโหลดหลักฐานรายสัปดาห์':''}</p></div>`;}
+  async function renderBacklog(refresh=false){
+    const host=$('#view-backlog');if(!host)return;
+    if(refresh){host.innerHTML='<div class="panel">กำลังตรวจสอบงานย้อนหลัง...</div>';try{await Promise.all([loadRecords(),loadPlateletWeeklyData(),reloadPlasmaRecords(),reloadRbcRecords()]);}catch(e){host.innerHTML=`<div class="notice warning">โหลดข้อมูลไม่สำเร็จ: ${esc(errText(e))}</div>`;return;}if(state.currentView!=='backlog')return;}
+    const {jobs,starts}=buildBacklog(),counts=backlogMonthCounts(jobs),f=state.backlogFilter||(state.backlogFilter={month:'',module:'',kind:'',owner:''});
+    const months=Object.keys(counts);if(f.month&&!months.includes(f.month))f.month='';
+    const selection=jobs.filter(j=>(!f.month||j.ym===f.month)&&(!f.module||j.module===f.module)&&(!f.kind||j.kind===f.kind));
+    const owner=j=>j.slot?plannedOwnerRow(j.ym,j.slot,j.module,j.type)?.staff_nickname||'': '';
+    const options=(arr,value)=>arr.map(([v,l])=>`<option value="${esc(v)}" ${v===value?'selected':''}>${esc(l)}</option>`).join('');
+    const names=[...new Set(selection.map(owner).filter(Boolean))].sort();
+    const visible=selection.filter(j=>!f.owner||owner(j)===f.owner);
+    host.innerHTML=`<div class="page-head"><div><h1>ติดตามงาน QC ค้างทั้งหมด</h1><p class="muted">${jobs.length} งาน · ${months.length} เดือน · รวมเดือนปัจจุบันและย้อนหลัง</p></div><div class="actions"><button class="btn" id="backlogRefresh">โหลดใหม่</button><button class="btn" data-go-route="#/nonconformance">Corrective Action</button></div></div><div class="panel"><h2>เดือนที่ยังไม่ครบ</h2><div class="actions left-actions">${months.map(ym=>`<button class="btn backlog-month" data-month="${esc(ym)}">${esc(plateletMonthLabel(ym))} · ${counts[ym]} งาน</button>`).join('')||'ไม่พบงานค้างจากข้อมูลที่โหลด'}</div><p class="muted small">เริ่มตรวจจากเดือนแรกที่พบของแต่ละผลิตภัณฑ์ (${esc(starts[0]||'ไม่ทราบ')}) หรือเดือนเริ่มต้นที่กำหนดใน config.js · ไม่สร้างงานสัปดาห์อนาคต · ${!state.plateletWeeklyReady?'คำเตือน: โหลดหลักฐานไม่ได้ · ':''}${!state.plasmaReady||!state.rbcReady?'คำเตือน: บางโมดูลโหลดไม่ได้ · ':''}ใช้รายการตามสิทธิ์ฐานข้อมูลของบัญชีนี้</p></div><div class="panel"><div class="form-grid"><div class="field"><label>เดือน</label><select id="blMonth">${options([['','ทุกเดือน'],...months.map(m=>[m,plateletMonthLabel(m)])],f.month)}</select></div><div class="field"><label>ผลิตภัณฑ์</label><select id="blModule">${options([['','ทุกกลุ่ม'],['platelet','Platelet'],['plasma','Plasma'],['rbc','RBC']],f.module)}</select></div><div class="field"><label>สถานะ</label><select id="blKind">${options([['','ทุกสถานะ'],['missing','ยังไม่ได้เก็บ'],['result','รอผล / ข้อมูล'],['submit','รอส่งแพทย์'],['ack','รอแพทย์รับทราบ'],['review','รอแพทย์ตรวจทวน']],f.kind)}</select></div><div class="field"><label>ผู้รับผิดชอบตามแผน</label><select id="blOwner">${options([['','ทุกคน'],...names.map(n=>[n,n])],f.owner)}</select></div></div><p class="muted small">แสดง ${visible.length} งาน · ${selection.filter(j=>j.kind==='missing'&&j.overdue).length} งานเก็บ QC เลยกำหนด</p><div class="platelet-week-popup-list">${visible.map((j,i)=>`<div class="platelet-week-popup-row ${j.kind==='missing'&&j.overdue?'pending':''}"><div><strong>${esc(j.type)} · ${esc(plateletMonthLabel(j.ym))}</strong><small>${j.slot?esc(j.module==='platelet'?plateletTrackingWeekLabel(j.ym,j.slot):plateletWeekLabel(j.ym,j.slot)):'ไม่อยู่ในรอบสัปดาห์'} · ${esc(j.slot?plannedOwnerText(j.ym,j.slot,j.module,j.type):'รอตรวจสอบวันที่')}</small><small>${esc(j.label)}${j.kind==='missing'?(j.overdue?' · เลยกำหนด':' · สัปดาห์นี้'):''}${j.record?' · '+esc(j.record.product_no)+' · ผู้สร้าง '+esc(profileName(j.record.created_by)):''}</small></div><div class="platelet-week-popup-actions">${j.event?`<button class="btn tiny-btn bl-action" data-i="${i}" data-action="evidence">ดูหลักฐาน</button>`:j.record?`<button class="btn tiny-btn bl-action" data-i="${i}" data-action="record">เปิดรายการ</button>`:staffWriteUi()?`<button class="btn tiny-btn bl-action" data-i="${i}" data-action="new">บันทึก QC</button>`:''}${j.kind==='missing'&&!j.record&&staffWriteUi()&&backlogCanExplain(j.module,j.type)?`<button class="btn tiny-btn bl-action" data-i="${i}" data-action="explain">ชี้แจง / แนบหลักฐาน</button>`:''}</div></div>`).join('')||'<div class="empty">ไม่มีงานตามตัวกรอง</div>'}</div></div>`;
+    $('#backlogRefresh').onclick=()=>{state.staffPlannerOwnersByMonth={};state.backlogPlannerLoading=new Set();renderBacklog(true);};for(const [id,key] of [['blMonth','month'],['blModule','module'],['blKind','kind'],['blOwner','owner']])$('#'+id).onchange=e=>{f[key]=e.target.value;if(key!=='owner')f.owner='';renderBacklog();};$$('.backlog-month',host).forEach(b=>b.onclick=()=>{f.month=b.dataset.month;f.owner='';renderBacklog();});
+    $$('.bl-action',host).forEach(b=>b.onclick=()=>{const j=visible[Number(b.dataset.i)],action=b.dataset.action;if(action==='evidence')return viewPlateletWeeklyEvidence(j.event.id);if(action==='explain')return openPlateletNoPoolDialog(j.module==='rbc'?j.type:null,backlogRefDate(j.ym,j.slot,j.module),j.module==='platelet'?j.type:null);if(action==='record'&&(j.kind==='review'||j.record.status!=='draft'||!staffWriteUi()))return j.module==='platelet'?openDetail(j.record.id):j.module==='plasma'?openPlasmaDetail(j.record.id):openRbcDetail(j.record.id);const key={platelet:'currentRecordId',plasma:'currentPlasmaRecordId',rbc:'currentRbcRecordId'}[j.module];state[key]=j.record?.id||null;state.backlogNewContext=j.record?null:j;location.hash=ROUTES[j.module].record;});
+    bindRouteButtons(host);updateBacklogBadge();const missing=[...new Set(selection.map(j=>j.ym))].filter(m=>!Array.isArray(state.staffPlannerOwnersByMonth[m])&&!state.backlogPlannerLoading?.has(m));if(missing.length){state.backlogPlannerLoading ||= new Set();for(const m of missing)state.backlogPlannerLoading.add(m);for(const m of missing)await loadStaffPlannerOwners(m);if(state.currentView==='backlog')renderBacklog();}
+  }
+
   function renderHome(){
     const rec=state.records.filter(r=>!r.deleted_at);
     const month=rec.filter(r=>r.collection_at && r.collection_at>=firstOfMonthISO());
@@ -1295,7 +1369,8 @@
       ${state.nonconformanceReady?`<div class="panel nc-home-panel"><div class="section-title-row"><div><h2>QC ไม่ผ่าน / Corrective Action</h2><p class="muted small">Platelet · Plasma · RBC ใช้ขั้นตอนเดียวกัน</p></div><span class="badge review">${pendingQcFailures().length+state.nonconformances.filter(n=>n.status!=='closed').length}</span></div><div class="actions left-actions"><button class="btn ${pendingQcFailures().length?'primary':''}" data-go-route="#/nonconformance">เปิดจัดการ QC ไม่ผ่าน</button></div></div>`:''}
       ${reviewerUi()?`<div class="panel review-home-panel"><div class="section-title-row"><h2>งานรอตรวจทวน</h2><span class="badge submitted">${pendingReviewRecords().length}</span></div><div class="actions left-actions"><button class="btn primary" data-go-route="#/review">เปิดงานรอตรวจทวน</button></div></div>`:''}
       ${adminUi()?`<div class="panel core-admin-panel"><h2>Admin</h2><div class="actions left-actions"><button class="btn" data-go-route="#/admin/users">ผู้ใช้งานระบบ</button><button class="btn" data-go-route="#/admin/audit">ประวัติการใช้งาน</button></div></div>`:''}`;
-    bindRouteButtons($('#view-home'));
+    $('#view-home').insertAdjacentHTML('beforeend',backlogHomeHtml());
+    bindRouteButtons($('#view-home')); updateBacklogBadge();
   }
 
   function futureModuleCard(module,label){
@@ -1454,8 +1529,9 @@
       }
       if(w.status==='no_pool')return `<div class="platelet-week-popup-row no_pool"><div><strong>${esc(label)}</strong><small>${esc(owner)} · สัปดาห์นี้ไม่มีผลิตภัณฑ์ · ${w.noPool.some(e=>e.reviewed_at)?"แพทย์รับทราบแล้ว":"รอแพทย์รับทราบ"}</small></div><div class="platelet-week-popup-actions"><span class="badge draft">ไม่มีผลิตภัณฑ์</span><button type="button" class="btn tiny-btn weekly-evidence-view" data-event-id="${w.noPool[0].id}">ดูหลักฐาน</button></div></div>`;
       const first=w.first,canPromote=first&&first.status==='draft'&&staffWriteUi();
-      return `<div class="platelet-week-popup-row pending"><div><strong>${esc(label)}</strong><small>${esc(owner)}${first?` · ถุงแรก ${esc(first.product_no)} ยังไม่ได้เลือกเป็น QC`:' · ยังไม่มีถุงในสัปดาห์นี้'}</small></div><div class="platelet-week-popup-actions"><span class="badge incomplete">ยังไม่ได้เก็บ QC</span>${canPromote?`<button type="button" class="btn tiny-btn platelet-week-first" data-id="${esc(first.id)}">เปิดถุงแรก</button>`:''}</div></div>`;
+      return `<div class="platelet-week-popup-row pending"><div><strong>${esc(label)}</strong><small>${esc(owner)}${first?` · ถุงแรก ${esc(first.product_no)} ยังไม่ได้เลือกเป็น QC`:' · ยังไม่มีถุงในสัปดาห์นี้'}</small></div><div class="platelet-week-popup-actions"><span class="badge incomplete">ยังไม่ได้เก็บ QC</span>${canPromote?`<button type="button" class="btn tiny-btn platelet-week-first" data-id="${esc(first.id)}">เปิดถุงแรก</button>`:''}${staffWriteUi()&&!first&&backlogCanExplain('platelet',productType)?`<button class="btn tiny-btn platelet-week-explain" data-slot="${w.slot}">ชี้แจง / แนบหลักฐาน</button>`:''}</div></div>`;
     }).join('')}</div><p class="muted small" style="margin-top:10px">เก็บตัวอย่าง QC กับตรวจผลครบเป็นคนละขั้นตอน · ถุงที่ผลิตก่อนวันจันทร์แรกของเดือนให้นับในสัปดาห์ที่ 1 โดยผู้รับผิดชอบยังยึดตาราง Staff Planner</p><div class="actions platelet-week-popup-footer"><button type="button" class="btn" id="plateletWeekPopupClose">ปิด</button></div>`;
+    $$('.platelet-week-explain',$('#detailBody')).forEach(b=>b.onclick=()=>{dlg.close();openPlateletNoPoolDialog(null,backlogRefDate(ym,Number(b.dataset.slot),'platelet'),productType);});
     $$('.platelet-week-first',$('#detailBody')).forEach(b=>b.onclick=()=>{dlg.close();state.currentRecordId=b.dataset.id;switchView('record');});
     $$('.weekly-evidence-view',$('#detailBody')).forEach(b=>b.onclick=()=>viewPlateletWeeklyEvidence(b.dataset.eventId));
     $('#plateletWeekPopupClose').onclick=()=>$('#detailDialog').close();
@@ -1467,10 +1543,10 @@
     const event=state.plateletWeeklyEvents.find(e=>e.id===eventId);const dlg=ensureDetailDialogShell();$('#detailTitle').textContent='หลักฐานไม่มีผลิตภัณฑ์สัปดาห์นี้';$('#detailSubtitle').textContent=`${event?.event_date||''} · ${event?.product_type||''} · ${event?.note||''} · ${rows.length} ไฟล์`;
     $('#detailBody').innerHTML=`<div class="evidence-list">${rows.map(e=>`<div class="evidence-item"><span class="name evidence-name"><strong>${esc(e.original_name)}</strong><small>${esc(profileName(e.uploaded_by))} · ${esc(dateTH(e.created_at))}</small></span><button type="button" class="btn small-btn weekly-evidence-file" data-id="${e.id}">ดู</button></div>`).join('')}</div><div class="actions platelet-week-popup-footer">${reviewerUi()&&!event?.reviewed_at?'<button type="button" class="btn primary" id="weeklyAcknowledge">แพทย์รับทราบ</button>':''}<button type="button" class="btn" id="weeklyEvidenceClose">ปิด</button></div>`;
     $$('.weekly-evidence-file',$('#detailBody')).forEach(b=>b.onclick=async()=>{const e=rows.find(x=>x.id===b.dataset.id);if(!e)return;const {data,error}=await state.sb.storage.from('bloodqc-evidence').createSignedUrl(e.storage_path,120);if(error){showToast(errText(error),'error');return;}window.open(data.signedUrl,'_blank','noopener');});
-    $('#weeklyAcknowledge')?.addEventListener('click',async()=>{const {error}=await state.sb.rpc('qc_ack_weekly_event',{p_id:eventId});if(error){showToast(errText(error),'error');return;}await reloadPlateletWeeklyData();dlg.close();showToast('บันทึกแพทย์รับทราบแล้ว','good');if(reviewerUi())renderReviewQueue();else renderDashboard();});$('#weeklyEvidenceClose').onclick=()=>dlg.close();if(!dlg.open)dlg.showModal();
+    $('#weeklyAcknowledge')?.addEventListener('click',async()=>{const {error}=await state.sb.rpc('qc_ack_weekly_event',{p_id:eventId});if(error){showToast(errText(error),'error');return;}await reloadPlateletWeeklyData();dlg.close();showToast('บันทึกแพทย์รับทราบแล้ว','good');if(state.currentView==='backlog')renderBacklog();else if(state.currentView==='home')renderHome();else if(reviewerUi())renderReviewQueue();else renderDashboard();});$('#weeklyEvidenceClose').onclick=()=>dlg.close();if(!dlg.open)dlg.showModal();
   }
 
-  async function openPlateletNoPoolDialog(rbcType=null,referenceDate=null){
+  async function openPlateletNoPoolDialog(rbcType=null,referenceDate=null,plateletType=null){
     if(!staffWriteUi()||!state.plateletWeeklyReady){showToast('กรุณา Run SQL v5.3.9 ก่อนใช้งานบันทึกไม่มีผลิตภัณฑ์สัปดาห์นี้','error');return;}
     let selectedFiles=[];
     const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -1479,6 +1555,8 @@
     $('#detailSubtitle').textContent='ใช้เมื่อสัปดาห์นั้นไม่มี Pool Platelet หรือไม่มี SDP และต้องมีหลักฐานจาก Ai-LIS';
     $('#detailBody').innerHTML=`<div class="panel no-pool-dialog-panel"><div class="form-grid"><div class="field"><label class="required">วันที่อ้างอิงในสัปดาห์</label><input id="noPoolDate" type="date" value="${esc(referenceDate||today)}"></div><div class="field"><label class="required">ชนิดผลิตภัณฑ์</label><select id="noPoolProduct"><option value="">เลือก</option>${(rbcType?[{product_type:rbcType}]:activePlateletTrackingProducts()).map(x=>`<option value="${esc(x.product_type)}">${esc(x.product_type)}</option>`).join('')}</select></div><div class="field span2"><label>รายละเอียด / เหตุผล</label><input id="noPoolNote" placeholder="เช่น ไม่มี SDP / ไม่มีถุงให้ Pool Platelet"></div><div class="field span2"><small class="muted">ระบบจะจัดข้อมูลเข้า สัปดาห์ 1–4 ตามรอบวันจันทร์แรกของเดือน เพื่อให้ตรงกับ Staff Planner</small></div></div><div class="measurement-evidence"><div class="measurement-evidence-head"><div><strong>หลักฐานจาก Ai-LIS ว่าไม่มีผลิตภัณฑ์สัปดาห์นี้</strong><small class="evidence-multi-hint">แนบได้หลายไฟล์: รูปภาพ, PDF, XLS, XLSX หรือ CSV</small></div><span class="section-badge required-evidence">บังคับ</span></div><div class="muted small">ใช้ภาพแคปจาก Ai-LIS หรือไฟล์ที่ Export จาก Ai-LIS เพื่อยืนยันว่าไม่มี Pool Platelet / ไม่มี SDP ในสัปดาห์นั้น</div><input class="hidden-file-input" type="file" id="noPoolCamera" accept="image/*" capture="environment"><input class="hidden-file-input" type="file" id="noPoolFile" accept="image/*,application/pdf,.xls,.xlsx,.csv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple><div class="evidence-pick-actions"><button type="button" class="btn primary small-btn" id="noPoolCameraBtn">ถ่ายรูป</button><button type="button" class="btn small-btn" id="noPoolFileBtn">เลือกรูป / Excel / CSV <span class="multi-file-label">หลายไฟล์ได้</span></button></div><div id="noPoolSelected" class="muted small">ยังไม่ได้เลือกหลักฐาน</div></div></div><div class="actions platelet-week-popup-footer"><button class="btn" id="noPoolCancel">ยกเลิก</button><button class="btn primary" id="noPoolSave">บันทึกสถานะนี้</button></div>`;
     dlg.showModal();
+    if(plateletType){$('#noPoolProduct').value=plateletType;$('#noPoolProduct').disabled=true;}
+    if(referenceDate)$('#noPoolDate').readOnly=true;
     if(rbcType){$('#noPoolNote').closest('.field').insertAdjacentHTML('beforebegin','<div class="field"><label>เหตุผลหลัก</label><select id="rbcNoReason"><option value="none">ไม่มีการกรอง</option><option value="old">กรองเลือดเกิน 7 วัน</option></select></div><div class="field"><label>Unit No. (บังคับเมื่อกรองเกิน 7 วัน)</label><input id="rbcNoUnit"></div>');$('#noPoolProduct').value=rbcType;$('#noPoolProduct').disabled=true;$('#detailSubtitle').textContent="ไม่มีการกรอง / ไม่มีเลือดอายุ 0–7 วันให้เก็บ QC · ระบุเลข Unit ถ้ามีการกรองเลือดเกิน 7 วัน";}
     const setFiles=files=>{const incoming=Array.from(files||[]);for(const f of incoming){if(!selectedFiles.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified))selectedFiles.push(f);}$('#noPoolSelected').innerHTML=selectedFiles.length?`เลือกแล้ว ${selectedFiles.length} ไฟล์<br>${selectedFiles.map(f=>esc(f.name)).join('<br>')}`:'ยังไม่ได้เลือกหลักฐาน';};
     $('#noPoolCameraBtn').onclick=()=>$('#noPoolCamera').click();$('#noPoolFileBtn').onclick=()=>$('#noPoolFile').click();
@@ -1486,7 +1564,7 @@
     $('#noPoolCancel').onclick=()=>dlg.close();
     $('#noPoolSave').onclick=async()=>{
       if(!qcDateGuard())return;const eventDate=$('#noPoolDate').value,productType=$('#noPoolProduct').value;let note=$('#noPoolNote').value.trim()||null;if(rbcType){const old=$('#rbcNoReason').value==='old',unit=$('#rbcNoUnit').value.trim();if(old&&!unit){showToast('ระบุ Unit No. ที่กรองเกิน 7 วัน','error');return;}if(note)note=(old?'กรองเลือดเกิน 7 วัน · Unit '+unit:'ไม่มีการกรอง')+' · '+note;}
-      if(!eventDate){showToast('กรุณาระบุวันที่อ้างอิงในสัปดาห์','error');return;}if(!productType){showToast('กรุณาเลือกชนิดผลิตภัณฑ์','error');return;}const eventSlot=rbcType?plateletWeekSlot(eventDate):plateletTrackingWeekSlot(eventDate);if(!eventSlot){const ym=eventDate.slice(0,7),[start]=plateletWeekRange(ym,1);showToast(`สัปดาห์ที่ 1 ของเดือนนี้เริ่มวันที่ ${start}/${ym.slice(5,7)} กรุณาเลือกวันที่ตั้งแต่สัปดาห์ที่ 1 เป็นต้นไป`,'error');return;}if(!note){showToast('กรุณาระบุเหตุผล','error');return;}if(!selectedFiles.some(f=>f.type.startsWith('image/')||/\.(png|jpe?g|webp|heic|heif)$/i.test(f.name))){showToast('ต้องแนบภาพจาก Ai-LIS อย่างน้อย 1 รูป','error');return;}const tooBig=selectedFiles.find(f=>f.size>10*1024*1024);if(tooBig){showToast(`${tooBig.name}: ไฟล์ต้องไม่เกิน 10 MB`,'error');return;}
+      if(!eventDate){showToast('กรุณาระบุวันที่อ้างอิงในสัปดาห์','error');return;}if(!productType){showToast('กรุณาเลือกชนิดผลิตภัณฑ์','error');return;}const eventSlot=rbcType?plateletWeekSlot(eventDate):plateletTrackingWeekSlot(eventDate);if(!eventSlot){const ym=eventDate.slice(0,7),[start]=plateletWeekRange(ym,1);showToast(`สัปดาห์ที่ 1 ของเดือนนี้เริ่มวันที่ ${start}/${ym.slice(5,7)} กรุณาเลือกวันที่ตั้งแต่สัปดาห์ที่ 1 เป็นต้นไป`,'error');return;}if(plateletNoPoolInSlot(eventDate.slice(0,7),eventSlot,productType).length){showToast('มีคำชี้แจงในสัปดาห์นี้แล้ว กรุณาเปิดหลักฐานเดิม','error');return;}if(!note){showToast('กรุณาระบุเหตุผล','error');return;}if(!selectedFiles.some(f=>f.type.startsWith('image/')||/\.(png|jpe?g|webp|heic|heif)$/i.test(f.name))){showToast('ต้องแนบภาพจาก Ai-LIS อย่างน้อย 1 รูป','error');return;}const tooBig=selectedFiles.find(f=>f.size>10*1024*1024);if(tooBig){showToast(`${tooBig.name}: ไฟล์ต้องไม่เกิน 10 MB`,'error');return;}
       try{
         const {data:event,error:eventErr}=await state.sb.from('platelet_weekly_events').insert({event_date:eventDate,product_type:productType,event_type:'no_pool',note,created_by:state.user.id}).select('*').single();if(eventErr)throw eventErr;
         const uploadedPaths=[];
@@ -1497,7 +1575,7 @@
             const {error:ferr}=await state.sb.from('platelet_weekly_evidence_files').insert({event_id:event.id,storage_path:path,original_name:file.name,mime_type:pf.mime,file_size:pf.body.size,uploaded_by:state.user.id});if(ferr)throw ferr;
           }
         }catch(uploadErr){if(uploadedPaths.length)await state.sb.storage.from('bloodqc-evidence').remove(uploadedPaths);await state.sb.from('platelet_weekly_evidence_files').delete().eq('event_id',event.id);await state.sb.from('platelet_weekly_events').delete().eq('id',event.id);throw uploadErr;}
-        await reloadPlateletWeeklyData();dlg.close();showToast(`บันทึกไม่มีผลิตภัณฑ์สัปดาห์นี้พร้อมหลักฐาน ${selectedFiles.length} ไฟล์แล้ว`,'good');if(rbcType)renderRbcDashboard();else renderDashboard();
+        await reloadPlateletWeeklyData();dlg.close();showToast(`บันทึกไม่มีผลิตภัณฑ์สัปดาห์นี้พร้อมหลักฐาน ${selectedFiles.length} ไฟล์แล้ว`,'good');if(state.currentView==='backlog')renderBacklog();else if(state.currentView==='home')renderHome();else if(rbcType)renderRbcDashboard();else renderDashboard();
       }catch(e){showToast(errText(e),'error');}
     };
   }
@@ -1612,6 +1690,7 @@
     $$('.pool-pyi,.pool-unit').forEach(x=>x.addEventListener('input',updatePoolPreview));
     $('#recordGuideBtn').onclick=()=>switchView('guide'); if($('#recordNoPoolBtn')) $('#recordNoPoolBtn').onclick=()=>openPlateletNoPoolDialog(); $('#cancelEdit').onclick=()=>switchView('records'); if($('#clearForm')) $('#clearForm').onclick=clearNewRecordForm; if($('#saveDraft')) $('#saveDraft').onclick=()=>saveRecord(false); if($('#submitReview')) $('#submitReview').onclick=submitRecord; if($('#returnForCorrection')) $('#returnForCorrection').onclick=returnForCorrection; if($('#approveAndLock')) $('#approveAndLock').onclick=approveAndLock; if($('#unlockRecord')) $('#unlockRecord').onclick=unlockRecord;
     if(!r&&$('#collection_at')){$('#collection_at').addEventListener('change',()=>maybeAutoSelectPlateletQc());$('#collection_at').addEventListener('blur',()=>maybeAutoSelectPlateletQc());}
+    if(!r)backlogApplyNewContext('platelet',$('#view-record'));
     if(state.scrollToPlateletPh){state.scrollToPlateletPh=false;$('#plateletPhPanel')?.scrollIntoView({behavior:'smooth',block:'start'});if(editable)$('#ph_value')?.focus({preventScroll:true});}
   }
 
@@ -2336,7 +2415,7 @@ async function adminDeletePlasmaBatch(batchId,reason){
     $('#plasma_volume_unit')?.addEventListener('change',()=>{const cfg=plasmaProductSetting($('#plasma_product_type')?.value||'');qcVolumeSwitch('plasma_volume_unit','plasma_gross_weight_g','plasma_volume_input_label','previousUnit',cfg?num(cfg.tare_weight_g):null,cfg?num(cfg.density):null,updatePlasmaPreview);});
     ['plasma_product_type','plasma_gross_weight_g','plasma_factor_viii_percent','plasma_manufactured_on'].forEach(id=>$('#'+id)?.addEventListener('input',updatePlasmaPreview));
     $('#plasma_product_type')?.addEventListener('change',refreshPlasmaOwner);$('#plasma_manufactured_on')?.addEventListener('change',refreshPlasmaOwner);refreshPlasmaOwner();
-    $('#plasmaBack').onclick=()=>location.hash=ROUTES.plasma.records;if($('#plasmaClear'))$('#plasmaClear').onclick=async()=>{if(await qcConfirmCentered('ล้างฟอร์มทั้งหมด?',{title:'ล้างฟอร์ม FFP',acceptText:'ล้างข้อมูล'}))renderPlasmaRecordForm();};if($('#plasmaSave'))$('#plasmaSave').onclick=()=>savePlasmaRecord(false);if($('#plasmaSubmit'))$('#plasmaSubmit').onclick=submitPlasmaRecord;if($('#plasmaUnlock'))$('#plasmaUnlock').onclick=unlockPlasmaRecord;if($('#plasmaOpenBatch'))$('#plasmaOpenBatch').onclick=openPlasmaBatchBuilder;if($('#plasmaPrintBatch'))$('#plasmaPrintBatch').onclick=()=>printPlasmaOutlabBatch(batch.id);
+    $('#plasmaBack').onclick=()=>location.hash=ROUTES.plasma.records;if($('#plasmaClear'))$('#plasmaClear').onclick=async()=>{if(await qcConfirmCentered('ล้างฟอร์มทั้งหมด?',{title:'ล้างฟอร์ม FFP',acceptText:'ล้างข้อมูล'}))renderPlasmaRecordForm();};if($('#plasmaSave'))$('#plasmaSave').onclick=()=>savePlasmaRecord(false);if($('#plasmaSubmit'))$('#plasmaSubmit').onclick=submitPlasmaRecord;if($('#plasmaUnlock'))$('#plasmaUnlock').onclick=unlockPlasmaRecord;if($('#plasmaOpenBatch'))$('#plasmaOpenBatch').onclick=openPlasmaBatchBuilder;if($('#plasmaPrintBatch'))$('#plasmaPrintBatch').onclick=()=>printPlasmaOutlabBatch(batch.id);if(!r)backlogApplyNewContext('plasma',$('#view-module'));
   }
   function collectPlasmaRecord(){
     const adminReason=$('#plasma_admin_reason')?.value.trim()||null;return {product_no:$('#plasma_product_no').value.trim(),product_type:$('#plasma_product_type').value,blood_group:$('#plasma_group').value||null,manufactured_on:$('#plasma_manufactured_on').value||null,centrifuge_no:$('#plasma_centrifuge').value||null,prep_time:$('#plasma_prep_time').value||null,gross_weight_g:(()=>{const c=plasmaProductSetting($('#plasma_product_type')?.value||'');return qcVolumeInput($('#plasma_volume_unit'),$('#plasma_gross_weight_g'),c?num(c.tare_weight_g):null,c?num(c.density):null).gross;})(),volume_input_unit:qcVolumeUnit($('#plasma_volume_unit')?.value),volume_input_value:num($('#plasma_gross_weight_g')?.value),factor_viii_percent:num($('#plasma_factor_viii_percent').value),factor_tested_on:$('#plasma_factor_tested_on').value||null,notes:$('#plasma_notes').value.trim()||null,...(adminUi()&&state.currentPlasmaRecordId&&adminReason?{last_admin_edit_reason:adminReason,last_admin_edit_id:crypto.randomUUID()}:{} )};
@@ -2548,13 +2627,13 @@ function printPlasmaOutlabBatch(batchId){
       const [settingsRes,productsRes,recordsRes]=await Promise.all([
         state.sb.from('rbc_qc_settings').select('*').eq('id',1).single(),
         state.sb.from('rbc_product_settings').select('*').order('sort_order').order('product_type'),
-        state.sb.from('rbc_records').select('*').order('manufactured_on',{ascending:false}).order('created_at',{ascending:false}).limit(1500)
+        qcAllRows('rbc_records')
       ]);
       const firstError=[settingsRes.error,productsRes.error,recordsRes.error].find(Boolean);
       if(firstError) throw firstError;
       state.rbcSettings=settingsRes.data;
       state.rbcProductSettings=productsRes.data||[];
-      state.rbcRecords=(recordsRes.data||[]).map(qcNormalizeRow);
+      state.rbcRecords=(recordsRes.data||[]).map(qcNormalizeRow).sort((a,b)=>String(b.manufactured_on||'').localeCompare(String(a.manufactured_on||''))||String(b.created_at||'').localeCompare(String(a.created_at||'')));
       state.rbcMonthlyProduction=[];
       state.rbcReady=true;
     }catch(e){
@@ -2564,8 +2643,8 @@ function printPlasmaOutlabBatch(batchId){
   }
   async function reloadRbcRecords(){
     if(!state.rbcReady)return;
-    const {data,error}=await state.sb.from('rbc_records').select('*').order('manufactured_on',{ascending:false}).order('created_at',{ascending:false}).limit(1500);
-    if(error)throw error; state.rbcRecords=(data||[]).map(qcNormalizeRow); updateNcNavBadge();
+    const {data,error}=await qcAllRows('rbc_records');
+    if(error)throw error; state.rbcRecords=(data||[]).map(qcNormalizeRow).sort((a,b)=>String(b.manufactured_on||'').localeCompare(String(a.manufactured_on||''))||String(b.created_at||'').localeCompare(String(a.created_at||''))); updateNcNavBadge();
   }
   function renderRbcPage(page='dashboard'){
     if(!state.rbcReady){ $('#view-module').innerHTML=rbcModuleReadyNotice(); return; }
@@ -2828,7 +2907,7 @@ function printPlasmaOutlabBatch(batchId){
     ['pre_cbc','post_cbc','post_adam'].forEach(cat=>{$('#rbc_camera_'+cat)?.addEventListener('change',()=>uploadRbcEvidence(cat,'rbc_camera_'+cat));$('#rbc_file_'+cat)?.addEventListener('change',()=>uploadRbcEvidence(cat,'rbc_file_'+cat));});
     renderRbcEvidenceLists(editable,locked); updateRbcPreview();
     $('#rbcBack').onclick=()=>location.hash=ROUTES.rbc.records; if($('#rbcClear'))$('#rbcClear').onclick=async()=>{if(await qcConfirmCentered('ล้างฟอร์มทั้งหมด?',{title:'ล้างฟอร์ม RBC',acceptText:'ล้างข้อมูล'})){state.currentRbcRecordId=null;renderRbcRecordForm();}}; if($('#rbcSave'))$('#rbcSave').onclick=()=>saveRbcRecord(false); if($('#rbcSubmit'))$('#rbcSubmit').onclick=submitRbcRecord; if($('#rbcUnlock'))$('#rbcUnlock').onclick=unlockRbcRecord;
-    bindRouteButtons($('#view-module'));
+    bindRouteButtons($('#view-module'));if(!r)backlogApplyNewContext('rbc',$('#view-module'));
   }
   function collectRbcRecord(){
     const type=$('#rbc_product_type').value,ps=rbcProductSetting(type),adminReason=$('#rbc_admin_reason')?.value.trim()||null;
