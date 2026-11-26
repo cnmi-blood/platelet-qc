@@ -1,4 +1,4 @@
-/* CNMI Blood Component QC v5.3.60 — Prominent pH Pending & Schedule */
+/* CNMI Blood Component QC v5.3.61 — Balanced Dashboard & Smart Alerts */
 (() => {
   'use strict';
   const C = window.APP_CONFIG || {};
@@ -90,10 +90,10 @@
     if(route.module){
       const meta=MODULE_META[route.module];
       if(sub) sub.textContent=`${meta.title} · CNMI Blood Bank`;
-      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.60 · bloodqc.cnmiblood.com${route.hash}`;
+      if(footer) footer.textContent=`CNMI Blood Component QC · ${meta.label} · v5.3.61 · bloodqc.cnmiblood.com${route.hash}`;
     }else{
       if(sub) sub.textContent='Blood Component Preparation & QC · CNMI Blood Bank';
-      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.60 · bloodqc.cnmiblood.com';
+      if(footer) footer.textContent='CNMI Blood Component QC · v5.3.61 · bloodqc.cnmiblood.com';
     }
     document.title='Blood QC';
     document.body.dataset.qcPage=route.page||'';
@@ -875,6 +875,26 @@
       <p class="qc60-ph-note">รอวันวัด = งานที่ยังไม่เสร็จ แต่ยังไม่เลยกำหนด · ไม่ใช่ผล QC ไม่ผ่าน</p></section>`;
   }
 
+  // Home presentation only. Detailed Platelet page keeps its original reminder panel.
+  function homePhSmartPanel(records,today=bangkokTodayKey()){
+    const ph=plateletPhSummary(plateletPendingRows(records,today));
+    if(!ph.total)return '';
+    const tomorrow=new Date(today+'T00:00:00Z');tomorrow.setUTCDate(tomorrow.getUTCDate()+1);
+    const tomorrowKey=tomorrow.toISOString().slice(0,10);
+    const levelOf=x=>{const t=x.tasks.find(t=>t.key==='ph');return t.level==='upcoming'&&inputFromISO(x.r.expiry_at).slice(0,10)===tomorrowKey?'tomorrow':t.level;};
+    const rank={overdue:0,due:1,tomorrow:2,missing:3,upcoming:4};
+    const ordered=[...ph.rows].sort((a,b)=>rank[levelOf(a)]-rank[levelOf(b)]||String(a.r.expiry_at||'').localeCompare(String(b.r.expiry_at||'')));
+    const nextDay=ordered.filter(x=>levelOf(x)==='tomorrow').length;
+    const tone=ph.overdue?'overdue':ph.due?'due':nextDay?'tomorrow':ph.missing?'missing':'upcoming';
+    const counts=[['overdue',ph.overdue,'เลยกำหนด'],['due',ph.due,'วันนี้'],['tomorrow',nextDay,'พรุ่งนี้'],['upcoming',ph.upcoming-nextDay,'รอวันวัด'],['missing',ph.missing,'ไม่ระบุวันหมดอายุ']];
+    const rows=ordered.slice(0,2).map(x=>{
+      const {r}=x,t=x.tasks.find(t=>t.key==='ph'),level=levelOf(x),quick=plateletCanEnterPh(r);
+      const label=level==='tomorrow'?`พรุ่งนี้ · ${dateTH(r.expiry_at,false)}`:t.label;
+      return `<div class="qc61-ph-row ${level}"><button type="button" class="qc60-record record-link" data-id="${esc(r.id)}"><strong>${esc(r.product_no)}</strong><small>${esc(r.product_type)}</small></button><span class="qc61-ph-date ${level}">${esc(label)}</span>${quick?`<button type="button" class="btn platelet-ph-quick" data-id="${esc(r.id)}">บันทึก pH</button>`:`<button type="button" class="btn record-link" data-id="${esc(r.id)}">ดูรายการ</button>`}</div>`;
+    }).join('');
+    return `<section id="home-ph-pending" class="panel qc61-ph-smart ${tone}" aria-label="ติดตาม pH"><div class="qc61-ph-head"><div class="qc61-ph-heading"><span class="ui59-icon" data-ui-icon="clock" aria-hidden="true"></span><h2>รอวัด pH <b>${ph.total} ถุง</b></h2></div><div class="qc61-ph-counts">${counts.filter(([,n])=>n>0).map(([k,n,label])=>`<span class="qc61-ph-date ${k}">${n} ${label}</span>`).join('')}</div><button type="button" class="btn qc61-ph-all" data-go-route="#/platelet">ดูทั้งหมด${ph.total>2?` (${ph.total} ถุง)`:''} <span aria-hidden="true">›</span></button></div><div class="qc61-ph-rows">${rows}</div>${ph.total>2?`<p class="qc61-ph-more">อีก ${ph.total-2} ถุง · เปิดดูทั้งหมดในหน้า Platelet</p>`:''}</section>`;
+  }
+
   function bindRouteButtons(root=document){
     $$('[data-go-route]',root).forEach(b=>b.onclick=()=>{
       const route=b.dataset.goRoute;
@@ -1393,10 +1413,9 @@
     const homeJobs=buildBacklog().jobs;
     $('#view-home').innerHTML=`
       <div class="page-head"><div><h1>CNMI Blood Component QC</h1><p class="muted">ระบบบันทึกและควบคุมคุณภาพส่วนประกอบโลหิต</p></div></div>
-      ${plateletReminderPanel(rec,true)}
       ${homeSummaryHtml(homeJobs)}
       ${ui59TaskLinks(homeJobs)}
-      ${backlogHomeHtml(homeJobs)}
+      ${homePhSmartPanel(rec)}
       <div class="ui59-section-heading"><h2>ผลิตภัณฑ์และการบันทึก QC</h2><span>เลือกผลิตภัณฑ์เพื่อเริ่มงาน</span></div>
       <div class="module-grid">
         <article class="module-card active-module ui59-platelet">
@@ -1407,6 +1426,7 @@
         ${plasmaModuleCard()}
         ${rbcModuleCard()}
       </div>
+      ${backlogHomeHtml(homeJobs)}
 
       ${reviewerUi()?`<div class="panel review-home-panel"><div class="section-title-row"><h2>งานรอตรวจทวน</h2><span class="badge submitted">${pendingReviewRecords().length}</span></div><div class="actions left-actions"><button class="btn primary" data-go-route="#/review">เปิดงานรอตรวจทวน</button></div></div>`:''}
       ${adminUi()?`<div class="panel core-admin-panel"><h2>Admin</h2><div class="actions left-actions"><button class="btn" data-go-route="#/admin/users">ผู้ใช้งานระบบ</button><button class="btn" data-go-route="#/admin/audit">ประวัติการใช้งาน</button></div></div>`:''}`;
